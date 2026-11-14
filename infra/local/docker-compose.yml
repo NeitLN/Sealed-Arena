@@ -1,0 +1,19 @@
+# Local Sealed L1 network. Driven by scripts/localnet.sh; image built by chain/scripts/build.sh.
+name: sealed-localnet
+
+services:
+  node:
+    image: ${SEALED_IMAGE:-sealed-node:dev}
+    container_name: sealed-node
+    init: true
+    environment:
+      SEALED_NODE_COUNT: ${SEALED_NODE_COUNT:-1}
+      SEALED_GENESIS: /sealed/genesis/local.json
+    volumes:
+      - ../../chain/genesis:/sealed/genesis:ro
+      - data:/data
+    ports:
+      - "127.0.0.1:9650:9650"
+
+volumes:
+  data:

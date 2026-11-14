@@ -44,4 +44,41 @@ Mọi thay đổi vào mã nguồn avalanchego (đó là T02). Fuji. Precompile.
 - Nếu sau nửa ngày vẫn chưa dựng được mạng local theo cách nào, dừng và ghi rõ đã thử gì, lỗi gì. Không chuyển sang sửa mã nguồn để lách.
 
 ## Bàn giao
-(người code điền)
+
+### Kết quả "Phải kiểm trước khi làm"
+1. Go: `go 1.26.10` (`go.mod` dòng 18 ở tag `v1.15.3`). Repo dùng `go.work` gồm module gốc, `graft/coreth`, `graft/evm`, `graft/subnet-evm`. Image build dùng `golang:1.26.10-bookworm`.
+2. Build chính thức: `scripts/build.sh` ở gốc (avalanchego) và `graft/subnet-evm/scripts/build.sh <đường dẫn>` (plugin). Cả hai đọc commit từ biến `AVALANCHEGO_COMMIT` nếu có (`scripts/git_commit.sh`), nên build được khi không có thư mục `.git`. `graft/subnet-evm/Dockerfile` cần image node có sẵn và proxy module ngoại tuyến, nên không dùng trực tiếp.
+3. Cách dựng mạng: xét tmpnet qua mã Go, `run.sh` + tự tạo subnet, và `avalanche-cli`. Chọn tmpnet. Lý do và bằng chứng ở `docs/decisions/D3.md`. Mở rộng lên 3 node: được, đã chạy thử.
+
+### Đã làm
+- `chain/UPSTREAM`: repo, tag `v1.15.3`, commit `983815fd993acf846a27749b598f0fea4d876a75`, phiên bản Go. Hash được ghi cố định trong file này; `fetch.sh` **kiểm** tag khớp hash và dừng nếu lệch (thay vì ghi lại hash mới mỗi lần), để tag bị đổi phía upstream không lọt vào build.
+- `chain/scripts/fetch.sh`, `chain/scripts/apply-patches.sh` (chưa có bản vá; `chain/patches/.gitkeep`), `chain/scripts/build.sh`, `chain/Dockerfile`, `chain/.dockerignore`, `chain/entrypoint.sh`.
+- `chain/localnet/main.go`: công cụ `sealed-localnet` dùng tmpnet. Tạo mạng mới với subnet `sealed` chạy Subnet-EVM và genesis `chain/genesis/local.json`; hoặc khởi động lại mạng đã có trong volume. Ghi `/data/sealed.json` (thư mục mạng, subnet ID, blockchain ID, URI node, đường dẫn RPC).
+- `chain/genesis/local.json`: chain id `261126`, `feeConfig` với gasLimit 15.000.000 và minBaseFee 25 gwei, cấp coin cho tài khoản dev `0x8db9…52FC`. Không bật precompile nào.
+- `infra/local/docker-compose.yml`, `scripts/localnet.sh` (`up`, `down`, `status`, `rpc`), `chain/scripts/smoke.sh`, `docs/RUNBOOK.md`, `docs/decisions/D3.md`.
+
+### File ngoài mục "Sở hữu"
+- `chain/localnet/main.go`, `chain/entrypoint.sh`, `chain/.dockerignore`, `chain/patches/.gitkeep`: cần cho cách dựng đã chọn.
+- `chain/UPSTREAM` có dạng `KEY=VALUE` để script `source` được.
+- `docs/decisions/D3.md`, `docs/REFERENCE.md`: theo quy trình khi task trả lời một quyết định D.
+
+### Kết quả kiểm
+Môi trường: Windows 11, Git Bash, Docker 29.5.3, ngày 15/11/2026, nhánh `task/T01-build-node`.
+
+| Tiêu chí | Lệnh | Kết quả |
+|---|---|---|
+| Build từ máy sạch | xoá `chain/.work/` và image `sealed-node:dev`; `bash chain/scripts/fetch.sh && bash chain/scripts/build.sh --no-cache` | `PASS`: 154 giây tổng, `docker build` 147 giây. Build lần đầu trên máy (chưa có cache Go) 126 giây. Ghi chú: `--no-cache` bỏ cache tầng, còn cache module và cache biên dịch Go (cache mount) vẫn được giữ |
+| `up` rồi smoke | `bash scripts/localnet.sh up && bash chain/scripts/smoke.sh` | `PASS`: mạng sẵn sàng sau khoảng 11 giây; `eth_chainId` `0x3fc06`; chuyển 10^18 wei, receipt `0x1`, số dư người nhận đúng |
+| `down` dọn sạch | `bash scripts/localnet.sh down`, đếm container, volume, network | `PASS`: còn 0 container `sealed-node`, 0 volume, 0 network `sealed-localnet` |
+| Lặp lại `up` sau `down` | hai vòng `up` → smoke → `down` | `PASS` cả hai vòng |
+| Khởi động lại container | `docker restart sealed-node`, `up`, smoke | `PASS`, blockchain ID giữ nguyên |
+| Ba node (cho T06) | `SEALED_NODE_COUNT=3 bash scripts/localnet.sh up`, smoke, `platform.getCurrentValidators`, `info.peers` | `PASS`: 3 validator của subnet, node 1 có 2 peer |
+| `bash scripts/check.sh` | | ghi trong PR |
+
+### Ghi chú, việc phát hiện thêm (không làm trong task này)
+- Blockchain ID đổi mỗi lần dựng mạng mới. Service phải lấy URL bằng `scripts/localnet.sh rpc` hoặc đọc `/data/sealed.json`. Nếu T06 hay T07 cần ID cố định, có thể đặt alias chain cho node (cờ `chain-aliases` của avalanchego). Chưa kiểm.
+- tmpnet tạo subnet có cấp quyền, không chuyển thành L1 theo ACP-77. Quy tắc hợp lệ không bị ảnh hưởng, nhưng T12 phải kiểm luồng L1 thật trên Fuji (đã ghi **[cần kiểm T12]** trong D3).
+- Lỗi lúc làm: khi container khởi động lại, file `process.json` cũ khiến tmpnet tưởng node còn chạy. Đã xử lý bằng cách xoá các file này rồi gọi `StartNodes`. Có test thủ công ở dòng "Khởi động lại container".
+- `smoke.sh` cố định cùng digest image Foundry với `scripts/forge.sh`. Khi nâng Foundry phải sửa cả hai chỗ.
+- Gợi ý cho T06 (từ review PR #2): `tests/e2e/p/l1.go` gửi `ConvertSubnetToL1Tx` trên tmpnet; thử chuyển mạng local thành L1 để khớp với T12.
+- Sau review: `PreFundedKey` của chain trỏ về khoá ewoq (tài khoản thật sự có coin trong genesis) thay cho khoá hardhat.

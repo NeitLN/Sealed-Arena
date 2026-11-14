@@ -19,9 +19,10 @@ Khi một task kiểm lại một mục, người code cập nhật mức kiểm
 | Kho `ava-labs/icm-contracts` đã lưu trữ (12/2025), chuyển vào `ava-labs/icm-services` (có `icm-contracts/avalanche/ictt`, gồm `ERC20TokenHome`, `NativeTokenRemote`, `ERC20TokenRemote`) | CHƯA KIỂM lại |
 | `ContractDeployerAllowList` kiểm `tx.origin` trong `CanCreateContract`, nên agent không triển khai được contract kể cả qua factory | CHƯA KIỂM lại; T06 phải có test |
 | Precompile có thể gọi `env.InvalidateExecution` để vô hiệu giao dịch từ bên trong lúc thực thi (`params/hooks_libevm.go`) | CHƯA KIỂM lại; là phương án thay thế nếu `preCheck` không dùng được |
-| Phiên bản Go cần để build | CHƯA KIỂM. Đọc `go.mod` của tag ở T01 |
+| Phiên bản Go cần để build: `go 1.26.10` (`go.mod` dòng 18); repo dùng `go.work` (gốc, `graft/coreth`, `graft/evm`, `graft/subnet-evm`) | ĐÃ KIỂM 15/11, đọc `go.mod` ở tag `v1.15.3`, build thành công bằng `golang:1.26.10-bookworm` (T01) |
 | Subnet-EVM ở tag này có áp ACP-194 (thực thi tách khỏi đồng thuận) không | CHƯA KIỂM. Là quyết định D1, T02 trả lời |
-| Công cụ dòng lệnh dựng L1 local (Avalanche CLI hoặc công cụ thay thế trong Builder Hub) còn được hỗ trợ và chạy được với VM tự build | CHƯA KIỂM. Là quyết định D3, T01 trả lời |
+| Dựng mạng local với VM tự build: `tests/fixture/tmpnet` ở tag `v1.15.3` tạo được subnet chạy Subnet-EVM qua mã Go (CLI `tmpnetctl` không khai báo được subnet). `avalanche-cli` bản mới nhất `v1.9.7` (14/10/2026), repo chưa lưu trữ, không chạy thử | ĐÃ KIỂM 15/11: tmpnet chạy 1 và 3 node (T01, `docs/decisions/D3.md`); `avalanche-cli` chỉ kiểm qua GitHub API |
+| tmpnet tạo subnet có cấp quyền (`CreateSubnetTx`, `CreateChainTx`, thêm validator cho subnet), không chuyển thành L1 theo ACP-77 | ĐÃ KIỂM 15/11, đọc `tests/fixture/tmpnet/subnet.go`. Luồng L1 trên Fuji: T12 kiểm |
 
 ## Avalanche: Fuji
 
