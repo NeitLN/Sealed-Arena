@@ -16,8 +16,10 @@ source "$CHAIN_DIR/UPSTREAM"
 SRC="$CHAIN_DIR/.work/avalanchego"
 
 # Packages and test name pattern covered by the Sealed Arena patches.
-PACKAGES=(./core/ ./core/txpool/legacypool/)
-RUN_PATTERN="${SEALED_TEST_RUN:-Spike}"
+PACKAGES=(./core/ ./core/txpool/legacypool/ ./precompile/contracts/agentpolicy/)
+RUN_PATTERN="${SEALED_TEST_RUN:-Spike|AgentPolicy}"
+# Shared WebAuthn vectors, read by the AgentPolicy tests.
+VECTORS="$CHAIN_DIR/testvectors"
 
 if [ "${SEALED_TEST_NO_FETCH:-0}" != "1" ]; then
   if [ -d "$SRC/.git" ]; then
@@ -32,13 +34,17 @@ fi
 
 if command -v cygpath >/dev/null 2>&1; then
   HOST_SRC="$(cygpath -w "$SRC")"
+  HOST_VECTORS="$(cygpath -w "$VECTORS")"
 else
   HOST_SRC="$SRC"
+  HOST_VECTORS="$VECTORS"
 fi
 
 echo "==> go test ${PACKAGES[*]} -run '$RUN_PATTERN'"
 MSYS_NO_PATHCONV=1 docker run --rm \
   -v "$HOST_SRC:/src" \
+  -v "$HOST_VECTORS:/vectors:ro" \
+  -e SEALED_TESTVECTORS=/vectors/webauthn.json \
   -v sealed-arena-gomod:/go/pkg/mod \
   -v sealed-arena-gocache:/root/.cache/go-build \
   -w /src/graft/subnet-evm \

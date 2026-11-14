@@ -17,7 +17,7 @@ export const ADDRESSES: {
   readonly arenaRecorder: Address | undefined;
   readonly reputationReceiver: Address | undefined;
 } = {
-  agentPolicy: undefined,
+  agentPolicy: "0x0300000000000000000000000000000000000001", // D4
   arenaRecorder: undefined,
   reputationReceiver: undefined,
 };
