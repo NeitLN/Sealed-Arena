@@ -105,4 +105,5 @@ Các phần khác (đăng ký một lần, chống biến dạng chữ ký, tác
 - `writeMandate` xoá các ô người nhận thừa khi danh sách ngắn lại. Có test 16 người nhận rồi 1 người nhận.
 - Gas chưa đo bằng benchmark.
 - Bộ vector cố định (có chữ ký ECDSA ngẫu nhiên lúc sinh). Sinh lại thì file đổi, các test vẫn phải xanh.
+- Sau review PR #4: thêm `TestAgentPolicyNonCanonicalAuth` (bằng chứng hợp lệ có thêm byte rác bị từ chối; đỏ khi tắt kiểm mã hoá lại). Ghi vào ARCHITECTURE 3.2: `register` ai đến trước thì được (agent thử thách phải đăng ký trước khi lộ khoá); precompile không kiểm `rpIdHash`/`origin`. Để sang T05: `ChargeSpend` lưu bằng `common.BigToHash`, quá `2^256` thì bị cắt; T05 thêm chặn tràn.
 - `eth_call` tới AgentPolicy chạy như giao dịch thường, không phải chế độ chỉ đọc. Chỉ `staticcall` mới là chỉ đọc.

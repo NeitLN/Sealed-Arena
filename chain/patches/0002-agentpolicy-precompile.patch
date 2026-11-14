@@ -1097,10 +1097,10 @@ index 0000000..2d68499
 +}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
 new file mode 100644
-index 0000000..f4eacb9
+index 0000000..225e4fa
 --- /dev/null
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
-@@ -0,0 +1,685 @@
+@@ -0,0 +1,696 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package agentpolicy
@@ -1785,6 +1785,17 @@ index 0000000..f4eacb9
 +		require.Error(t, err) // challenge for nonce 0 does not match nonce 1
 +		require.Equal(t, uint64(1), ownerNonceOf(t, e, v.Agent))
 +	})
++}
++
++// A valid proof with extra bytes appended decodes to the same values; the canonical
++// re-encoding check must still reject it.
++func TestAgentPolicyNonCanonicalAuth(t *testing.T) {
++	v := loadVectors(t)
++	e := registeredEnv(t, v)
++	auth := append(hexBytes(t, v.SetMandate.Valid.Auth), make([]byte, 32)...)
++	_, err := e.call(t, setMandateInput(t, v.Agent, v.mandate(t), 0, auth), false)
++	require.ErrorIs(t, err, ErrBadAuthEncoding)
++	require.Equal(t, uint64(0), ownerNonceOf(t, e, v.Agent))
 +}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/event.go b/graft/subnet-evm/precompile/contracts/agentpolicy/event.go
 new file mode 100644

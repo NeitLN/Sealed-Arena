@@ -129,6 +129,8 @@ Quyết định đã chốt:
 - `nonce` phải bằng `ownerNonce(agent)` và tăng 1 sau mỗi thao tác thành công, để chống phát lại.
 - Một agent mới đăng ký chưa có uỷ quyền: mọi giao dịch của nó đều không hợp lệ cho tới khi `setMandate`.
 - Không có hàm nào cho phép gỡ đăng ký.
+- `register` ai đến trước thì được, chỉ cần khoá agent. Agent thử thách phải được đăng ký và đặt uỷ quyền **trước** khi khoá được công khai; nếu không, người cầm khoá đăng ký passkey của chính họ (T06, T11).
+- Precompile không kiểm `rpIdHash` hay `origin` trong bằng chứng WebAuthn (đúng 3.3). Trang nào lừa được chủ ví ký đúng challenge của mình cũng tạo được bằng chứng hợp lệ. Ghi vào giới hạn ở T09.
 - Tên giá trị trả về `registered` và `nonce` được thêm ở T04 cho công cụ sinh khung; selector và cách mã hoá không đổi.
 - `getSpend` trả bộ đếm tính theo thời điểm block hiện tại: sang ngày UTC mới thì `spentToday` đọc là 0 và `dayIndex` là ngày hiện tại, khớp với cách quy tắc sẽ áp ở T05.
 - `register` cần chữ ký 65 byte `r || s || v` (v là 0, 1, 27 hoặc 28), `s` ở nửa thấp.

@@ -2,7 +2,7 @@
 Cập nhật: 15/11/2026. Người code cập nhật trong PR của từng task; người review kiểm.
 
 ## Đang ở đâu
-- Mốc hiện tại: M0 xong (T01–T03, D1, D3); đang M1. T03 (khung repo) xong trong PR #1. T01 (build node, mạng local) xong trong PR #2; D3 đã chốt (tmpnet trong container). T02 (spike quy tắc) xong trong PR #3; D1 đã chốt: **được**, giữ bậc 1. T04 (precompile AgentPolicy) trong PR #4; D4 đề xuất địa chỉ `0x0300…01`, `0x100` có trên L1.
+- Mốc hiện tại: M0 xong (T01–T03, D1, D3); đang M1. T03 (khung repo) xong trong PR #1. T01 (build node, mạng local) xong trong PR #2; D3 đã chốt (tmpnet trong container). T02 (spike quy tắc) xong trong PR #3; D1 đã chốt: **được**, giữ bậc 1. T04 (precompile AgentPolicy) trong PR #4; D4 đã chốt: địa chỉ `0x0300…01`, `0x100` có trên L1.
 - Repo: `https://github.com/NeitLN/Sealed-Arena` (public). Nhánh mặc định `main`.
 - Đã có: bộ tài liệu trong `docs/`; workspace pnpm + TypeScript strict; Foundry chạy trong Docker; `scripts/check.sh`.
 - Node avalanchego `v1.15.3` + Subnet-EVM chưa sửa build được trong Docker (`sealed-node:dev`); mạng local 1 hoặc 3 node dựng bằng `bash scripts/localnet.sh up`. Bản vá spike `chain/patches/0001-spike-agent-rule.patch` chứng minh quy tắc ở `preCheck` + txpool giữ giao dịch bị cấm ngoài mọi block (test Go và mạng local).

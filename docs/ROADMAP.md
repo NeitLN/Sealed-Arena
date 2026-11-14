@@ -62,7 +62,7 @@ Phiếu chi tiết: `docs/tasks/`. T01–T06 có phiếu riêng. T07–T17 nằm
 | D1 | Lỗi ở `preCheck` có làm giao dịch bị loại khỏi block ở tag `v1.15.3` không; Subnet-EVM có dùng ACP-194 không | T05 và mọi câu chữ "giao dịch không hợp lệ" | 16/11 | T02 | đã chốt: được, giữ bậc 1 (`docs/decisions/D1.md`, PR #3) |
 | D2 | Giữ bậc 1 hay lùi bậc 2 | T06 trở đi, README, slide, video | 19/11 cuối ngày | T05 `PASS` trên mạng nhiều node | mở |
 | D3 | Cách dựng L1: công cụ dòng lệnh chính thức hay tự chạy avalanchego bằng Docker | T06, T12 | 16/11 | T01 | đã chốt: tmpnet trong container (`docs/decisions/D3.md`, PR #2) |
-| D4 | Địa chỉ precompile AgentPolicy và việc `0x100` có trên L1 | T04, T09, PolicyWallet bậc 2 | 17/11 | T04 | đề xuất: `0x0300…01`; `0x100` có trên L1 (`docs/decisions/D4.md`, PR #4) |
+| D4 | Địa chỉ precompile AgentPolicy và việc `0x100` có trên L1 | T04, T09, PolicyWallet bậc 2 | 17/11 | T04 | đã chốt: `0x0300…01`; `0x100` có trên L1 (`docs/decisions/D4.md`, PR #4) |
 | D5 | Dùng SDK `@x402/*` có điểm mở rộng hay tự viết luồng 402 | T07, T08 | 18/11 | T07 | mở |
 | D6 | USDC vào L1 bằng ICTT hay coin thử cấp trong genesis | T12, README | 19/11 | T12 thử trên Fuji | mở |
 | D7 | Chữ ký hàm ghi của registry ERC-8004 trên Fuji | T13 | 19/11 | Đọc ABI thật | mở |
