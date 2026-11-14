@@ -48,4 +48,43 @@ Precompile, uỷ quyền, bộ đếm ngân sách, passkey (T04, T05).
 Không cố sửa cho được bằng cách thay đổi sâu vào đồng thuận. Ghi rõ lý do, đề xuất phương án, dừng. Người review và chủ dự án quyết định D1 và D2.
 
 ## Bàn giao
-(người code điền)
+
+### Kết quả "Phải kiểm trước khi làm"
+Cả năm câu được trả lời trong `docs/decisions/D1.md`, có file và số dòng trên tag `v1.15.3`. Tóm tắt:
+1. Vị trí TxAllowList khớp `master`: `state_transition.go:254–258` (trong `if !msg.SkipAccountChecks`), `txpool/validation.go:281–286`.
+2. Mọi đường đưa giao dịch vào block (xác minh block, người dựng block) đi qua `preCheck` với `SkipAccountChecks == false`; `eth_call`/`eth_estimateGas` thì không (không ghi trạng thái).
+3. ACP-194 (`vms/saevm`) chỉ dùng cho C-Chain; Subnet-EVM không import.
+4. Người dựng block gặp lỗi thì bỏ giao dịch (và các giao dịch sau của cùng người gửi), dựng tiếp.
+5. `InvalidateExecution` có, nhưng chỉ hoàn trạng thái; giao dịch vẫn vào block. Không dùng.
+
+### Đã làm
+- `chain/patches/0001-spike-agent-rule.patch`. File bị đụng trong `graft/subnet-evm/`:
+  - `core/spike_agent_rule.go` (mới): hằng `SpikeAgentAddress`, `SpikePayeeAddress`, lỗi `ErrSpikeAgentPayeeNotAllowed`, hàm `CheckSpikeAgentRule(from, to)`. Để ở gói `core` vì `core/txpool` đã import `core`, nên hai chỗ dùng chung một hàm.
+  - `core/state_transition.go` (+5 dòng): gọi quy tắc ngay sau kiểm TxAllowList, trong khối `!SkipAccountChecks`.
+  - `core/txpool/validation.go` (+5 dòng): gọi quy tắc ngay sau kiểm TxAllowList.
+  - `core/spike_agent_rule_test.go`, `core/txpool/legacypool/spike_agent_rule_test.go` (mới): test.
+- `chain/scripts/test.sh`: kiểm `.work` không có sửa đổi ngoài bản vá, fetch sạch, áp bản vá, chạy `go test -run Spike` trong `golang:1.26.10-bookworm` với volume cache module và cache biên dịch. `SEALED_TEST_NO_FETCH=1` để test cây đang sửa; `SEALED_TEST_RUN=<mẫu>` để đổi mẫu test. `scripts/check.sh` tự gọi nó (bước chain-test).
+- `chain/scripts/make-patch.sh`: ghi toàn bộ diff của `.work` so với commit upstream vào một file bản vá; `--check` để biết bản vá có khớp cây không.
+- `chain/tests/spike/run.sh`: kiểm trên mạng local đã vá (mô tả ở đầu file).
+
+### Kết quả kiểm
+Môi trường: Windows 11, Git Bash, Docker 29.5.3, Go 1.26.10 trong Docker, ngày 15/11/2026, nhánh `task/T02-spike-quy-tac`.
+
+| Tiêu chí | Lệnh | Kết quả |
+|---|---|---|
+| Test Go, gồm "block chứa giao dịch bị cấm bị từ chối" | `bash chain/scripts/test.sh` | `PASS` (`TestSpikeAgentBlockWithForbiddenTxIsRejected`: 3 loại × 2 kiểu; `TestSpikeAgentForbiddenTxAfterAllowedTxRejectsBlock`; chiều được phép; người gửi khác; txpool local và remote, kể cả phí rất cao) |
+| Test có thể đỏ | chỉ có hàm quy tắc, chưa nối | `FAIL` đúng các test block và txpool, test chiều được phép vẫn `PASS` (đã thấy trước khi nối) |
+| Không hồi quy | `SEALED_TEST_NO_FETCH=1 SEALED_TEST_RUN=. bash chain/scripts/test.sh` | `PASS` toàn bộ `./core/` (46 giây) và `./core/txpool/legacypool/` (14 giây) |
+| Bản vá áp sạch | `bash chain/scripts/fetch.sh` (gọi `apply-patches.sh` trên cây vừa clone) | `PASS` |
+| Script mạng local, mọi loại giao dịch | `bash chain/scripts/build.sh && bash scripts/localnet.sh up && bash chain/tests/spike/run.sh` | `PASS` (chi tiết trong D1) |
+| Script mạng local có thể đỏ | cùng script trên image build không có bản vá | `FAIL`, 14 lỗi |
+| Bản vá tối thiểu | xem danh sách file ở trên | 3 file nguồn (1 mới, 2 sửa +5 dòng mỗi file), 2 file test |
+| `scripts/check.sh` gọi `chain/scripts/test.sh` và xanh | `bash scripts/check.sh` | ghi trong PR |
+
+### Ghi chú, việc phát hiện thêm (không làm trong task này)
+- Loại giao dịch: blob (EIP-4844) không dựng được với chain này; EIP-7702 bị RPC từ chối vì sai định dạng (`typed transaction too short`), không phải vì quy tắc. Cả hai không vào block. ARCHITECTURE đã ghi không bật EIP-7702.
+- `cast publish` mặc định chờ receipt; script dùng `--async` để không treo khi RPC lỡ nhận giao dịch.
+- Hành vi người dựng block chỉ kiểm bằng đọc mã; không có test ở mức `miner/`. Mạng local không chạm tới đường này vì RPC đã từ chối trước. T05 nên thêm test dựng block với nhiều giao dịch trong pool vượt ngân sách.
+- Lưu ý state sync trong D1 (node đồng bộ trạng thái tin các validator) chưa đọc mã state sync.
+- Kết luận D1 chưa được bên thứ ba ngoài người review rà lại.
+- `make-patch.sh` gom mọi sửa đổi vào một file; T05 thay `0001-spike-agent-rule.patch` bằng bản thật.

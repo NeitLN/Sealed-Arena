@@ -20,7 +20,7 @@ Thứ tự làm là thứ tự trong bảng, trừ khi cột phụ thuộc cho p
 | ID | Mốc | Việc | Phụ thuộc | Kiểm chấp nhận (tóm tắt) | Mức rủi ro | Ngày | Trạng thái |
 |---|---|---|---|---|---|---|---|
 | T01 | M0 | Build node từ tag cố định trong Docker, chạy mạng L1 local một node | — | Gửi được một giao dịch chuyển coin gốc trên mạng local | Standard | 15/11 | đã tích hợp (PR #2) |
-| T02 | M0 | Spike: quy tắc viết cứng trong `preCheck` và txpool | T01 | Giao dịch bị cấm: RPC từ chối, không vào block, block chứa nó bị loại; có câu trả lời về ACP-194 | Full | 16/11 | đề xuất |
+| T02 | M0 | Spike: quy tắc viết cứng trong `preCheck` và txpool | T01 | Giao dịch bị cấm: RPC từ chối, không vào block, block chứa nó bị loại; có câu trả lời về ACP-194 | Full | 16/11 | đã tích hợp (PR #3) |
 | T03 | M0 | Khung repo: workspace, Foundry trong Docker, `scripts/check.sh` | — | `scripts/check.sh` chạy xanh trên repo rỗng | Mini | 15/11 | đã tích hợp (PR #1) |
 | T04 | M1 | Precompile AgentPolicy: lưu trữ, register, setMandate, freeze, WebAuthn | T01 | Test Go: mọi hàm, chữ ký sai bị từ chối, phát lại bị từ chối | Full | 17/11 | đề xuất |
 | T05 | M1 | Nối quy tắc với AgentPolicy, bộ đếm ngày, `totalCharged` | T02, T04 | Bảy điều kiện ở ARCHITECTURE 3.1 đều có test hai chiều; 20 giao dịch cùng lúc không vượt ngân sách | Full | 18/11 | đề xuất |
@@ -59,7 +59,7 @@ Phiếu chi tiết: `docs/tasks/`. T01–T06 có phiếu riêng. T07–T17 nằm
 
 | # | Quyết định | Việc phải chờ nó | Hạn | Cách kiểm | Trạng thái |
 |---|---|---|---|---|---|
-| D1 | Lỗi ở `preCheck` có làm giao dịch bị loại khỏi block ở tag `v1.15.3` không; Subnet-EVM có dùng ACP-194 không | T05 và mọi câu chữ "giao dịch không hợp lệ" | 16/11 | T02 | mở |
+| D1 | Lỗi ở `preCheck` có làm giao dịch bị loại khỏi block ở tag `v1.15.3` không; Subnet-EVM có dùng ACP-194 không | T05 và mọi câu chữ "giao dịch không hợp lệ" | 16/11 | T02 | đề xuất: được, giữ bậc 1 (`docs/decisions/D1.md`, PR #3) |
 | D2 | Giữ bậc 1 hay lùi bậc 2 | T06 trở đi, README, slide, video | 19/11 cuối ngày | T05 `PASS` trên mạng nhiều node | mở |
 | D3 | Cách dựng L1: công cụ dòng lệnh chính thức hay tự chạy avalanchego bằng Docker | T06, T12 | 16/11 | T01 | đã chốt: tmpnet trong container (`docs/decisions/D3.md`, PR #2) |
 | D4 | Địa chỉ precompile AgentPolicy và việc `0x100` có trên L1 | T04, T09, PolicyWallet bậc 2 | 17/11 | T04 | mở |

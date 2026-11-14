@@ -1,0 +1,354 @@
+diff --git a/graft/subnet-evm/core/spike_agent_rule.go b/graft/subnet-evm/core/spike_agent_rule.go
+new file mode 100644
+index 0000000..3d13752
+--- /dev/null
++++ b/graft/subnet-evm/core/spike_agent_rule.go
+@@ -0,0 +1,39 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package core
++
++import (
++	"errors"
++	"fmt"
++
++	"github.com/ava-labs/libevm/common"
++)
++
++// Sealed Arena spike rule (T02): a hard-coded validity rule used to prove that a
++// check in preCheck and in the txpool keeps forbidden transactions out of every
++// block. It is replaced by the AgentPolicy-backed rule in T05.
++var (
++	// SpikeAgentAddress may only send transactions to SpikePayeeAddress.
++	// It is controlled by the private key 0x...01, intentionally public.
++	SpikeAgentAddress = common.HexToAddress("0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf")
++	// SpikePayeeAddress is the only allowed recipient (private key 0x...02).
++	SpikePayeeAddress = common.HexToAddress("0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF")
++
++	ErrSpikeAgentPayeeNotAllowed = errors.New("spike agent: payee not allowed")
++)
++
++// CheckSpikeAgentRule returns an error when `from` is the spike agent and the
++// transaction does not pay SpikePayeeAddress. Contract creation (nil `to`) is
++// rejected. Transactions from any other sender are not affected.
++func CheckSpikeAgentRule(from common.Address, to *common.Address) error {
++	if from != SpikeAgentAddress {
++		return nil
++	}
++	if to == nil {
++		return fmt.Errorf("%w: contract creation", ErrSpikeAgentPayeeNotAllowed)
++	}
++	if *to != SpikePayeeAddress {
++		return fmt.Errorf("%w: %s", ErrSpikeAgentPayeeNotAllowed, to.Hex())
++	}
++	return nil
++}
+diff --git a/graft/subnet-evm/core/spike_agent_rule_test.go b/graft/subnet-evm/core/spike_agent_rule_test.go
+new file mode 100644
+index 0000000..bb36131
+--- /dev/null
++++ b/graft/subnet-evm/core/spike_agent_rule_test.go
+@@ -0,0 +1,194 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package core
++
++import (
++	"crypto/ecdsa"
++	"math/big"
++	"testing"
++
++	"github.com/ava-labs/libevm/common"
++	"github.com/ava-labs/libevm/core/rawdb"
++	"github.com/ava-labs/libevm/core/types"
++	"github.com/ava-labs/libevm/core/vm"
++	"github.com/ava-labs/libevm/crypto"
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
++
++	ethparams "github.com/ava-labs/libevm/params"
++)
++
++var (
++	// Private keys 0x...01 and 0x...02 control SpikeAgentAddress and SpikePayeeAddress.
++	spikeAgentKey, _ = crypto.HexToECDSA("0000000000000000000000000000000000000000000000000000000000000001")
++	spikeOtherKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
++	spikeOtherAddr   = crypto.PubkeyToAddress(spikeOtherKey.PublicKey)
++	spikeStranger    = common.HexToAddress("0x00000000000000000000000000000000DeaDBeef")
++)
++
++func TestSpikeAgentKeysMatchAddresses(t *testing.T) {
++	require.Equal(t, SpikeAgentAddress, crypto.PubkeyToAddress(spikeAgentKey.PublicKey))
++}
++
++func TestCheckSpikeAgentRule(t *testing.T) {
++	payee := SpikePayeeAddress
++	stranger := spikeStranger
++	for _, tc := range []struct {
++		name    string
++		from    common.Address
++		to      *common.Address
++		wantErr bool
++	}{
++		{"agent to payee", SpikeAgentAddress, &payee, false},
++		{"agent to stranger", SpikeAgentAddress, &stranger, true},
++		{"agent creates contract", SpikeAgentAddress, nil, true},
++		{"agent to itself", SpikeAgentAddress, &SpikeAgentAddress, true},
++		{"other to stranger", spikeOtherAddr, &stranger, false},
++		{"other creates contract", spikeOtherAddr, nil, false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			err := CheckSpikeAgentRule(tc.from, tc.to)
++			if tc.wantErr {
++				require.ErrorIs(t, err, ErrSpikeAgentPayeeNotAllowed)
++			} else {
++				require.NoError(t, err)
++			}
++		})
++	}
++}
++
++// spikeChain returns a Subnet-EVM chain whose genesis funds the agent and another sender.
++func spikeChain(t *testing.T) (*BlockChain, *Genesis, types.Signer) {
++	t.Helper()
++	config := params.TestChainConfig
++	oneCoin := new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
++	gspec := &Genesis{
++		Config: config,
++		Alloc: types.GenesisAlloc{
++			SpikeAgentAddress: {Balance: new(big.Int).Mul(oneCoin, big.NewInt(100))},
++			spikeOtherAddr:    {Balance: new(big.Int).Mul(oneCoin, big.NewInt(100))},
++		},
++		GasLimit: params.GetExtra(config).FeeConfig.GasLimit.Uint64(),
++	}
++	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
++	require.NoError(t, err)
++	t.Cleanup(chain.Stop)
++	return chain, gspec, types.LatestSigner(config)
++}
++
++var spikeFeeCap = big.NewInt(300_000_000_000) // above the test chain's minimum base fee
++
++// spikeTx signs one transaction of the requested type. A nil `to` creates a contract.
++func spikeTx(t *testing.T, signer types.Signer, key *ecdsa.PrivateKey, txType byte, nonce uint64, to *common.Address, value *big.Int) *types.Transaction {
++	t.Helper()
++	gas := ethparams.TxGas
++	var data []byte
++	if to == nil {
++		gas = 100_000
++		data = []byte{0x60, 0x00, 0x60, 0x00, 0xf3} // PUSH1 0 PUSH1 0 RETURN: empty contract
++	}
++	var inner types.TxData
++	switch txType {
++	case types.LegacyTxType:
++		inner = &types.LegacyTx{Nonce: nonce, GasPrice: spikeFeeCap, Gas: gas, To: to, Value: value, Data: data}
++	case types.AccessListTxType:
++		inner = &types.AccessListTx{ChainID: signer.ChainID(), Nonce: nonce, GasPrice: spikeFeeCap, Gas: gas, To: to, Value: value, Data: data}
++	case types.DynamicFeeTxType:
++		inner = &types.DynamicFeeTx{ChainID: signer.ChainID(), Nonce: nonce, GasTipCap: big.NewInt(1), GasFeeCap: spikeFeeCap, Gas: gas, To: to, Value: value, Data: data}
++	default:
++		t.Fatalf("unsupported tx type %d", txType)
++	}
++	tx, err := types.SignNewTx(key, signer, inner)
++	require.NoError(t, err)
++	return tx
++}
++
++var spikeTxTypes = []struct {
++	name string
++	typ  byte
++}{
++	{"legacy", types.LegacyTxType},
++	{"access list", types.AccessListTxType},
++	{"dynamic fee", types.DynamicFeeTxType},
++}
++
++// The agent paying the allowed payee is built and imported like any other transaction.
++func TestSpikeAgentAllowedPaymentIsIncluded(t *testing.T) {
++	for _, tt := range spikeTxTypes {
++		t.Run(tt.name, func(t *testing.T) {
++			chain, gspec, signer := spikeChain(t)
++			value := big.NewInt(12345)
++			tx := spikeTx(t, signer, spikeAgentKey, tt.typ, 0, &SpikePayeeAddress, value)
++
++			_, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewCoinbaseFaker(), 1, 10, func(_ int, b *BlockGen) {
++				b.AddTx(tx)
++			})
++			require.NoError(t, err)
++			_, err = chain.InsertChain(blocks)
++			require.NoError(t, err)
++
++			state, err := chain.State()
++			require.NoError(t, err)
++			require.Equal(t, value.Uint64(), state.GetBalance(SpikePayeeAddress).Uint64())
++			require.Equal(t, uint64(1), state.GetNonce(SpikeAgentAddress))
++		})
++	}
++}
++
++// A block built by hand that contains a forbidden agent transaction must fail
++// block verification, for every transaction type and however high the fee.
++func TestSpikeAgentBlockWithForbiddenTxIsRejected(t *testing.T) {
++	for _, tt := range spikeTxTypes {
++		for _, target := range []struct {
++			name string
++			to   *common.Address
++		}{
++			{"to stranger", &spikeStranger},
++			{"contract creation", nil},
++		} {
++			t.Run(tt.name+" "+target.name, func(t *testing.T) {
++				chain, gspec, signer := spikeChain(t)
++				tx := spikeTx(t, signer, spikeAgentKey, tt.typ, 0, target.to, big.NewInt(1))
++
++				block := GenerateBadBlock(gspec.ToBlock(), dummy.NewCoinbaseFaker(), types.Transactions{tx}, gspec.Config)
++				_, err := chain.InsertChain(types.Blocks{block})
++				require.ErrorIs(t, err, ErrSpikeAgentPayeeNotAllowed)
++				require.Equal(t, uint64(0), chain.CurrentBlock().Number.Uint64(), "chain head must not move")
++			})
++		}
++	}
++}
++
++// A forbidden transaction hidden after an allowed one in the same block still
++// makes the whole block invalid.
++func TestSpikeAgentForbiddenTxAfterAllowedTxRejectsBlock(t *testing.T) {
++	chain, gspec, signer := spikeChain(t)
++	ok := spikeTx(t, signer, spikeAgentKey, types.DynamicFeeTxType, 0, &SpikePayeeAddress, big.NewInt(1))
++	bad := spikeTx(t, signer, spikeAgentKey, types.DynamicFeeTxType, 1, &spikeStranger, big.NewInt(1))
++
++	block := GenerateBadBlock(gspec.ToBlock(), dummy.NewCoinbaseFaker(), types.Transactions{ok, bad}, gspec.Config)
++	_, err := chain.InsertChain(types.Blocks{block})
++	require.ErrorIs(t, err, ErrSpikeAgentPayeeNotAllowed)
++}
++
++// Other senders are not affected by the rule.
++func TestSpikeAgentRuleIgnoresOtherSenders(t *testing.T) {
++	chain, gspec, signer := spikeChain(t)
++	value := big.NewInt(777)
++	pay := spikeTx(t, signer, spikeOtherKey, types.DynamicFeeTxType, 0, &spikeStranger, value)
++	deploy := spikeTx(t, signer, spikeOtherKey, types.DynamicFeeTxType, 1, nil, big.NewInt(0))
++
++	_, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewCoinbaseFaker(), 1, 10, func(_ int, b *BlockGen) {
++		b.AddTx(pay)
++		b.AddTx(deploy)
++	})
++	require.NoError(t, err)
++	_, err = chain.InsertChain(blocks)
++	require.NoError(t, err)
++
++	state, err := chain.State()
++	require.NoError(t, err)
++	require.Equal(t, value.Uint64(), state.GetBalance(spikeStranger).Uint64())
++}
+diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
+index 415a986..452bc86 100644
+--- a/graft/subnet-evm/core/state_transition.go
++++ b/graft/subnet-evm/core/state_transition.go
+@@ -257,6 +257,11 @@ func (st *StateTransition) preCheck() error {
+ 				return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, msg.From)
+ 			}
+ 		}
++
++		// Sealed Arena: an agent transaction outside its rule is invalid, not reverted.
++		if err := CheckSpikeAgentRule(msg.From, msg.To); err != nil {
++			return err
++		}
+ 	}
+ 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
+ 	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
+diff --git a/graft/subnet-evm/core/txpool/legacypool/spike_agent_rule_test.go b/graft/subnet-evm/core/txpool/legacypool/spike_agent_rule_test.go
+new file mode 100644
+index 0000000..390d63f
+--- /dev/null
++++ b/graft/subnet-evm/core/txpool/legacypool/spike_agent_rule_test.go
+@@ -0,0 +1,72 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package legacypool
++
++import (
++	"math/big"
++	"testing"
++
++	"github.com/ava-labs/libevm/common"
++	"github.com/ava-labs/libevm/core/types"
++	"github.com/ava-labs/libevm/crypto"
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
++)
++
++func TestSpikeAgentRuleInTxPool(t *testing.T) {
++	agentKey, err := crypto.HexToECDSA("0000000000000000000000000000000000000000000000000000000000000001")
++	require.NoError(t, err)
++	require.Equal(t, core.SpikeAgentAddress, crypto.PubkeyToAddress(agentKey.PublicKey))
++
++	signer := types.LatestSigner(params.TestChainConfig)
++	stranger := common.HexToAddress("0x00000000000000000000000000000000DeaDBeef")
++
++	sign := func(nonce uint64, to *common.Address, gasPrice *big.Int) *types.Transaction {
++		gas := uint64(21_000)
++		if to == nil {
++			gas = 100_000
++		}
++		tx, err := types.SignNewTx(agentKey, signer, &types.LegacyTx{
++			Nonce: nonce, GasPrice: gasPrice, Gas: gas, To: to, Value: big.NewInt(1),
++		})
++		require.NoError(t, err)
++		return tx
++	}
++
++	for _, tc := range []struct {
++		name    string
++		to      *common.Address
++		price   *big.Int
++		wantErr bool
++	}{
++		{"to payee", &core.SpikePayeeAddress, big.NewInt(1), false},
++		{"to stranger", &stranger, big.NewInt(1), true},
++		{"to stranger with a very high fee", &stranger, big.NewInt(1_000_000_000_000), true},
++		{"contract creation", nil, big.NewInt(1), true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			for _, local := range []bool{false, true} {
++				pool, _ := setupPool()
++				defer pool.Close()
++				testAddBalance(pool, core.SpikeAgentAddress, new(big.Int).Exp(big.NewInt(10), big.NewInt(21), nil))
++
++				tx := sign(0, tc.to, tc.price)
++				var err error
++				if local {
++					err = pool.addLocal(tx)
++				} else {
++					err = pool.addRemoteSync(tx)
++				}
++				if tc.wantErr {
++					require.ErrorIs(t, err, core.ErrSpikeAgentPayeeNotAllowed, "local=%v", local)
++					require.Nil(t, pool.Get(tx.Hash()), "rejected tx must not be in the pool")
++				} else {
++					require.NoError(t, err, "local=%v", local)
++					require.NotNil(t, pool.Get(tx.Hash()))
++				}
++			}
++		})
++	}
++}
+diff --git a/graft/subnet-evm/core/txpool/validation.go b/graft/subnet-evm/core/txpool/validation.go
+index 1827192..63e529b 100644
+--- a/graft/subnet-evm/core/txpool/validation.go
++++ b/graft/subnet-evm/core/txpool/validation.go
+@@ -285,5 +285,10 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
+ 		}
+ 	}
+ 
++	// Sealed Arena: read-only check of the agent rule; preCheck enforces it in blocks.
++	if err := core.CheckSpikeAgentRule(from, tx.To()); err != nil {
++		return err
++	}
++
+ 	return nil
+ }
