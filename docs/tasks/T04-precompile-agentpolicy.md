@@ -94,7 +94,7 @@ Môi trường: Windows 11, Git Bash, Docker 29.5.3, Go 1.26.10 trong Docker, No
 | `bash chain/scripts/test.sh` và `bash scripts/check.sh` | | ghi trong PR |
 
 ### Rà lại trước khi mở PR
-Bản vá được một người rà độc lập đọc lại (chỉ đọc mã, không chạy). Ba điểm nêu ra, đã tự kiểm lại bằng mã và test rồi sửa:
+Bản vá được rà lại độc lập trước khi mở PR (chỉ đọc mã, không chạy). Ba điểm nêu ra, người code đã tự kiểm lại bằng mã và test rồi sửa:
 1. `auth` không bị giới hạn kích thước: bằng chứng lỗi vẫn bắt node giải mã ABI và phân tích JSON lớn mà không làm nonce tăng. Sửa: `MaxAuthSize = 2048`, kiểm trước khi giải mã. Phần giải mã calldata do khung sinh sẵn vẫn chạy trên cả input, nhưng chi phí calldata và bộ nhớ đã do người gọi trả.
 2. Nonce lưu `uint64`, `current+1` có thể quấn về 0 khi tới `2^64−1`, làm bằng chứng cũ với nonce 0 dùng lại được. Sửa: trả `ErrNonceExhausted` khi nonce đã ở giá trị lớn nhất.
 3. Trạng thái được ghi trước khi trừ gas sự kiện. Trong EVM, lỗi làm khung gọi bị hoàn nên không khai thác được, nhưng khi gọi `Run` trực tiếp thì để lại ghi dở. Sửa: trừ gas sự kiện trước, ghi trạng thái sau cùng (`checkOwner` không còn ghi; `bumpNonce` chạy sau `chargeEvent`).
