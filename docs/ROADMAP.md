@@ -21,7 +21,7 @@ Thứ tự làm là thứ tự trong bảng, trừ khi cột phụ thuộc cho p
 |---|---|---|---|---|---|---|---|
 | T01 | M0 | Build node từ tag cố định trong Docker, chạy mạng L1 local một node | — | Gửi được một giao dịch chuyển coin gốc trên mạng local | Standard | 15/11 | đề xuất |
 | T02 | M0 | Spike: quy tắc viết cứng trong `preCheck` và txpool | T01 | Giao dịch bị cấm: RPC từ chối, không vào block, block chứa nó bị loại; có câu trả lời về ACP-194 | Full | 16/11 | đề xuất |
-| T03 | M0 | Khung repo: workspace, Foundry trong Docker, `scripts/check.sh` | — | `scripts/check.sh` chạy xanh trên repo rỗng | Mini | 15/11 | đề xuất |
+| T03 | M0 | Khung repo: workspace, Foundry trong Docker, `scripts/check.sh` | — | `scripts/check.sh` chạy xanh trên repo rỗng | Mini | 15/11 | đã tích hợp (PR #1) |
 | T04 | M1 | Precompile AgentPolicy: lưu trữ, register, setMandate, freeze, WebAuthn | T01 | Test Go: mọi hàm, chữ ký sai bị từ chối, phát lại bị từ chối | Full | 17/11 | đề xuất |
 | T05 | M1 | Nối quy tắc với AgentPolicy, bộ đếm ngày, `totalCharged` | T02, T04 | Bảy điều kiện ở ARCHITECTURE 3.1 đều có test hai chiều; 20 giao dịch cùng lúc không vượt ngân sách | Full | 18/11 | đề xuất |
 | T06 | M1 | Genesis, allow-list, mạng local nhiều node, script tấn công lớp 9 | T05 | Mọi đường rút bằng key lộ đều thất bại trên mạng 3 node | Standard | 18/11 | đề xuất |
@@ -48,7 +48,7 @@ Phiếu chi tiết: `docs/tasks/`. T01–T06 có phiếu riêng. T07–T17 nằm
 | H1 | Có 1–3 máy chạy liên tục 20–30/11 để deploy L1 (cấu hình chính xác do T12 kiểm). Đang chờ duyệt GitHub Student Developer Pack để lấy credit cloud. Chưa duyệt kịp thì dùng Azure for Students hoặc một máy bàn để ở nhà | T12 | 18/11 |
 | H2 | Lấy AVAX Fuji cho P-Chain (ước tính 2 AVAX mỗi validator) và USDC Fuji từ faucet | T12 | 18/11 |
 | H3 | Cấp API key LLM cho agent | T08 | 17/11 |
-| H4 | Tạo repo GitHub; nếu private thì thêm `tuantqse90` | T16 | 19/11 |
+| H4 | Tạo repo GitHub; nếu private thì thêm `tuantqse90`. **Xong 15/11:** public, `https://github.com/NeitLN/Sealed-Arena` | T16 | 19/11 |
 | H5 | Hỏi ban tổ chức về thử thách mở | T17 | 20/11 |
 | H6 | Quay video 2–3 phút theo kịch bản trong bản đề xuất | Nộp bài | 21/11 |
 | H7 | Làm slide; chốt câu trả lời "tiền đến từ đâu" | Nộp bài | 21/11 |
