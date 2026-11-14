@@ -132,7 +132,7 @@ Quyết định đã chốt:
 - Tên giá trị trả về `registered` và `nonce` được thêm ở T04 cho công cụ sinh khung; selector và cách mã hoá không đổi.
 - `getSpend` trả bộ đếm tính theo thời điểm block hiện tại: sang ngày UTC mới thì `spentToday` đọc là 0 và `dayIndex` là ngày hiện tại, khớp với cách quy tắc sẽ áp ở T05.
 - `register` cần chữ ký 65 byte `r || s || v` (v là 0, 1, 27 hoặc 28), `s` ở nửa thấp.
-- Lỗi của precompile (chuỗi trả về qua RPC, tiền tố `agentpolicy:`): `ErrNotRegistered`, `ErrAlreadyRegistered`, `ErrBadAgentSignature`, `ErrBadOwnerKey`, `ErrBadNonce`, `ErrBadAuthEncoding`, `ErrBadClientData`, `ErrBadClientDataType`, `ErrChallengeMismatch`, `ErrUserNotPresent`, `ErrHighS`, `ErrBadOwnerSignature`, `ErrTooManyPayees`, `ErrPerTxAboveDaily`.
+- Lỗi của precompile (chuỗi trả về qua RPC, tiền tố `agentpolicy:`): `ErrNotRegistered`, `ErrAlreadyRegistered`, `ErrBadAgentSignature`, `ErrBadOwnerKey`, `ErrBadNonce`, `ErrBadAuthEncoding`, `ErrBadClientData`, `ErrBadClientDataType`, `ErrChallengeMismatch`, `ErrUserNotPresent`, `ErrHighS`, `ErrBadOwnerSignature`, `ErrTooManyPayees`, `ErrPerTxAboveDaily`, `ErrNonceExhausted`, `ErrAuthTooLarge` (`auth` tối đa 2048 byte).
 - Hàm Go nội bộ cho T05 (không có trong ABI): `GetMandateForRule(state, agent)` chỉ đọc; `SpendForDay(state, agent, timestamp)` chỉ đọc; `ChargeSpend(state, agent, charge, timestamp)` ghi bộ đếm.
 
 ### 3.3 Bằng chứng WebAuthn (`auth`)

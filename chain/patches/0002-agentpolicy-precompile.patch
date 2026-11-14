@@ -1097,10 +1097,10 @@ index 0000000..2d68499
 +}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
 new file mode 100644
-index 0000000..c2edc9f
+index 0000000..f4eacb9
 --- /dev/null
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
-@@ -0,0 +1,637 @@
+@@ -0,0 +1,685 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package agentpolicy
@@ -1738,6 +1738,54 @@ index 0000000..c2edc9f
 +		})
 +	}
 +}
++
++// ---- hardening after review --------------------------------------------------
++
++func TestAgentPolicyBounds(t *testing.T) {
++	v := loadVectors(t)
++	m := v.mandate(t)
++
++	t.Run("auth larger than MaxAuthSize: rejected before parsing", func(t *testing.T) {
++		e := registeredEnv(t, v)
++		huge := make([]byte, MaxAuthSize+1)
++		_, err := e.call(t, setMandateInput(t, v.Agent, m, 0, huge), false)
++		require.ErrorIs(t, err, ErrAuthTooLarge)
++		_, err = e.call(t, freezeInput(t, v.Agent, 0, huge, true), false)
++		require.ErrorIs(t, err, ErrAuthTooLarge)
++		require.Equal(t, uint64(0), ownerNonceOf(t, e, v.Agent))
++	})
++
++	t.Run("real proofs fit in MaxAuthSize", func(t *testing.T) {
++		require.LessOrEqual(t, len(hexBytes(t, v.SetMandate.Valid.Auth)), MaxAuthSize)
++	})
++
++	t.Run("owner nonce never wraps", func(t *testing.T) {
++		e := registeredEnv(t, v)
++		setUint64(e.db, v.Agent, fieldOwnerNonce, ^uint64(0))
++		in, err := PackSetMandate(SetMandateInput{Agent: v.Agent, M: m, Nonce: new(big.Int).SetUint64(^uint64(0)), Auth: hexBytes(t, v.SetMandate.Valid.Auth)})
++		require.NoError(t, err)
++		_, err = e.call(t, in, false)
++		require.ErrorIs(t, err, ErrNonceExhausted)
++	})
++
++	t.Run("out of gas for the event leaves no state written", func(t *testing.T) {
++		e := registeredEnv(t, v)
++		_, err := e.call(t, setMandateInput(t, v.Agent, m, 0, hexBytes(t, v.SetMandate.Valid.Auth)), false)
++		require.NoError(t, err)
++		// Enough for the function but not for the Frozen event. Run is called directly,
++		// so nothing outside the precompile would roll back a partial write.
++		_, _, err = AgentPolicyPrecompile.Run(e, common.Address{0xaa}, ContractAddress,
++			freezeInput(t, v.Agent, 1, hexBytes(t, v.Freeze.Valid.Auth), true), FreezeGasCost, false)
++		require.ErrorIs(t, err, vm.ErrOutOfGas)
++		require.Equal(t, uint64(1), ownerNonceOf(t, e, v.Agent))
++		require.False(t, mandateOf(t, e, v.Agent).Frozen)
++
++		_, _, err = AgentPolicyPrecompile.Run(e, common.Address{0xaa}, ContractAddress,
++			setMandateInput(t, v.Agent, m, 1, hexBytes(t, v.SetMandate.Valid.Auth)), SetMandateGasCost, false)
++		require.Error(t, err) // challenge for nonce 0 does not match nonce 1
++		require.Equal(t, uint64(1), ownerNonceOf(t, e, v.Agent))
++	})
++}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/event.go b/graft/subnet-evm/precompile/contracts/agentpolicy/event.go
 new file mode 100644
 index 0000000..eadd58a
@@ -1960,15 +2008,16 @@ index 0000000..eadd58a
 +// UnpackUnfrozenEvent won't be generated because the event does not have any non-indexed data.
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/logic.go b/graft/subnet-evm/precompile/contracts/agentpolicy/logic.go
 new file mode 100644
-index 0000000..398f796
+index 0000000..716a513
 --- /dev/null
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/logic.go
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,218 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package agentpolicy
 +
 +import (
++	"math"
 +	"math/big"
 +
 +	"github.com/ava-labs/libevm/common"
@@ -2001,18 +2050,28 @@ index 0000000..398f796
 +	return nil, ErrNoChainID
 +}
 +
-+func emit(as contract.AccessibleState, remainingGas *uint64, gas uint64, topics []common.Hash, data []byte) error {
++// event is a log to add once every check and every state write has succeeded.
++type event struct {
++	gas    uint64
++	topics []common.Hash
++	data   []byte
++}
++
++// chargeEvent deducts the event's gas up front, so an out-of-gas error never
++// leaves state written (writes happen only after all charges and checks).
++func chargeEvent(remainingGas *uint64, ev event) error {
 +	var err error
-+	if *remainingGas, err = contract.DeductGas(*remainingGas, gas); err != nil {
-+		return err
-+	}
++	*remainingGas, err = contract.DeductGas(*remainingGas, ev.gas)
++	return err
++}
++
++func addLog(as contract.AccessibleState, ev event) {
 +	as.GetStateDB().AddLog(&types.Log{
 +		Address:     ContractAddress,
-+		Topics:      topics,
-+		Data:        data,
++		Topics:      ev.topics,
++		Data:        ev.data,
 +		BlockNumber: as.GetBlockContext().Number().Uint64(),
 +	})
-+	return nil
 +}
 +
 +func doRegister(as contract.AccessibleState, remainingGas *uint64, in RegisterInput) error {
@@ -2030,37 +2089,48 @@ index 0000000..398f796
 +	if err := verifyAgentSignature(in.Agent, RegisterDigest(chainID, in.Agent, in.OwnerX, in.OwnerY), in.AgentSig); err != nil {
 +		return err
 +	}
-+
-+	setFlag(st, in.Agent, flagRegistered, true)
-+	setWord(st, in.Agent, fieldOwnerX, in.OwnerX)
-+	setWord(st, in.Agent, fieldOwnerY, in.OwnerY)
-+	setUint64(st, in.Agent, fieldOwnerNonce, 0)
-+
 +	data := AgentRegisteredEventData{OwnerX: in.OwnerX, OwnerY: in.OwnerY}
 +	topics, packed, err := PackAgentRegisteredEvent(in.Agent, data)
 +	if err != nil {
 +		return err
 +	}
-+	return emit(as, remainingGas, GetAgentRegisteredEventGasCost(data), topics, packed)
++	ev := event{GetAgentRegisteredEventGasCost(data), topics, packed}
++	if err := chargeEvent(remainingGas, ev); err != nil {
++		return err
++	}
++
++	setFlag(st, in.Agent, flagRegistered, true)
++	setWord(st, in.Agent, fieldOwnerX, in.OwnerX)
++	setWord(st, in.Agent, fieldOwnerY, in.OwnerY)
++	setUint64(st, in.Agent, fieldOwnerNonce, 0)
++	addLog(as, ev)
++	return nil
 +}
 +
 +// checkOwner verifies that `nonce` is the next owner nonce and that `auth` is the
-+// owner's passkey assertion over `challenge`; on success it increments the nonce.
-+func checkOwner(st contract.StateDB, agent common.Address, nonce *big.Int, auth []byte, challenge common.Hash) error {
++// owner's passkey assertion over `challenge`. It does not write; the caller bumps
++// the nonce with bumpNonce after charging gas.
++func checkOwner(st contract.StateReader, agent common.Address, nonce *big.Int, auth []byte, challenge common.Hash) (uint64, error) {
 +	if !isRegistered(st, agent) {
-+		return ErrNotRegistered
++		return 0, ErrNotRegistered
 +	}
 +	current := getUint64(st, agent, fieldOwnerNonce)
++	if current == math.MaxUint64 {
++		return 0, ErrNonceExhausted // never wrap back to an old nonce
++	}
 +	if nonce == nil || !nonce.IsUint64() || nonce.Uint64() != current {
-+		return ErrBadNonce
++		return 0, ErrBadNonce
 +	}
 +	x := [32]byte(getWord(st, agent, fieldOwnerX))
 +	y := [32]byte(getWord(st, agent, fieldOwnerY))
 +	if err := VerifyWebAuthn(auth, challenge, x, y); err != nil {
-+		return err
++		return 0, err
 +	}
++	return current, nil
++}
++
++func bumpNonce(st contract.StateDB, agent common.Address, current uint64) {
 +	setUint64(st, agent, fieldOwnerNonce, current+1)
-+	return nil
 +}
 +
 +func doSetMandate(as contract.AccessibleState, remainingGas *uint64, in SetMandateInput) error {
@@ -2075,16 +2145,10 @@ index 0000000..398f796
 +		return err
 +	}
 +	st := as.GetStateDB()
-+	if err := checkOwner(st, in.Agent, in.Nonce, in.Auth, SetMandateChallenge(chainID, in.Agent, in.M, in.Nonce)); err != nil {
++	current, err := checkOwner(st, in.Agent, in.Nonce, in.Auth, SetMandateChallenge(chainID, in.Agent, in.M, in.Nonce))
++	if err != nil {
 +		return err
 +	}
-+	writeMandate(st, in.Agent, Mandate{
-+		Payees:   in.M.Payees,
-+		PerTxCap: in.M.PerTxCap,
-+		DailyCap: in.M.DailyCap,
-+		Expiry:   in.M.Expiry,
-+	})
-+
 +	data := MandateSetEventData{
 +		PerTxCap:   in.M.PerTxCap,
 +		DailyCap:   in.M.DailyCap,
@@ -2095,7 +2159,20 @@ index 0000000..398f796
 +	if err != nil {
 +		return err
 +	}
-+	return emit(as, remainingGas, GetMandateSetEventGasCost(data), topics, packed)
++	ev := event{GetMandateSetEventGasCost(data), topics, packed}
++	if err := chargeEvent(remainingGas, ev); err != nil {
++		return err
++	}
++
++	bumpNonce(st, in.Agent, current)
++	writeMandate(st, in.Agent, Mandate{
++		Payees:   in.M.Payees,
++		PerTxCap: in.M.PerTxCap,
++		DailyCap: in.M.DailyCap,
++		Expiry:   in.M.Expiry,
++	})
++	addLog(as, ev)
++	return nil
 +}
 +
 +func doToggleFreeze(as contract.AccessibleState, remainingGas *uint64, agent common.Address, nonce *big.Int, auth []byte, freeze bool) error {
@@ -2108,23 +2185,32 @@ index 0000000..398f796
 +		challenge = FreezeChallenge(chainID, agent, nonce)
 +	}
 +	st := as.GetStateDB()
-+	if err := checkOwner(st, agent, nonce, auth, challenge); err != nil {
++	current, err := checkOwner(st, agent, nonce, auth, challenge)
++	if err != nil {
 +		return err
 +	}
-+	setFlag(st, agent, flagFrozen, freeze)
-+
++	var ev event
 +	if freeze {
 +		topics, packed, err := PackFrozenEvent(agent)
 +		if err != nil {
 +			return err
 +		}
-+		return emit(as, remainingGas, GetFrozenEventGasCost(), topics, packed)
++		ev = event{GetFrozenEventGasCost(), topics, packed}
++	} else {
++		topics, packed, err := PackUnfrozenEvent(agent)
++		if err != nil {
++			return err
++		}
++		ev = event{GetUnfrozenEventGasCost(), topics, packed}
 +	}
-+	topics, packed, err := PackUnfrozenEvent(agent)
-+	if err != nil {
++	if err := chargeEvent(remainingGas, ev); err != nil {
 +		return err
 +	}
-+	return emit(as, remainingGas, GetUnfrozenEventGasCost(), topics, packed)
++
++	bumpNonce(st, agent, current)
++	setFlag(st, agent, flagFrozen, freeze)
++	addLog(as, ev)
++	return nil
 +}
 +
 +func viewMandate(st contract.StateReader, agent common.Address) GetMandateOutput {
@@ -2402,10 +2488,10 @@ index 0000000..d6626ae
 +}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go b/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
 new file mode 100644
-index 0000000..f988102
+index 0000000..95a5767
 --- /dev/null
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
-@@ -0,0 +1,237 @@
+@@ -0,0 +1,247 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package agentpolicy
@@ -2445,6 +2531,8 @@ index 0000000..f988102
 +	ErrTooManyPayees       = errors.New("agentpolicy: more than 16 payees")
 +	ErrPerTxAboveDaily     = errors.New("agentpolicy: perTxCap greater than dailyCap")
 +	ErrNoChainID           = errors.New("agentpolicy: chain id unavailable")
++	ErrNonceExhausted      = errors.New("agentpolicy: owner nonce exhausted")
++	ErrAuthTooLarge        = errors.New("agentpolicy: auth larger than MaxAuthSize")
 +)
 +
 +var (
@@ -2464,6 +2552,10 @@ index 0000000..f988102
 +
 +	p256HalfN = new(big.Int).Rsh(elliptic.P256().Params().N, 1)
 +)
++
++// MaxAuthSize bounds the encoded WebAuthn proof. Real assertions are a few hundred
++// bytes (37-byte authenticatorData, clientDataJSON around 150-250 bytes, plus ABI heads).
++const MaxAuthSize = 2048
 +
 +func mustPack(args abi.Arguments, values ...any) []byte {
 +	b, err := args.Pack(values...)
@@ -2595,6 +2687,10 @@ index 0000000..f988102
 +// VerifyWebAuthn checks `auth` = abi.encode(bytes authenticatorData, bytes clientDataJSON,
 +// bytes32 r, bytes32 s) against the expected challenge and the owner's P-256 key.
 +func VerifyWebAuthn(auth []byte, challenge common.Hash, ownerX, ownerY [32]byte) error {
++	// Bound the work done on attacker-supplied bytes before the signature is checked.
++	if len(auth) > MaxAuthSize {
++		return ErrAuthTooLarge
++	}
 +	vals, err := authArgs.Unpack(auth)
 +	if err != nil || len(vals) != 4 {
 +		return ErrBadAuthEncoding

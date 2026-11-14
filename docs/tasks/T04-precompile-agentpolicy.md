@@ -87,10 +87,18 @@ Môi trường: Windows 11, Git Bash, Docker 29.5.3, Go 1.26.10 trong Docker, No
 | Hàm đọc chạy ở chế độ chỉ đọc, hàm ghi bị từ chối | `TestAgentPolicyReadOnly` | `PASS` |
 | TS: challenge và `auth` khớp từng byte với vector | `packages/shared/src/agentPolicy.test.ts` (13 test) | `PASS` |
 | Test có thể đỏ | Đột biến từng cái rồi hoàn nguyên: bỏ kiểm `s` thấp, bỏ kiểm UP, bỏ kiểm `type`, bỏ kiểm challenge, không tăng nonce, cho đăng ký lại | `FAIL` đúng test ở cả 6 lần |
+| Giới hạn sau khi rà lại | `TestAgentPolicyBounds`: `auth` lớn hơn `MaxAuthSize` (2048 byte) bị từ chối trước khi phân tích; nonce ở `2^64−1` trả `ErrNonceExhausted`; hết gas đúng lúc trừ gas sự kiện thì không ghi trạng thái | `PASS`; đột biến (bỏ giới hạn kích thước; ghi nonce trước khi trừ gas) đều bị bắt |
 | Không hồi quy | `SEALED_TEST_RUN=. bash chain/scripts/test.sh`; `go test ./precompile/...` | `PASS` |
 | Node build và chạy với cả hai bản vá | `build.sh`, `localnet.sh up`, `smoke.sh`, `chain/tests/spike/run.sh` | `PASS` |
 | Precompile trên chain thật | xem D4 | `PASS` |
 | `bash chain/scripts/test.sh` và `bash scripts/check.sh` | | ghi trong PR |
+
+### Rà lại trước khi mở PR
+Bản vá được một người rà độc lập đọc lại (chỉ đọc mã, không chạy). Ba điểm nêu ra, đã tự kiểm lại bằng mã và test rồi sửa:
+1. `auth` không bị giới hạn kích thước: bằng chứng lỗi vẫn bắt node giải mã ABI và phân tích JSON lớn mà không làm nonce tăng. Sửa: `MaxAuthSize = 2048`, kiểm trước khi giải mã. Phần giải mã calldata do khung sinh sẵn vẫn chạy trên cả input, nhưng chi phí calldata và bộ nhớ đã do người gọi trả.
+2. Nonce lưu `uint64`, `current+1` có thể quấn về 0 khi tới `2^64−1`, làm bằng chứng cũ với nonce 0 dùng lại được. Sửa: trả `ErrNonceExhausted` khi nonce đã ở giá trị lớn nhất.
+3. Trạng thái được ghi trước khi trừ gas sự kiện. Trong EVM, lỗi làm khung gọi bị hoàn nên không khai thác được, nhưng khi gọi `Run` trực tiếp thì để lại ghi dở. Sửa: trừ gas sự kiện trước, ghi trạng thái sau cùng (`checkOwner` không còn ghi; `bumpNonce` chạy sau `chargeEvent`).
+Các phần khác (đăng ký một lần, chống biến dạng chữ ký, tách miền giữa các hàm, phân tích JSON, va chạm ô lưu trữ, tính tất định, chế độ chỉ đọc, cách lấy chain id) được báo là không có vấn đề.
 
 ### Ghi chú, việc phát hiện thêm (không làm trong task này)
 - Bố cục lưu trữ là contract nội bộ giữa T04 và T05 (`storage.go`). Đổi bố cục sau khi chain chạy thật sẽ cần state upgrade.
