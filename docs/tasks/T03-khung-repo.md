@@ -64,7 +64,7 @@ Môi trường: Windows 11, Git Bash, Node 24.12.0, pnpm 11.21.0, Docker 29.5.3.
 | Hỏng test TS | đổi `261126` thành `261127` trong `chain.test.ts`, chạy lại | `PASS`: thoát 1, test-ts `FAIL`, các bước sau `NOT RUN` |
 | Hỏng bước chain | tạo tạm `chain/scripts/test.sh` trả `exit 3`, chạy lại | `PASS`: thoát 1 |
 | `git status` sạch sau kiểm | `git status --short` sau khi hoàn nguyên và chạy lại | `PASS`: chỉ còn file của task; `contracts/out/`, `contracts/cache/`, `node_modules/` nằm trong mục bị bỏ qua |
-| Không lộ file chỉ dùng trên máy và secret | `git ls-files` | `PASS`: không có `CLAUDE.md`, `.claude/`, `idea-debate/`, `Y_TUONG_CHOT_*.md`, `UniHack_2026_brief.md`, `.env` |
+| Không lộ file chỉ dùng trên máy và secret | `git ls-files`, đối chiếu với mục "Chỉ dùng trên máy" và "Secret" của `.gitignore` | `PASS`: không có file nào thuộc hai mục này |
 | Clone sạch chạy được | clone nhánh vào thư mục tạm, `bash scripts/check.sh` | ghi trong PR |
 
 ### Chưa làm / ghi chú cho task sau
