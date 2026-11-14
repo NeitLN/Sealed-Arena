@@ -13,14 +13,15 @@ Khi một task kiểm lại một mục, người code cập nhật mức kiểm
 | Tag avalanchego mới nhất là `v1.15.3` (phát hành 05/11/2026). Dự án cố định ở tag này | ĐÃ KIỂM 15/11, GitHub API |
 | Subnet-EVM nằm trong repo avalanchego tại `graft/subnet-evm/`. Có `Dockerfile`, `scripts/build.sh`, `scripts/run.sh`, `Taskfile.yml`, `plugin/` | ĐÃ KIỂM 15/11, GitHub API |
 | Precompile có sẵn trong `graft/subnet-evm/precompile/contracts/`: `deployerallowlist`, `feemanager`, `gaspricemanager`, `nativeminter`, `rewardmanager`, `txallowlist`, `warp` | ĐÃ KIỂM 15/11, GitHub API |
-| `(*StateTransition).preCheck()` ở dòng 230 của `core/state_transition.go`; kiểm TxAllowList ở dòng 254–257 qua `txallowlist.GetTxAllowListStatus(st.state, msg.From)`, trả `vmerrors.ErrSenderAddressNotAllowListed` | ĐÃ KIỂM 15/11 trên `master`. Phải kiểm lại trên tag `v1.15.3` |
-| `ValidateTransactionWithState()` ở dòng 226 của `core/txpool/validation.go`; kiểm TxAllowList ở dòng 281–284 | ĐÃ KIỂM 15/11 trên `master`. Phải kiểm lại trên tag |
+| `(*StateTransition).preCheck()` ở dòng 230 của `core/state_transition.go`; kiểm TxAllowList ở dòng 254–258 qua `txallowlist.GetTxAllowListStatus(st.state, msg.From)`, trả `vmerrors.ErrSenderAddressNotAllowListed` | ĐÃ KIỂM 15/11 trên tag `v1.15.3` (T02, D1) |
+| `ValidateTransactionWithState()` ở dòng 226 của `core/txpool/validation.go`; kiểm TxAllowList ở dòng 281–286 | ĐÃ KIỂM 15/11 trên tag `v1.15.3` (T02, D1) |
 | Kho `ava-labs/precompile-evm` đã bị lưu trữ (10/2026). Precompile tự viết phải nằm trong bản fork avalanchego | CHƯA KIỂM lại |
 | Kho `ava-labs/icm-contracts` đã lưu trữ (12/2025), chuyển vào `ava-labs/icm-services` (có `icm-contracts/avalanche/ictt`, gồm `ERC20TokenHome`, `NativeTokenRemote`, `ERC20TokenRemote`) | CHƯA KIỂM lại |
 | `ContractDeployerAllowList` kiểm `tx.origin` trong `CanCreateContract`, nên agent không triển khai được contract kể cả qua factory | CHƯA KIỂM lại; T06 phải có test |
-| Precompile có thể gọi `env.InvalidateExecution` để vô hiệu giao dịch từ bên trong lúc thực thi (`params/hooks_libevm.go`) | CHƯA KIỂM lại; là phương án thay thế nếu `preCheck` không dùng được |
+| Precompile có thể gọi `env.InvalidateExecution` (`params/hooks_libevm.go:138`). Trong Subnet-EVM nó chỉ hoàn trạng thái của giao dịch (`core/state_transition.go:413–421`); giao dịch vẫn nằm trong block. Yếu hơn lỗi ở `preCheck` | ĐÃ KIỂM 15/11, đọc mã ở tag và libevm `d398bc4dbe41` (T02, D1 câu 5) |
 | Phiên bản Go cần để build: `go 1.26.10` (`go.mod` dòng 18); repo dùng `go.work` (gốc, `graft/coreth`, `graft/evm`, `graft/subnet-evm`) | ĐÃ KIỂM 15/11, đọc `go.mod` ở tag `v1.15.3`, build thành công bằng `golang:1.26.10-bookworm` (T01) |
-| Subnet-EVM ở tag này có áp ACP-194 (thực thi tách khỏi đồng thuận) không | CHƯA KIỂM. Là quyết định D1, T02 trả lời |
+| Subnet-EVM ở tag này **không** áp ACP-194: `vms/saevm` chỉ dùng cho C-Chain (`graft/coreth`), `graft/subnet-evm` không import nó | ĐÃ KIỂM 15/11, đọc mã ở tag (T02, D1 câu 3) |
+| Lỗi ở `preCheck` làm block không hợp lệ khi xác minh (`wrapped_block.go:237` → `blockchain.go:1463` → `state_processor.go:107`); người dựng block bỏ giao dịch lỗi và dựng tiếp (`miner/worker.go:480–484`) | ĐÃ KIỂM 15/11: đọc mã và test Go (T02, D1) |
 | Dựng mạng local với VM tự build: `tests/fixture/tmpnet` ở tag `v1.15.3` tạo được subnet chạy Subnet-EVM qua mã Go (CLI `tmpnetctl` không khai báo được subnet). `avalanche-cli` bản mới nhất `v1.9.7` (14/10/2026), repo chưa lưu trữ, không chạy thử | ĐÃ KIỂM 15/11: tmpnet chạy 1 và 3 node (T01, `docs/decisions/D3.md`); `avalanche-cli` chỉ kiểm qua GitHub API |
 | tmpnet tạo subnet có cấp quyền (`CreateSubnetTx`, `CreateChainTx`, thêm validator cho subnet), không chuyển thành L1 theo ACP-77 | ĐÃ KIỂM 15/11, đọc `tests/fixture/tmpnet/subnet.go`. Luồng L1 trên Fuji: T12 kiểm |
 

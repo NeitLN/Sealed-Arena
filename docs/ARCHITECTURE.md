@@ -51,12 +51,12 @@ Quy tắc ranh giới:
 
 ### 3.1 Quy tắc hợp lệ (phần lõi)
 
-Chèn ở đúng hai chỗ, ngay cạnh kiểm tra TxAllowList có sẵn (đã xác nhận vị trí trên `master` ngày 15/11/2026):
+Chèn ở đúng hai chỗ, ngay cạnh kiểm tra TxAllowList có sẵn (đã xác nhận vị trí trên tag `v1.15.3` ở T02, `docs/decisions/D1.md`):
 
 | File (trong `graft/subnet-evm/`) | Hàm | Dòng tham chiếu | Việc phải làm |
 |---|---|---|---|
-| `core/state_transition.go` | `(*StateTransition).preCheck()` | kiểm TxAllowList ở dòng 254–257 | Kiểm quy tắc. Lỗi trả về ở đây làm giao dịch không hợp lệ. Nếu qua, ghi bộ đếm |
-| `core/txpool/validation.go` | `ValidateTransactionWithState()` | kiểm TxAllowList ở dòng 281–284 | Kiểm quy tắc ở chế độ chỉ đọc, không ghi bộ đếm |
+| `core/state_transition.go` | `(*StateTransition).preCheck()` | kiểm TxAllowList ở dòng 254–258 (trong khối `if !msg.SkipAccountChecks`, dòng 233) | Kiểm quy tắc. Lỗi trả về ở đây làm giao dịch không hợp lệ. Nếu qua, ghi bộ đếm |
+| `core/txpool/validation.go` | `ValidateTransactionWithState()` | kiểm TxAllowList ở dòng 281–286 | Kiểm quy tắc ở chế độ chỉ đọc, không ghi bộ đếm |
 
 Điều kiện bật: `IsPrecompileEnabled(agentpolicy.ContractAddress, time)`, giống hệt cách TxAllowList làm, để mọi node bật ở cùng một block.
 
@@ -78,10 +78,12 @@ Lỗi trả về dùng các biến lỗi riêng (`ErrAgentPayeeNotAllowed`, `Err
 **Bất biến dùng để phát hiện vi phạm** (ArenaRecorder dựa vào đây):
 `balance(agent) ≥ tổng tiền đã nạp cho agent − totalCharged(agent)`.
 Mọi đường làm tiền rời tài khoản mà không qua quy tắc sẽ phá bất biến này.
+Ngoài quy tắc (không phải giao dịch): state upgrade (`stateupgrade/state_upgrade.go:33–44`) và genesis `alloc` có thể đổi số dư hoặc code của agent. Đây là quyền của người vận hành; README phải cam kết không phát hành state upgrade nào đụng tới địa chỉ agent (D1).
 
 Rủi ro đã biết phải có test:
-- Txpool kiểm trên trạng thái hiện tại, nên nhiều giao dịch đang chờ có thể cùng qua txpool. Khi vào block, giao dịch vượt ngân sách phải bị `preCheck` loại và bị người dựng block bỏ qua, không làm hỏng block. **[cần kiểm T02]**
-- **[cần kiểm T02]** Ở tag này Subnet-EVM có dùng cơ chế thực thi tách khỏi đồng thuận (ACP-194) không. Nếu có, "lỗi ở preCheck làm block không hợp lệ" có thể không còn đúng, và phải đổi điểm chèn hoặc lùi bậc 2.
+- Txpool kiểm trên trạng thái hiện tại, nên nhiều giao dịch đang chờ có thể cùng qua txpool. Khi vào block, giao dịch vượt ngân sách phải bị `preCheck` loại và bị người dựng block bỏ qua, không làm hỏng block. Đã kiểm ở T02 bằng đọc mã: người dựng block gặp lỗi thì bỏ giao dịch và các giao dịch sau của cùng người gửi, dựng tiếp (`miner/worker.go:469–484`, D1 câu 4). Test 20 giao dịch đồng thời là việc của T05.
+- Ở tag này Subnet-EVM **không** dùng cơ chế thực thi tách khỏi đồng thuận (ACP-194 chỉ dùng cho C-Chain qua `vms/saevm`). Lỗi ở `preCheck` làm block không hợp lệ: đã kiểm ở T02 (`docs/decisions/D1.md`).
+- `eth_call` và `eth_estimateGas` chạy với `SkipAccountChecks: true` nên không áp quy tắc. Không dùng chúng để đoán giao dịch có hợp lệ không.
 - Hai node chạy bản khác nhau sẽ tách chain. Mọi node dùng cùng một image.
 
 ### 3.2 Precompile AgentPolicy
