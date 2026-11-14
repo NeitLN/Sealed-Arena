@@ -1,0 +1,5 @@
+# Pinned upstream. fetch.sh refuses to continue if the tag does not resolve to this commit.
+AVALANCHEGO_REPO=https://github.com/ava-labs/avalanchego.git
+AVALANCHEGO_TAG=v1.15.3
+AVALANCHEGO_COMMIT=983815fd993acf846a27749b598f0fea4d876a75
+GO_VERSION=1.26.10
