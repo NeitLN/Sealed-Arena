@@ -2302,10 +2302,10 @@ index 0000000..31323e3
 +}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
 new file mode 100644
-index 0000000..d6626ae
+index 0000000..8ac7ba6
 --- /dev/null
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,188 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package agentpolicy
@@ -2316,6 +2316,7 @@ index 0000000..d6626ae
 +
 +	"github.com/ava-labs/libevm/common"
 +	"github.com/ava-labs/libevm/crypto"
++	"github.com/ava-labs/libevm/libevm/stateconf"
 +
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 +)
@@ -2346,6 +2347,13 @@ index 0000000..d6626ae
 +	MaxPayees = 16
 +)
 +
++// StateReadWriter is the storage access this file needs. contract.StateDB (inside the
++// precompile) and the EVM state used by preCheck (vm.StateDB) both satisfy it.
++type StateReadWriter interface {
++	contract.StateReader
++	SetState(common.Address, common.Hash, common.Hash, ...stateconf.StateDBStateOption)
++}
++
 +func slot(agent common.Address, field byte, extra ...byte) common.Hash {
 +	buf := make([]byte, 0, common.AddressLength+2)
 +	buf = append(buf, agent.Bytes()...)
@@ -2358,7 +2366,7 @@ index 0000000..d6626ae
 +	return s.GetState(ContractAddress, slot(agent, field, extra...))
 +}
 +
-+func setWord(s contract.StateDB, agent common.Address, field byte, v common.Hash, extra ...byte) {
++func setWord(s StateReadWriter, agent common.Address, field byte, v common.Hash, extra ...byte) {
 +	s.SetState(ContractAddress, slot(agent, field, extra...), v)
 +}
 +
@@ -2367,7 +2375,7 @@ index 0000000..d6626ae
 +	return binary.BigEndian.Uint64(h[24:])
 +}
 +
-+func setUint64(s contract.StateDB, agent common.Address, field byte, v uint64) {
++func setUint64(s StateReadWriter, agent common.Address, field byte, v uint64) {
 +	var h common.Hash
 +	binary.BigEndian.PutUint64(h[24:], v)
 +	setWord(s, agent, field, h)
@@ -2377,7 +2385,7 @@ index 0000000..d6626ae
 +	return getWord(s, agent, field).Big()
 +}
 +
-+func setBig(s contract.StateDB, agent common.Address, field byte, v *big.Int) {
++func setBig(s StateReadWriter, agent common.Address, field byte, v *big.Int) {
 +	setWord(s, agent, field, common.BigToHash(v))
 +}
 +
@@ -2404,7 +2412,7 @@ index 0000000..d6626ae
 +	return getUint64(s, agent, fieldFlags)&flagFrozen != 0
 +}
 +
-+func setFlag(s contract.StateDB, agent common.Address, flag uint64, on bool) {
++func setFlag(s StateReadWriter, agent common.Address, flag uint64, on bool) {
 +	flags := getUint64(s, agent, fieldFlags)
 +	if on {
 +		flags |= flag
@@ -2431,7 +2439,7 @@ index 0000000..d6626ae
 +	}
 +}
 +
-+func writeMandate(s contract.StateDB, agent common.Address, m Mandate) {
++func writeMandate(s StateReadWriter, agent common.Address, m Mandate) {
 +	old := int(getUint64(s, agent, fieldPayeeCount))
 +	for i := 0; i < MaxPayees; i++ {
 +		var v common.Hash
@@ -2480,7 +2488,7 @@ index 0000000..d6626ae
 +// ChargeSpend adds `charge` to the agent's spend counters at `timestamp`
 +// (spentToday resets when the UTC day changes; totalCharged never resets).
 +// Callers must check the mandate first; this function only records.
-+func ChargeSpend(s contract.StateDB, agent common.Address, charge *big.Int, timestamp uint64) {
++func ChargeSpend(s StateReadWriter, agent common.Address, charge *big.Int, timestamp uint64) {
 +	sp := SpendForDay(s, agent, timestamp)
 +	setBig(s, agent, fieldSpentToday, new(big.Int).Add(sp.SpentToday, charge))
 +	setUint64(s, agent, fieldDayIndex, sp.DayIndex)
