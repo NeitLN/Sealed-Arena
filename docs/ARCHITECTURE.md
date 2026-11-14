@@ -1,0 +1,215 @@
+# ARCHITECTURE
+
+Tài liệu này chỉ ghi các contract giữa các thành phần và các quyết định mà hai task có thể làm mâu thuẫn nhau.
+Chi tiết bên trong mỗi thành phần do người code quyết định trong phạm vi phiếu việc.
+Điều nào đánh dấu **[cần kiểm]** là thiết kế dự kiến, phải được xác nhận ở task nêu kèm; dấu chỉ được bỏ trong PR của task đó, kèm bằng chứng, sau khi người review kiểm.
+
+## 1. Tổng quan
+
+```
+Fuji C-Chain                              L1 Sealed (Subnet-EVM đã sửa)
++------------------------+   ICTT   +--------------------------------------------+
+| ERC20TokenHome (USDC)  | -------> | USDC là coin gốc (NativeTokenRemote)       |
+| ReputationReceiver     | <------- | ArenaRecorder                              |
+|   -> registry ERC-8004 |   ICM    | AgentPolicy (precompile, lưu uỷ quyền)     |
++------------------------+          | Quy tắc hợp lệ: preCheck + txpool          |
+                                    | TxAllowList, ContractDeployerAllowList     |
+                                    +--------------------------------------------+
+Ngoài chain: facilitator x402, người bán mẫu, agent mua hàng, cổng RPC (ghi lượt thử), web (chủ ví, thử thách)
+```
+
+## 2. Bố cục repo
+
+| Thư mục | Chứa gì | Công cụ |
+|---|---|---|
+| `chain/` | Bản vá lên avalanchego, precompile AgentPolicy, genesis, Dockerfile build node | Go, chạy trong Docker |
+| `contracts/` | ArenaRecorder, ReputationReceiver, PolicyWallet (bậc 2), ví đối chứng O | Solidity, Foundry trong Docker |
+| `services/facilitator/` | Facilitator x402 cho phương thức `signed-native-tx` | TypeScript |
+| `services/seller/` | Người bán mẫu trả 402 | TypeScript |
+| `services/agent/` | Agent mua hàng (vòng lặp LLM gọi công cụ) | TypeScript |
+| `services/rpc-gateway/` | Cổng RPC công khai: lọc phương thức, giới hạn tốc độ, ghi lượt thử | TypeScript |
+| `services/attacks/` | Bộ tấn công và trình chạy đánh giá | TypeScript |
+| `packages/shared/` | ABI, địa chỉ, kiểu dữ liệu, hàm mã hoá dùng chung | TypeScript |
+| `web/` | Dashboard chủ ví, trang thử thách, trang so sánh | Next.js |
+| `infra/` | docker-compose, cấu hình relayer, reverse proxy | |
+| `scripts/` | `check.sh` (bộ kiểm nhanh), script dựng mạng local | bash |
+
+Quy tắc ranh giới:
+- `chain/` không phụ thuộc gì ngoài avalanchego. Không có code TypeScript trong `chain/`.
+- Mọi service và `web/` lấy ABI, địa chỉ, chain id từ `packages/shared/`. Không chép địa chỉ vào từng service.
+- Bản vá avalanchego lưu dưới dạng file `.patch` trong `chain/patches/` áp lên một tag cố định, **không** chép cả cây mã nguồn avalanchego vào repo. Lý do: giám khảo đọc được đúng phần đội viết, repo nhỏ.
+
+## 3. L1 Sealed
+
+- Nền: avalanchego tag `v1.15.3`, VM là `graft/subnet-evm` trong chính repo đó (kho `precompile-evm` đã bị lưu trữ, không dùng).
+- Chain id: `261126`. Tên: `Sealed`. Ký hiệu coin gốc: `USDC` (18 chữ số thập phân ở tầng EVM).
+- Precompile bật từ genesis: TxAllowList, ContractDeployerAllowList, NativeMinter, Warp, AgentPolicy. **[cần kiểm T06]** secp256r1 (ACP-204, `0x100`) có sẵn trên Subnet-EVM ở tag này hay không.
+- TxAllowList: chỉ các địa chỉ sau được gửi giao dịch: admin, người triển khai contract, relayer (gửi hộ thao tác passkey của chủ ví), facilitator, relayer ICM, và mỗi địa chỉ agent đã đăng ký.
+- ContractDeployerAllowList: chỉ admin và người triển khai. Agent không bao giờ có trong danh sách này.
+- Phí: phí cơ sở tối thiểu đặt thấp. Người gửi trả gas bằng coin gốc.
+- Không bật bất kỳ cơ chế uỷ quyền tài khoản nào (không EIP-7702).
+
+### 3.1 Quy tắc hợp lệ (phần lõi)
+
+Chèn ở đúng hai chỗ, ngay cạnh kiểm tra TxAllowList có sẵn (đã xác nhận vị trí trên `master` ngày 15/11/2026):
+
+| File (trong `graft/subnet-evm/`) | Hàm | Dòng tham chiếu | Việc phải làm |
+|---|---|---|---|
+| `core/state_transition.go` | `(*StateTransition).preCheck()` | kiểm TxAllowList ở dòng 254–257 | Kiểm quy tắc. Lỗi trả về ở đây làm giao dịch không hợp lệ. Nếu qua, ghi bộ đếm |
+| `core/txpool/validation.go` | `ValidateTransactionWithState()` | kiểm TxAllowList ở dòng 281–284 | Kiểm quy tắc ở chế độ chỉ đọc, không ghi bộ đếm |
+
+Điều kiện bật: `IsPrecompileEnabled(agentpolicy.ContractAddress, time)`, giống hệt cách TxAllowList làm, để mọi node bật ở cùng một block.
+
+Với giao dịch có `from` là agent đã đăng ký, giao dịch hợp lệ khi **tất cả** điều sau đúng:
+1. `to` khác rỗng (không tạo contract).
+2. `to` nằm trong danh sách người nhận của uỷ quyền.
+3. `to` không có code.
+4. Agent không bị dừng (`frozen == false`).
+5. `block.timestamp < expiry`.
+6. `charge = value + gasLimit × gasFeeCap`. `charge ≤ perTxCap`.
+7. `spentToday + charge ≤ dailyCap`, với `spentToday` về 0 khi `block.timestamp / 86400` đổi.
+
+Khi qua (chỉ ở `preCheck`): `spentToday += charge`, `totalCharged += charge`. Tính theo mức tối đa, không hoàn lại phần gas không dùng. Đây là chủ ý: bộ đếm luôn lớn hơn hoặc bằng số tiền thực sự rời tài khoản.
+
+`from` không phải agent đã đăng ký: quy tắc không áp, chỉ còn TxAllowList.
+
+Lỗi trả về dùng các biến lỗi riêng (`ErrAgentPayeeNotAllowed`, `ErrAgentBudgetExceeded`, `ErrAgentFrozen`, `ErrAgentMandateExpired`, `ErrAgentContractCreation`, `ErrAgentPayeeHasCode`) để cổng RPC và giao diện hiển thị đúng lý do.
+
+**Bất biến dùng để phát hiện vi phạm** (ArenaRecorder dựa vào đây):
+`balance(agent) ≥ tổng tiền đã nạp cho agent − totalCharged(agent)`.
+Mọi đường làm tiền rời tài khoản mà không qua quy tắc sẽ phá bất biến này.
+
+Rủi ro đã biết phải có test:
+- Txpool kiểm trên trạng thái hiện tại, nên nhiều giao dịch đang chờ có thể cùng qua txpool. Khi vào block, giao dịch vượt ngân sách phải bị `preCheck` loại và bị người dựng block bỏ qua, không làm hỏng block. **[cần kiểm T02]**
+- **[cần kiểm T02]** Ở tag này Subnet-EVM có dùng cơ chế thực thi tách khỏi đồng thuận (ACP-194) không. Nếu có, "lỗi ở preCheck làm block không hợp lệ" có thể không còn đúng, và phải đổi điểm chèn hoặc lùi bậc 2.
+- Hai node chạy bản khác nhau sẽ tách chain. Mọi node dùng cùng một image.
+
+### 3.2 Precompile AgentPolicy
+
+Địa chỉ: `0x0300000000000000000000000000000000000001` **[cần kiểm T04]** theo dải địa chỉ dành cho precompile tự định nghĩa trong `precompile/modules`.
+
+Giao diện (Solidity, dùng để sinh binding và để web gọi):
+
+```solidity
+interface IAgentPolicy {
+    struct Mandate {
+        address[] payees;     // tối đa 16
+        uint256 perTxCap;     // đơn vị wei của coin gốc
+        uint256 dailyCap;
+        uint64  expiry;       // unix giây
+    }
+
+    // Đăng ký một lần. agentSig là chữ ký secp256k1 của chính khoá agent trên
+    // keccak256(abi.encode("SealedArena:register", chainId, agent, ownerX, ownerY)).
+    function register(address agent, bytes32 ownerX, bytes32 ownerY, bytes calldata agentSig) external;
+
+    // Chỉ khoá passkey của chủ ví đổi được. auth là bằng chứng WebAuthn (mục 3.3).
+    function setMandate(address agent, Mandate calldata m, uint256 nonce, bytes calldata auth) external;
+    function freeze(address agent, uint256 nonce, bytes calldata auth) external;
+    function unfreeze(address agent, uint256 nonce, bytes calldata auth) external;
+
+    function isAgent(address agent) external view returns (bool);
+    function getMandate(address agent) external view returns (Mandate memory m, bool frozen);
+    function getSpend(address agent) external view returns (uint256 spentToday, uint64 dayIndex, uint256 totalCharged);
+    function ownerNonce(address agent) external view returns (uint256);
+    function ownerKey(address agent) external view returns (bytes32 x, bytes32 y);
+
+    event AgentRegistered(address indexed agent, bytes32 ownerX, bytes32 ownerY);
+    event MandateSet(address indexed agent, uint256 perTxCap, uint256 dailyCap, uint64 expiry, uint256 payeeCount);
+    event Frozen(address indexed agent);
+    event Unfrozen(address indexed agent);
+}
+```
+
+Quyết định đã chốt:
+- `register` chỉ chạy được một lần cho mỗi agent, và cần chữ ký của chính khoá agent. Người cầm key công khai không đăng ký lại được vì agent đã đăng ký.
+- Mọi thay đổi sau đó chỉ cần chữ ký passkey của chủ ví, ai gửi giao dịch cũng được (relayer gửi hộ). Khoá agent không đổi được uỷ quyền.
+- `nonce` phải bằng `ownerNonce(agent)` và tăng 1 sau mỗi thao tác thành công, để chống phát lại.
+- Một agent mới đăng ký chưa có uỷ quyền: mọi giao dịch của nó đều không hợp lệ cho tới khi `setMandate`.
+- Không có hàm nào cho phép gỡ đăng ký.
+
+### 3.3 Bằng chứng WebAuthn (`auth`)
+
+`auth = abi.encode(bytes authenticatorData, bytes clientDataJSON, bytes32 r, bytes32 s)`.
+
+Thông điệp chủ ví ký (challenge), mã hoá base64url trong `clientDataJSON.challenge`:
+- setMandate: `keccak256(abi.encode("SealedArena:setMandate", chainId, agent, keccak256(abi.encode(m)), nonce))`
+- freeze: `keccak256(abi.encode("SealedArena:freeze", chainId, agent, nonce))`
+- unfreeze: `keccak256(abi.encode("SealedArena:unfreeze", chainId, agent, nonce))`
+
+Precompile kiểm: `clientDataJSON.type == "webauthn.get"`, challenge khớp, cờ User Present trong `authenticatorData` bật, rồi kiểm chữ ký P-256 trên `sha256(authenticatorData || sha256(clientDataJSON))` với `(ownerX, ownerY)`. Bắt `s` ở nửa thấp để chống biến dạng chữ ký.
+
+Hàm mã hoá challenge ở phía TypeScript đặt trong `packages/shared/` và phải có test đối chiếu với Go bằng cùng bộ vector.
+
+## 4. Thanh toán x402 trên L1
+
+Chuẩn `exact` của x402 trên EVM chỉ có ba phương thức (EIP-3009, Permit2, ERC-7710); coin gốc không dùng được cả ba. Dự án thêm một phương thức mới.
+
+- `scheme`: `exact`. `network`: `eip155:261126`. `asset`: `native`.
+- `extra.assetTransferMethod`: `signed-native-tx`.
+- Payload người mua gửi: `{ "signedTransaction": "0x..." }`, là giao dịch L1 đã ký bởi khoá agent với:
+  - `to` = `payTo` của người bán, `value` = `amount`,
+  - `data` = `keccak256(abi.encode(resourceUrl, requestId))` (32 byte), `requestId` do người bán cấp trong phản hồi 402.
+- Facilitator `/verify`: giải mã, kiểm chain id, `to`, `value`, `data`, chữ ký; gọi `eth_call` và đọc `getMandate`/`getSpend` để báo trước lý do từ chối. Không giữ tiền, không giữ khoá của ai.
+- Facilitator `/settle`: `eth_sendRawTransaction`, chờ receipt, trả hash.
+- Người bán chỉ giao hàng sau khi `/settle` trả receipt thành công và `data` khớp với `requestId` đã cấp.
+
+**[cần kiểm T07]** Cách đăng ký phương thức mới với gói `@x402/*` hiện hành. Nếu SDK không mở được điểm mở rộng, tự viết luồng 402 theo đúng định dạng header của đặc tả hiện hành. Không tự nghĩ ra định dạng header.
+
+Hệ quả phải ghi trong README: người bán phải thêm mạng L1 và trỏ sang facilitator này.
+
+## 5. ArenaRecorder (Solidity, trên L1)
+
+- `enroll(agent)` (chỉ admin): đưa agent vào thử thách.
+- `fund(agent)` payable: nạp coin gốc cho agent qua recorder để cộng `funded[agent]`. Tiền gửi thẳng cho agent không được tính.
+- `checkpoint(agent)` (ai cũng gọi được): cộng `score += balance × (now − lastCheckpoint)`; kiểm bất biến ở mục 3.1. Bất biến vỡ thì ghi `breached = true`, `score = 0`, phát `Breach`.
+- `reportBreach(agent)`: gọi `checkpoint`; nếu phát hiện vi phạm, ghi `msg.sender` là người tìm ra.
+- `publish(agent)`: gửi `(agent, score, breached, lastCheckpoint, block.chainid)` qua Teleporter tới ReputationReceiver trên Fuji.
+- Số lượt thử không nằm trong contract (giao dịch bị từ chối không vào chain). Cổng RPC đếm ở ngoài chain và giao diện ghi rõ đó là số đo ngoài chain.
+
+ReputationReceiver (Fuji C-Chain): chỉ nhận tin từ Teleporter với nguồn là đúng chain id và đúng địa chỉ ArenaRecorder; ghi vào registry ERC-8004. **[cần kiểm T13]** chữ ký hàm ghi của registry đang triển khai trên Fuji (reputation hay validation), đọc từ ABI thật, không viết theo trí nhớ.
+
+Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. README phải nói điều này.
+
+## 6. Cổng RPC
+
+- Là điểm duy nhất người ngoài chạm vào L1. Node RPC đứng sau nó, không phải validator.
+- Chỉ cho: `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_getTransactionByHash`, `eth_getTransactionReceipt`, `eth_getBlockByNumber`, `eth_call`, `eth_estimateGas`, `eth_gasPrice`, `eth_maxPriorityFeePerGas`, `eth_feeHistory`, `eth_getCode`, `eth_getLogs` (giới hạn dải block), `eth_sendRawTransaction`, `net_version`.
+- Với `eth_sendRawTransaction`: giải mã người gửi; ghi một dòng `{thời điểm, from, to, value, kết quả, lý do}` vào kho lượt thử. Không ghi IP dạng rõ.
+- Giới hạn tốc độ theo IP.
+- API đọc: `GET /attempts/summary` trả tổng lượt thử, số bị từ chối theo lý do, số người gửi phân biệt (theo hash của IP).
+
+## 7. Khoá và vai
+
+| Khoá | Ở đâu | Dùng để |
+|---|---|---|
+| Admin L1 | `.env` trên máy vận hành | Quản lý allow-list, enroll agent |
+| Người triển khai | `.env` | Triển khai contract |
+| Relayer | `.env` của web | Gửi hộ thao tác passkey của chủ ví |
+| Facilitator | `.env` của facilitator | Phát giao dịch đã ký của agent (không cần tiền nếu chỉ `sendRawTransaction`) |
+| Relayer ICM | cấu hình relayer | Chuyển tin ICM |
+| Agent thử thách | **công khai có chủ đích** trên trang thử thách | Bị tấn công |
+| Agent demo riêng | `.env` | Demo luồng mua hàng bình thường |
+| Passkey chủ ví | thiết bị của chủ ví | Đặt uỷ quyền, dừng |
+
+Không dùng lại khoá agent thử thách cho bất kỳ vai nào khác, trên bất kỳ chain nào.
+
+## 8. Quy ước
+
+- Tiền: số nguyên wei của coin gốc (18 chữ số). Hiển thị quy đổi về USDC 6 chữ số chỉ ở giao diện. Không dùng số thực.
+- Thời gian: unix giây, UTC. "Ngày" của ngân sách là `timestamp / 86400` theo UTC. Giao diện ghi rõ ngân sách đặt lại lúc 07:00 giờ Việt Nam.
+- Cấu hình qua biến môi trường; mỗi service có `.env.example`.
+- Mọi contract Solidity và mọi nhánh của quy tắc Go có test cho cả hai chiều: trường hợp được phép chạy được, trường hợp bị cấm bị chặn.
+- Tên lỗi, tên sự kiện, tên trường trong tài liệu này là contract. Đổi tên phải qua người review và cập nhật tài liệu này.
+
+## 9. Phương án lùi
+
+| Bậc | Lớp thực thi | Còn giữ | Phải bỏ |
+|---|---|---|---|
+| 1 | Bản vá Subnet-EVM + AgentPolicy (mục 3) | Toàn bộ | Không |
+| 2 | Subnet-EVM gốc. Contract `PolicyWallet` giữ coin gốc và áp cùng bộ quy tắc ở mục 3.1 khi agent gọi `pay(to, amount, ref)`. Ví agent chỉ nhận nhỏ giọt phí gas, có trong TxAllowList, không có trong ContractDeployerAllowList. Passkey kiểm bằng `0x100` hoặc thư viện Solidity | L1 riêng, ICTT, allow-list, ICM, thử thách key công khai, ERC-8004 | Câu "giao dịch không hợp lệ". Phải nói: "ví chính sách trên L1 riêng" |
+| 3 | Ví hạn mức trên Fuji C-Chain theo cơ chế giữ chỗ rồi mới thanh toán, x402 chuẩn với USDC | Hạn mức giữ khi gửi đồng thời; người bán không sửa gì | L1 riêng là thành phần chịu lực |
+
+Ở mọi bậc, giao diện giữa lớp thực thi và phần còn lại là: `getMandate`, `getSpend`, `setMandate/freeze` bằng passkey, và bất biến `balance ≥ funded − totalCharged`. Agent, người bán, facilitator, web, ArenaRecorder và bộ tấn công không phải viết lại khi đổi bậc; chỉ đổi adapter trong `packages/shared/`.
+
+Điều kiện lùi xuống bậc 2: tới cuối ngày 19/11, T05 chưa có kết quả `PASS` trên mạng local nhiều node, hoặc T02 kết luận lỗi ở `preCheck` không làm giao dịch bị loại khỏi block.
