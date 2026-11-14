@@ -45,7 +45,7 @@ CI trên GitHub, hook git, mọi code sản phẩm.
 - `packages/shared/src/chain.ts`: `CHAIN_ID = 261126`, `CHAIN_NAME = "Sealed"`, `NATIVE_SYMBOL = "USDC"`, đối tượng `ADDRESSES` (agentPolicy, arenaRecorder, reputationReceiver) để `undefined` cho tới task triển khai hoặc kiểm địa chỉ. Test viết trước (`chain.test.ts`, đã thấy đỏ trước khi có `chain.ts`).
 - `contracts/`: Foundry, solc `0.8.38`, `evm_version = "cancun"`, forge-std `v1.17.0` dạng git submodule (`contracts/lib/forge-std`). Contract mẫu `Placeholder.sol` và test hai chiều (được phép / revert), xoá ở T10.
 - `scripts/forge.sh`: chạy `forge` trong image `ghcr.io/foundry-rs/foundry:v1.9.0` cố định bằng digest `sha256:3a392c18…7d39`. Volume tên `sealed-arena-foundry-home` giữ solc đã tải giữa các lần chạy.
-- `scripts/check.sh`: typecheck → lint → test TS → forge build → forge test → `chain/scripts/test.sh` (nếu có). Dừng ở lỗi đầu tiên; bảng tổng kết in mỗi bước một dòng `PASS`/`FAIL`, bước bị bỏ qua in `NOT RUN (...)`, bước chain chưa có in `N/A (...)`. Tự chạy `pnpm install --frozen-lockfile` và `git submodule update --init` nếu thiếu.
+- `scripts/check.sh`: typecheck → lint (`--error-on-warnings`) → test TS → forge build → forge test → `chain/scripts/test.sh` (nếu có). Dừng ở lỗi đầu tiên; bảng tổng kết in mỗi bước một dòng `PASS`/`FAIL`, bước bị bỏ qua in `NOT RUN (...)`, bước chain chưa có in `N/A (...)`. Mỗi lần chạy đều đồng bộ `pnpm install --frozen-lockfile` và `git submodule update --init` trước (góp ý review).
 - `chain/`, `services/`, `web/`, `infra/` có `.gitkeep`. `README.md` tối thiểu, `.env.example` ở gốc.
 
 ### File ngoài mục "Sở hữu" (cần người review đồng ý)

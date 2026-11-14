@@ -7,7 +7,7 @@
   },
   "scripts": {
     "typecheck": "pnpm -r --if-present typecheck",
-    "lint": "biome check .",
+    "lint": "biome check --error-on-warnings .",
     "format": "biome format --write .",
     "test": "pnpm -r --if-present test",
     "check": "bash scripts/check.sh"

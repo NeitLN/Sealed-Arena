@@ -19,15 +19,13 @@ STEPS=(
 declare -a RESULTS=()
 failed=0
 
+# Always sync dependencies with the lockfile and submodule pins, so a pull that changes them
+# is picked up. Both commands are fast when nothing changed.
 prepare() {
-  if [ ! -d node_modules ]; then
-    echo "==> pnpm install --frozen-lockfile"
-    pnpm install --frozen-lockfile || return 1
-  fi
-  if [ ! -f contracts/lib/forge-std/src/Test.sol ]; then
-    echo "==> git submodule update --init --recursive"
-    git submodule update --init --recursive || return 1
-  fi
+  echo "==> pnpm install --frozen-lockfile"
+  pnpm install --frozen-lockfile --silent || return 1
+  echo "==> git submodule update --init --recursive"
+  git submodule update --init --recursive || return 1
 }
 
 if ! prepare; then

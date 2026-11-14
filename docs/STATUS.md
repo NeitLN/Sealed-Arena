@@ -35,4 +35,4 @@ Cần Docker Desktop đang chạy, Node 24, pnpm 11.
 ```bash
 bash scripts/check.sh
 ```
-Lần đầu sau khi clone, script tự chạy `pnpm install --frozen-lockfile` và `git submodule update --init`.
+Mỗi lần chạy, script đồng bộ trước `pnpm install --frozen-lockfile` và `git submodule update --init`.
