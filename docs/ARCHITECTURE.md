@@ -43,7 +43,7 @@ Quy tắc ranh giới:
 
 - Nền: avalanchego tag `v1.15.3`, VM là `graft/subnet-evm` trong chính repo đó (kho `precompile-evm` đã bị lưu trữ, không dùng).
 - Chain id: `261126`. Tên: `Sealed`. Ký hiệu coin gốc: `USDC` (18 chữ số thập phân ở tầng EVM).
-- Precompile bật từ genesis: TxAllowList, ContractDeployerAllowList, NativeMinter, Warp, AgentPolicy. **[cần kiểm T06]** secp256r1 (ACP-204, `0x100`) có sẵn trên Subnet-EVM ở tag này hay không.
+- Precompile bật từ genesis: TxAllowList, ContractDeployerAllowList, NativeMinter, Warp, AgentPolicy. secp256r1 (ACP-204, `0x100`) có sẵn trên Subnet-EVM ở tag này từ nâng cấp Granite: đã kiểm ở T04 bằng `eth_call` trên mạng local (`docs/decisions/D4.md`). AgentPolicy không gọi sang `0x100`; nó kiểm P-256 bằng thư viện chuẩn của Go.
 - TxAllowList: chỉ các địa chỉ sau được gửi giao dịch: admin, người triển khai contract, relayer (gửi hộ thao tác passkey của chủ ví), facilitator, relayer ICM, và mỗi địa chỉ agent đã đăng ký.
 - ContractDeployerAllowList: chỉ admin và người triển khai. Agent không bao giờ có trong danh sách này.
 - Phí: phí cơ sở tối thiểu đặt thấp. Người gửi trả gas bằng coin gốc.
@@ -88,7 +88,7 @@ Rủi ro đã biết phải có test:
 
 ### 3.2 Precompile AgentPolicy
 
-Địa chỉ: `0x0300000000000000000000000000000000000001` **[cần kiểm T04]** theo dải địa chỉ dành cho precompile tự định nghĩa trong `precompile/modules`.
+Địa chỉ: `0x0300000000000000000000000000000000000001`, trong dải `0x0300…00–0x0300…ff` dành cho precompile tự định nghĩa (`precompile/modules/registerer.go:22–35`). Khoá cấu hình genesis: `"agentPolicyConfig": {"blockTimestamp": 0}` trong `config`. Đã kiểm ở T04 (`docs/decisions/D4.md`).
 
 Giao diện (Solidity, dùng để sinh binding và để web gọi):
 
@@ -110,10 +110,10 @@ interface IAgentPolicy {
     function freeze(address agent, uint256 nonce, bytes calldata auth) external;
     function unfreeze(address agent, uint256 nonce, bytes calldata auth) external;
 
-    function isAgent(address agent) external view returns (bool);
+    function isAgent(address agent) external view returns (bool registered);
     function getMandate(address agent) external view returns (Mandate memory m, bool frozen);
     function getSpend(address agent) external view returns (uint256 spentToday, uint64 dayIndex, uint256 totalCharged);
-    function ownerNonce(address agent) external view returns (uint256);
+    function ownerNonce(address agent) external view returns (uint256 nonce);
     function ownerKey(address agent) external view returns (bytes32 x, bytes32 y);
 
     event AgentRegistered(address indexed agent, bytes32 ownerX, bytes32 ownerY);
@@ -129,6 +129,11 @@ Quyết định đã chốt:
 - `nonce` phải bằng `ownerNonce(agent)` và tăng 1 sau mỗi thao tác thành công, để chống phát lại.
 - Một agent mới đăng ký chưa có uỷ quyền: mọi giao dịch của nó đều không hợp lệ cho tới khi `setMandate`.
 - Không có hàm nào cho phép gỡ đăng ký.
+- Tên giá trị trả về `registered` và `nonce` được thêm ở T04 cho công cụ sinh khung; selector và cách mã hoá không đổi.
+- `getSpend` trả bộ đếm tính theo thời điểm block hiện tại: sang ngày UTC mới thì `spentToday` đọc là 0 và `dayIndex` là ngày hiện tại, khớp với cách quy tắc sẽ áp ở T05.
+- `register` cần chữ ký 65 byte `r || s || v` (v là 0, 1, 27 hoặc 28), `s` ở nửa thấp.
+- Lỗi của precompile (chuỗi trả về qua RPC, tiền tố `agentpolicy:`): `ErrNotRegistered`, `ErrAlreadyRegistered`, `ErrBadAgentSignature`, `ErrBadOwnerKey`, `ErrBadNonce`, `ErrBadAuthEncoding`, `ErrBadClientData`, `ErrBadClientDataType`, `ErrChallengeMismatch`, `ErrUserNotPresent`, `ErrHighS`, `ErrBadOwnerSignature`, `ErrTooManyPayees`, `ErrPerTxAboveDaily`.
+- Hàm Go nội bộ cho T05 (không có trong ABI): `GetMandateForRule(state, agent)` chỉ đọc; `SpendForDay(state, agent, timestamp)` chỉ đọc; `ChargeSpend(state, agent, charge, timestamp)` ghi bộ đếm.
 
 ### 3.3 Bằng chứng WebAuthn (`auth`)
 
@@ -139,7 +144,7 @@ Thông điệp chủ ví ký (challenge), mã hoá base64url trong `clientDataJS
 - freeze: `keccak256(abi.encode("SealedArena:freeze", chainId, agent, nonce))`
 - unfreeze: `keccak256(abi.encode("SealedArena:unfreeze", chainId, agent, nonce))`
 
-Precompile kiểm: `clientDataJSON.type == "webauthn.get"`, challenge khớp, cờ User Present trong `authenticatorData` bật, rồi kiểm chữ ký P-256 trên `sha256(authenticatorData || sha256(clientDataJSON))` với `(ownerX, ownerY)`. Bắt `s` ở nửa thấp để chống biến dạng chữ ký.
+Precompile kiểm: `auth` mã hoá đúng chuẩn (mã hoá lại phải ra đúng các byte đó), `clientDataJSON` là một object JSON duy nhất không có khoá trùng tên ở tầng đầu và có `type`, `challenge` là chuỗi, `clientDataJSON.type == "webauthn.get"`, challenge khớp, `authenticatorData` dài ít nhất 37 byte và cờ User Present bật, rồi kiểm chữ ký P-256 trên `sha256(authenticatorData || sha256(clientDataJSON))` với `(ownerX, ownerY)`. Bắt `s` ở nửa thấp để chống biến dạng chữ ký.
 
 Hàm mã hoá challenge ở phía TypeScript đặt trong `packages/shared/` và phải có test đối chiếu với Go bằng cùng bộ vector.
 

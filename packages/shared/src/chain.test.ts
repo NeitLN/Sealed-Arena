@@ -11,9 +11,12 @@ describe("chain constants", () => {
     expect(NATIVE_SYMBOL).toBe("USDC");
   });
 
-  it("leaves addresses unset until they are deployed or verified", () => {
-    for (const value of Object.values(ADDRESSES)) {
-      expect(value).toBeUndefined();
-    }
+  it("fixes the AgentPolicy precompile address (D4)", () => {
+    expect(ADDRESSES.agentPolicy).toBe("0x0300000000000000000000000000000000000001");
+  });
+
+  it("leaves contract addresses unset until they are deployed", () => {
+    expect(ADDRESSES.arenaRecorder).toBeUndefined();
+    expect(ADDRESSES.reputationReceiver).toBeUndefined();
   });
 });

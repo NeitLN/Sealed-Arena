@@ -32,7 +32,8 @@ Khi một task kiểm lại một mục, người code cập nhật mức kiểm
 | RPC C-Chain Fuji: `https://api.avax-test.network/ext/bc/C/rpc`, chain id `43113` | Công khai, kiểm lại bằng `eth_chainId` ở T12 |
 | EIP-7702 không dùng được trên Fuji và C-Chain: giao dịch loại `0x04` bị từ chối; ACP-209 còn ở trạng thái Proposed | ĐÃ KIỂM 14/11, gọi RPC |
 | Precompile secp256r1 (ACP-204) ở `0x0000000000000000000000000000000000000100` trên Fuji C-Chain: vector thử RIP-7212 trả 1 | ĐÃ KIỂM 14/11, `eth_call` |
-| ACP-204 có trên Subnet-EVM L1 ở tag `v1.15.3` | CHƯA KIỂM. D4 |
+| ACP-204 (`P256Verify` ở `0x100`) có trên Subnet-EVM L1 ở tag `v1.15.3`, bật từ Granite (`params/hooks_libevm.go:93–95`). Trên mạng local: input hợp lệ trả `1`, input sai trả rỗng (khi block đầu tiên chỉ có genesis với timestamp 0 thì trả rỗng cho cả hai) | ĐÃ KIỂM 15/11, `eth_call` trên mạng local (T04, D4) |
+| Precompile tự viết: thư mục `precompile/contracts/<tên>/`, tự đăng ký trong `init()` của `module.go`, import trong `precompile/registry/registry.go`; công cụ sinh khung `cmd/precompilegen` (cần ABI có tên cho mọi giá trị trả về). Dải địa chỉ dành cho precompile tự định nghĩa `0x0300…00–0x0300…ff` (`precompile/modules/registerer.go:22–35`) | ĐÃ KIỂM 15/11, đọc mã ở tag và dùng ở T04 |
 | USDC Fuji: `0x5425890298aed601595a70AB815c96711a31Bc65`, EIP-712 version `"2"`, có `transferWithAuthorization` nhận chữ ký `bytes` | ĐÃ KIỂM 14/11, `eth_call` |
 | TeleporterMessenger có code trên Fuji tại địa chỉ bắt đầu `0x253b` và kết thúc `5fcf` | ĐÃ KIỂM 14/11 một phần. **Lấy địa chỉ đầy đủ từ tài liệu chính thức ở T13, không tự điền** |
 | Registry ERC-8004 trên Fuji: Identity bắt đầu `0x8004A818`, Reputation bắt đầu `0x8004B663`, Validation bắt đầu `0x8004Cb1B`, đều có code | ĐÃ KIỂM 14/11 một phần. **Lấy địa chỉ đầy đủ và ABI từ nguồn chính thức ở T13** |

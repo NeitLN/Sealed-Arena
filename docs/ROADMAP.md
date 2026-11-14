@@ -22,7 +22,7 @@ Thứ tự làm là thứ tự trong bảng, trừ khi cột phụ thuộc cho p
 | T01 | M0 | Build node từ tag cố định trong Docker, chạy mạng L1 local một node | — | Gửi được một giao dịch chuyển coin gốc trên mạng local | Standard | 15/11 | đã tích hợp (PR #2) |
 | T02 | M0 | Spike: quy tắc viết cứng trong `preCheck` và txpool | T01 | Giao dịch bị cấm: RPC từ chối, không vào block, block chứa nó bị loại; có câu trả lời về ACP-194 | Full | 16/11 | đã tích hợp (PR #3) |
 | T03 | M0 | Khung repo: workspace, Foundry trong Docker, `scripts/check.sh` | — | `scripts/check.sh` chạy xanh trên repo rỗng | Mini | 15/11 | đã tích hợp (PR #1) |
-| T04 | M1 | Precompile AgentPolicy: lưu trữ, register, setMandate, freeze, WebAuthn | T01 | Test Go: mọi hàm, chữ ký sai bị từ chối, phát lại bị từ chối | Full | 17/11 | đề xuất |
+| T04 | M1 | Precompile AgentPolicy: lưu trữ, register, setMandate, freeze, WebAuthn | T01 | Test Go: mọi hàm, chữ ký sai bị từ chối, phát lại bị từ chối | Full | 17/11 | đã tích hợp (PR #4) |
 | T05 | M1 | Nối quy tắc với AgentPolicy, bộ đếm ngày, `totalCharged` | T02, T04 | Bảy điều kiện ở ARCHITECTURE 3.1 đều có test hai chiều; 20 giao dịch cùng lúc không vượt ngân sách | Full | 18/11 | đề xuất |
 | T06 | M1 | Genesis, allow-list, mạng local nhiều node, script tấn công lớp 9 | T05 | Mọi đường rút bằng key lộ đều thất bại trên mạng 3 node | Standard | 18/11 | đề xuất |
 | T07 | M2 | x402 `signed-native-tx`: facilitator, người bán mẫu, thư viện client | T03; tích hợp cần T06 | Mua một tài nguyên từ đầu tới cuối trên mạng local; sai `to`/`value`/`data` bị từ chối | Standard | 18/11 | đề xuất |
@@ -62,7 +62,7 @@ Phiếu chi tiết: `docs/tasks/`. T01–T06 có phiếu riêng. T07–T17 nằm
 | D1 | Lỗi ở `preCheck` có làm giao dịch bị loại khỏi block ở tag `v1.15.3` không; Subnet-EVM có dùng ACP-194 không | T05 và mọi câu chữ "giao dịch không hợp lệ" | 16/11 | T02 | đã chốt: được, giữ bậc 1 (`docs/decisions/D1.md`, PR #3) |
 | D2 | Giữ bậc 1 hay lùi bậc 2 | T06 trở đi, README, slide, video | 19/11 cuối ngày | T05 `PASS` trên mạng nhiều node | mở |
 | D3 | Cách dựng L1: công cụ dòng lệnh chính thức hay tự chạy avalanchego bằng Docker | T06, T12 | 16/11 | T01 | đã chốt: tmpnet trong container (`docs/decisions/D3.md`, PR #2) |
-| D4 | Địa chỉ precompile AgentPolicy và việc `0x100` có trên L1 | T04, T09, PolicyWallet bậc 2 | 17/11 | T04 | mở |
+| D4 | Địa chỉ precompile AgentPolicy và việc `0x100` có trên L1 | T04, T09, PolicyWallet bậc 2 | 17/11 | T04 | đề xuất: `0x0300…01`; `0x100` có trên L1 (`docs/decisions/D4.md`, PR #4) |
 | D5 | Dùng SDK `@x402/*` có điểm mở rộng hay tự viết luồng 402 | T07, T08 | 18/11 | T07 | mở |
 | D6 | USDC vào L1 bằng ICTT hay coin thử cấp trong genesis | T12, README | 19/11 | T12 thử trên Fuji | mở |
 | D7 | Chữ ký hàm ghi của registry ERC-8004 trên Fuji | T13 | 19/11 | Đọc ABI thật | mở |
