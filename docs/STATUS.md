@@ -2,7 +2,7 @@
 Cập nhật: 15/11/2026. Người code cập nhật trong PR của từng task; người review kiểm.
 
 ## Đang ở đâu
-- Mốc hiện tại: M0. T03 (khung repo) xong trong PR #1. T01 (build node, mạng local) xong trong PR #2; D3 đã chốt (tmpnet trong container). T02 (spike quy tắc) trong PR #3; D1 đề xuất **được**.
+- Mốc hiện tại: M0. T03 (khung repo) xong trong PR #1. T01 (build node, mạng local) xong trong PR #2; D3 đã chốt (tmpnet trong container). T02 (spike quy tắc) trong PR #3; D1 đã chốt: **được**, giữ bậc 1.
 - Repo: `https://github.com/NeitLN/Sealed-Arena` (public). Nhánh mặc định `main`.
 - Đã có: bộ tài liệu trong `docs/`; workspace pnpm + TypeScript strict; Foundry chạy trong Docker; `scripts/check.sh`.
 - Node avalanchego `v1.15.3` + Subnet-EVM chưa sửa build được trong Docker (`sealed-node:dev`); mạng local 1 hoặc 3 node dựng bằng `bash scripts/localnet.sh up`. Bản vá spike `chain/patches/0001-spike-agent-rule.patch` chứng minh quy tắc ở `preCheck` + txpool giữ giao dịch bị cấm ngoài mọi block (test Go và mạng local).
@@ -23,7 +23,6 @@ Cập nhật: 15/11/2026. Người code cập nhật trong PR của từng task;
 ## Quyết định đang chờ
 | Câu hỏi | Việc bị chặn | Phải chốt trước |
 |---|---|---|
-| D1: lỗi `preCheck` có loại giao dịch khỏi block không. Đề xuất: được (`docs/decisions/D1.md`), chờ người review và chủ dự án | T05 | 16/11 |
 | Các câu hỏi cho chủ dự án trong `docs/PROJECT.md` (VPS, API key LLM, phân vai) | T08, T12 | 17–18/11 |
 
 ## Bước tiếp theo

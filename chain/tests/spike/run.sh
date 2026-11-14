@@ -117,12 +117,13 @@ latest_after="$(cast block-number --rpc-url "$RPC")"
   || fail "chain did not advance ($latest_before -> $latest_after)"
 
 echo "==> nothing forbidden reached the chain"
+known=0
 for h in "${FORBIDDEN_HASHES[@]}"; do
   if cast tx "$h" --rpc-url "$RPC" >/dev/null 2>&1; then
-    fail "transaction $h is known to the node"
+    known=1; fail "transaction $h is known to the node"
   fi
 done
-pass "none of ${#FORBIDDEN_HASHES[@]} forbidden hashes is known to the node"
+[ "$known" = 0 ] && pass "none of ${#FORBIDDEN_HASHES[@]} forbidden hashes is known to the node"
 
 # Scan every block since the allowed payment for transactions sent by the agent.
 found=0

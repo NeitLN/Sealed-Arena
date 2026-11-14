@@ -78,6 +78,7 @@ Lỗi trả về dùng các biến lỗi riêng (`ErrAgentPayeeNotAllowed`, `Err
 **Bất biến dùng để phát hiện vi phạm** (ArenaRecorder dựa vào đây):
 `balance(agent) ≥ tổng tiền đã nạp cho agent − totalCharged(agent)`.
 Mọi đường làm tiền rời tài khoản mà không qua quy tắc sẽ phá bất biến này.
+Ngoài quy tắc (không phải giao dịch): state upgrade (`stateupgrade/state_upgrade.go:33–44`) và genesis `alloc` có thể đổi số dư hoặc code của agent. Đây là quyền của người vận hành; README phải cam kết không phát hành state upgrade nào đụng tới địa chỉ agent (D1).
 
 Rủi ro đã biết phải có test:
 - Txpool kiểm trên trạng thái hiện tại, nên nhiều giao dịch đang chờ có thể cùng qua txpool. Khi vào block, giao dịch vượt ngân sách phải bị `preCheck` loại và bị người dựng block bỏ qua, không làm hỏng block. Đã kiểm ở T02 bằng đọc mã: người dựng block gặp lỗi thì bỏ giao dịch và các giao dịch sau của cùng người gửi, dựng tiếp (`miner/worker.go:469–484`, D1 câu 4). Test 20 giao dịch đồng thời là việc của T05.

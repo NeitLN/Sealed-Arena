@@ -85,6 +85,7 @@ Môi trường: Windows 11, Git Bash, Docker 29.5.3, Go 1.26.10 trong Docker, ng
 - Loại giao dịch: blob (EIP-4844) không dựng được với chain này; EIP-7702 bị RPC từ chối vì sai định dạng (`typed transaction too short`), không phải vì quy tắc. Cả hai không vào block. ARCHITECTURE đã ghi không bật EIP-7702.
 - `cast publish` mặc định chờ receipt; script dùng `--async` để không treo khi RPC lỡ nhận giao dịch.
 - Hành vi người dựng block chỉ kiểm bằng đọc mã; không có test ở mức `miner/`. Mạng local không chạm tới đường này vì RPC đã từ chối trước. T05 nên thêm test dựng block với nhiều giao dịch trong pool vượt ngân sách.
+- Sau review PR #3: D1 ghi thêm state upgrade và genesis `alloc` là đường nằm ngoài quy tắc (người vận hành), ARCHITECTURE 3.1 có một dòng cạnh bất biến; README (T16) phải cam kết không có state upgrade đụng tới agent.
 - Lưu ý state sync trong D1 (node đồng bộ trạng thái tin các validator) chưa đọc mã state sync.
 - Kết luận D1 chưa được bên thứ ba ngoài người review rà lại.
 - `make-patch.sh` gom mọi sửa đổi vào một file; T05 thay `0001-spike-agent-rule.patch` bằng bản thật.
