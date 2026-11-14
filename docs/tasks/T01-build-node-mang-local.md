@@ -80,3 +80,5 @@ Môi trường: Windows 11, Git Bash, Docker 29.5.3, ngày 15/11/2026, nhánh `t
 - tmpnet tạo subnet có cấp quyền, không chuyển thành L1 theo ACP-77. Quy tắc hợp lệ không bị ảnh hưởng, nhưng T12 phải kiểm luồng L1 thật trên Fuji (đã ghi **[cần kiểm T12]** trong D3).
 - Lỗi lúc làm: khi container khởi động lại, file `process.json` cũ khiến tmpnet tưởng node còn chạy. Đã xử lý bằng cách xoá các file này rồi gọi `StartNodes`. Có test thủ công ở dòng "Khởi động lại container".
 - `smoke.sh` cố định cùng digest image Foundry với `scripts/forge.sh`. Khi nâng Foundry phải sửa cả hai chỗ.
+- Gợi ý cho T06 (từ review PR #2): `tests/e2e/p/l1.go` gửi `ConvertSubnetToL1Tx` trên tmpnet; thử chuyển mạng local thành L1 để khớp với T12.
+- Sau review: `PreFundedKey` của chain trỏ về khoá ewoq (tài khoản thật sự có coin trong genesis) thay cho khoá hardhat.

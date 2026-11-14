@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -116,7 +117,7 @@ func newNetwork() (*tmpnet.Network, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid SEALED_BASE_PORT")
 	}
-	genesis, err := os.ReadFile(env("SEALED_GENESIS", "/sealed/genesis/local.json"))
+	genesisBytes, err := os.ReadFile(env("SEALED_GENESIS", "/sealed/genesis/local.json"))
 	if err != nil {
 		return nil, fmt.Errorf("read genesis: %w", err)
 	}
@@ -149,8 +150,9 @@ func newNetwork() (*tmpnet.Network, error) {
 			Name: subnetName,
 			Chains: []*tmpnet.Chain{{
 				VMID:         vmID,
-				Genesis:      genesis,
-				PreFundedKey: tmpnet.HardhatKey,
+				Genesis:      genesisBytes,
+				// The ewoq key is the account funded in chain/genesis/local.json.
+				PreFundedKey: genesis.EWOQKey,
 			}},
 			ValidatorIDs: validatorIDs,
 		}},
