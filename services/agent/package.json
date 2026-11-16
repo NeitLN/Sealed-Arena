@@ -1,0 +1,22 @@
+{
+  "name": "agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scenario": "tsx src/scenario.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sealed-arena/shared": "workspace:*",
+    "attacks": "workspace:*",
+    "facilitator": "workspace:*",
+    "hono": "4.13.17",
+    "seller": "workspace:*",
+    "viem": "2.57.19"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

@@ -30,6 +30,31 @@ importers:
         specifier: 2.57.19
         version: 2.57.19(typescript@5.9.3)(zod@4.6.7)
 
+  services/agent:
+    dependencies:
+      '@sealed-arena/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      attacks:
+        specifier: workspace:*
+        version: link:../attacks
+      facilitator:
+        specifier: workspace:*
+        version: link:../facilitator
+      hono:
+        specifier: 4.13.17
+        version: 4.13.17
+      seller:
+        specifier: workspace:*
+        version: link:../seller
+      viem:
+        specifier: 2.57.19
+        version: 2.57.19(typescript@5.9.3)(zod@4.6.7)
+    devDependencies:
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+
   services/attacks:
     dependencies:
       '@hono/node-server':

@@ -51,7 +51,7 @@ type Issued = {
   amount: bigint;
   expires: number;
   /** pending: settle did not confirm after the payment may have been broadcast; only that same transaction can still complete it. */
-  state: "issued" | "settling" | "pending" | "used";
+  state: "issued" | "settling" | "pending" | "delivering" | "used";
   /** Hash of the signed payment once it passed /verify. */
   txHash?: Hex;
 };
@@ -64,6 +64,8 @@ export type SellerOptions = {
   /** Reads the chain to check the settled transaction itself, not only the facilitator's word. */
   client: PublicClient;
   maxTimeoutSeconds?: number;
+  /** How long a pending payment (settle not confirmed) can still be claimed with the same transaction. */
+  pendingTtlMs?: number;
   /** How long a 402 request id stays payable. */
   requestTtlMs?: number;
   products?: Product[];
@@ -76,6 +78,7 @@ export function createSellerApp(o: SellerOptions) {
   const f = o.fetch ?? fetch;
   const maxTimeoutSeconds = o.maxTimeoutSeconds ?? 60;
   const ttl = o.requestTtlMs ?? 5 * 60_000;
+  const pendingTtl = o.pendingTtlMs ?? 60 * 60_000;
   const issued = new Map<Hex, Issued>();
   const app = new Hono();
 
@@ -99,7 +102,10 @@ export function createSellerApp(o: SellerOptions) {
   /** A 402 with a fresh request id for this request. */
   const paymentRequired = (c: Context, p: Product, error?: string) => {
     const now = Date.now();
-    for (const [id, v] of issued) if (v.expires < now && v.state === "issued") issued.delete(id);
+    // Drop expired entries, except ones a request is working on right now.
+    for (const [id, v] of issued) {
+      if (v.expires < now && v.state !== "settling" && v.state !== "delivering") issued.delete(id);
+    }
     const requestId = newRequestId();
     issued.set(requestId, { path: p.path, amount: p.price, expires: now + ttl, state: "issued" });
     const body: PaymentRequired = {
@@ -196,9 +202,12 @@ export function createSellerApp(o: SellerOptions) {
         if (!isHex(raw) || keccak256(raw) !== entry.txHash) {
           return paymentRequired(c, p, "request_id_already_used");
         }
-        return (
-          (await deliverIfOnChain(entry.txHash)) ?? paymentRequired(c, p, "settlement_pending")
-        );
+        // Claimed before the await, so two concurrent retries cannot both deliver.
+        entry.state = "delivering";
+        const delivered = await deliverIfOnChain(entry.txHash);
+        if (delivered) return delivered;
+        entry.state = "pending";
+        return paymentRequired(c, p, "settlement_pending");
       }
       if (entry.state !== "issued") return paymentRequired(c, p, "request_id_already_used");
       if (entry.expires < Date.now()) return paymentRequired(c, p, "request_id_expired");
@@ -235,6 +244,7 @@ export function createSellerApp(o: SellerOptions) {
       if (delivered) return delivered;
       // Not on chain (yet): keep the id for this one transaction, so the buyer can retry it.
       entry.state = "pending";
+      entry.expires = Date.now() + pendingTtl;
       return paymentRequired(c, p, settled.errorReason ?? "settlement_not_confirmed");
     });
   }
