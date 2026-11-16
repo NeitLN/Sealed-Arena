@@ -1,16 +1,12 @@
 // x402 signed-native-tx on the local Sealed L1, end to end (docs/ARCHITECTURE.md section 4).
-// Starts the facilitator and two sample sellers over HTTP, makes one purchase, then tries
+// Starts the facilitator and three sample sellers over HTTP, makes one purchase, then tries
 // each forbidden payment and checks it is refused without moving the agent's coins.
 // Test keys only (packages/shared/src/addresses.local.ts); a fresh agent is made each run.
-import type { AddressInfo } from "node:net";
-import { serve } from "@hono/node-server";
 import {
-  allowListAbi,
   CHAIN_ID,
   fetchWithPayment,
   LOCAL_PAYEES,
   PAYMENT_GAS,
-  PRECOMPILES,
   paymentData,
   pickSignedNativeTx,
 } from "@sealed-arena/shared";
@@ -18,46 +14,10 @@ import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402
 import type { PaymentPayload, PaymentRequired, PaymentRequirements } from "@x402/core/types";
 import { createFacilitatorApp } from "facilitator";
 import { createSellerApp } from "seller";
-import { type Address, encodeFunctionData, type Hex, keccak256 } from "viem";
+import { type Address, type Hex, keccak256 } from "viem";
 import { generatePrivateKey, type PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
-import {
-  accounts,
-  coin,
-  type Node,
-  nodes,
-  readPolicy,
-  registerAgent,
-  sendAndWait,
-  setMandate,
-} from "./localnet.js";
-
-type Server = { url: string; close: () => void };
-
-function listen(fetch: (r: Request) => Response | Promise<Response>): Promise<Server> {
-  return new Promise((resolve) => {
-    const s = serve({ fetch, port: 0, hostname: "127.0.0.1" }, (info: AddressInfo) => {
-      resolve({ url: `http://127.0.0.1:${info.port}`, close: () => s.close() });
-    });
-  });
-}
-
-/** A fresh agent: allowed to send, funded, registered, with a one-day mandate for `payees`. */
-async function freshAgent(n: Node, payees: readonly Address[]): Promise<PrivateKeyAccount> {
-  const agent = privateKeyToAccount(generatePrivateKey());
-  await sendAndWait(n, accounts.admin, {
-    to: PRECOMPILES.txAllowList,
-    data: encodeFunctionData({
-      abi: allowListAbi,
-      functionName: "setEnabled",
-      args: [agent.address],
-    }),
-  });
-  await sendAndWait(n, accounts.admin, { to: agent.address, value: coin(10), gas: 21_000n });
-  await registerAgent(n, agent);
-  const expiry = BigInt(Math.floor(Date.now() / 1000) + 86_400);
-  await setMandate(n, agent.address, { payees, perTxCap: coin(1), dailyCap: coin(3), expiry });
-  return agent;
-}
+import { coin, freshAgent, nodes, readPolicy } from "./localnet.js";
+import { listen, type Server } from "./serve.js";
 
 type Result = { name: string; ok: boolean; detail: string };
 

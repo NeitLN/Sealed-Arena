@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./localnet": "./src/localnet.ts"
+    "./localnet": "./src/localnet.ts",
+    "./serve": "./src/serve.ts"
   },
   "scripts": {
     "seed": "tsx src/seed.ts",

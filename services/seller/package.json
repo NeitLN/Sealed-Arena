@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "tsx src/main.ts",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "2.1.8",

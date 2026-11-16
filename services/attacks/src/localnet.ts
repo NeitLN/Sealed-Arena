@@ -33,7 +33,7 @@ import {
   type PublicClient,
   toHex,
 } from "viem";
-import { type PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
+import { generatePrivateKey, type PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
 
 /** RPC path of the Sealed chain, e.g. /ext/bc/<blockchainId>/rpc (changes with every new network). */
 export function rpcPath(): string {
@@ -240,3 +240,34 @@ export async function setFrozen(n: Node, agent: Address, frozen: boolean): Promi
 }
 
 export const coin = (n: number | bigint) => BigInt(n) * 10n ** 18n;
+
+/** A fresh agent: allowed to send, funded, registered, with a one-day mandate for `payees`. */
+export async function freshAgent(
+  n: Node,
+  payees: readonly Address[],
+  o: { funding?: bigint; perTxCap?: bigint; dailyCap?: bigint } = {},
+): Promise<PrivateKeyAccount> {
+  const agent = privateKeyToAccount(generatePrivateKey());
+  await sendAndWait(n, accounts.admin, {
+    to: PRECOMPILES.txAllowList,
+    data: encodeFunctionData({
+      abi: allowListAbi,
+      functionName: "setEnabled",
+      args: [agent.address],
+    }),
+  });
+  await sendAndWait(n, accounts.admin, {
+    to: agent.address,
+    value: o.funding ?? coin(10),
+    gas: 21_000n,
+  });
+  await registerAgent(n, agent);
+  const expiry = BigInt(Math.floor(Date.now() / 1000) + 86_400);
+  await setMandate(n, agent.address, {
+    payees,
+    perTxCap: o.perTxCap ?? coin(1),
+    dailyCap: o.dailyCap ?? coin(3),
+    expiry,
+  });
+  return agent;
+}
