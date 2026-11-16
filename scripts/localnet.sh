@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Manage the local Sealed L1 network (one container running tmpnet nodes).
-# Usage: bash scripts/localnet.sh up|down|status|rpc
+# Usage: bash scripts/localnet.sh up|down|status|rpc|seed
 #   up      start the network and wait until the Sealed chain answers eth_chainId
 #   down    stop the container and delete all network data
 #   status  show container state and the chain id reported by the RPC
-#   rpc     print the RPC URL of the Sealed chain on the host
+#   rpc     print the RPC URL of the Sealed chain on the host (node 1; nodes 2 and 3 use ports 9652, 9654)
+#   seed    register the local test agent, give it a sample mandate and coins (services/attacks)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -69,6 +70,13 @@ cmd_status() {
   fi
 }
 
+cmd_seed() {
+  local path
+  path="$(rpc_path)" || { echo "localnet: network is not up" >&2; return 1; }
+  # Pass the path without its leading slash so Git Bash does not rewrite it.
+  (cd "$ROOT" && SEALED_RPC_PATH="${path#/}" pnpm --filter attacks run --silent seed)
+}
+
 cmd_rpc() {
   rpc_url || { echo "localnet: network is not up" >&2; return 1; }
 }
@@ -78,5 +86,6 @@ case "${1:-}" in
   down) cmd_down ;;
   status) cmd_status ;;
   rpc) cmd_rpc ;;
-  *) echo "usage: $0 up|down|status|rpc" >&2; exit 2 ;;
+  seed) cmd_seed ;;
+  *) echo "usage: $0 up|down|status|rpc|seed" >&2; exit 2 ;;
 esac

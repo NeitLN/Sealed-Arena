@@ -47,7 +47,7 @@ Transactions from other senders are not affected. Details and the exact contract
 | Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                 | Done    |
 | `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters | Done    |
 | Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)         | Done    |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Next    |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Done    |
 | x402 payments with a signed native transaction; buying agent                                                 | Planned |
 | Owner dashboard with passkeys                                                                                | Planned |
 | Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                   | Planned |
@@ -71,9 +71,11 @@ bash scripts/check.sh            # typecheck, lint, TS tests, Foundry, Go tests 
 
 bash chain/scripts/fetch.sh      # avalanchego v1.15.3 at the pinned commit, patches applied
 bash chain/scripts/build.sh      # node image sealed-node:dev
-bash scripts/localnet.sh up      # local Sealed L1 (SEALED_NODE_COUNT=3 for three validators)
+bash scripts/localnet.sh up      # local Sealed L1 with three validators
+bash scripts/localnet.sh seed    # test agent with a sample mandate
 bash chain/scripts/smoke.sh      # chain id 261126 and a test transfer
 bash chain/tests/rule/run.sh     # mandate, rejected payments, freeze, concurrent payments
+pnpm --filter attacks leaked-key # someone holding the agent's key tries every way out
 bash scripts/localnet.sh down    # stop and delete the local network
 ```
 
@@ -100,6 +102,7 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 - A VM-level test drives the real transaction pool and block builder: 20 payments that are each valid alone are queued at once, and only what fits the daily budget reaches a block.
 - WebAuthn test vectors in [`chain/testvectors/`](chain/testvectors) are shared by the Go precompile tests and the TypeScript encoder tests, so both sides agree byte for byte.
 - `chain/tests/rule/run.sh` checks the same behaviour over RPC on a running local L1 with one and three nodes.
+- The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 24 ways out (every transaction type, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
 
 ## Security model and limitations
 

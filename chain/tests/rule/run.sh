@@ -57,6 +57,8 @@ expect_reject() { # expect_reject <label> <error> <output>
 echo "==> rpc $HOST_RPC, agent $AGENT"
 [ "$(cast chain-id --rpc-url "$RPC")" = "261126" ] || { echo "rule: wrong chain id"; exit 1; }
 cast send "$AGENT" --value "$FUNDED" --private-key "$DEV_KEY" --rpc-url "$RPC" >/dev/null
+# The genesis enables TxAllowList; the admin (DEV_KEY) lets the new agent send.
+cast send 0x0200000000000000000000000000000000000002 "setEnabled(address)" "$AGENT" --private-key "$DEV_KEY" --rpc-url "$RPC" >/dev/null
 admin register >/dev/null
 admin set-mandate "{\"payees\":[\"$PAYEE\"],\"perTxCap\":\"$((2 * CHARGE))\",\"dailyCap\":\"$((5 * CHARGE))\",\"expiry\":\"4102444800\"}" >/dev/null
 [ "$(admin show | field registered)" = "true" ] && pass "agent registered with a mandate" || fail "agent not registered"

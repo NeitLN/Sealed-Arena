@@ -1,4 +1,5 @@
 # Local Sealed L1 network. Driven by scripts/localnet.sh; image built by chain/scripts/build.sh.
+# Three validator nodes run in one container (tmpnet); node i serves HTTP on 9650 + 2i.
 name: sealed-localnet
 
 services:
@@ -7,13 +8,15 @@ services:
     container_name: sealed-node
     init: true
     environment:
-      SEALED_NODE_COUNT: ${SEALED_NODE_COUNT:-1}
-      SEALED_GENESIS: /sealed/genesis/local.json
+      SEALED_NODE_COUNT: ${SEALED_NODE_COUNT:-3}
+      SEALED_GENESIS: /sealed/genesis/${SEALED_GENESIS_FILE:-sealed-local.json}
     volumes:
       - ../../chain/genesis:/sealed/genesis:ro
       - data:/data
     ports:
       - "127.0.0.1:9650:9650"
+      - "127.0.0.1:9652:9652"
+      - "127.0.0.1:9654:9654"
 
 volumes:
   data:
