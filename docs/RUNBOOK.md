@@ -101,7 +101,16 @@ pnpm --filter fuji-ops ictt send <USDC> <địa chỉ trên L1>
 - Số dư validator giảm khoảng 0,044 AVAX/ngày; nạp thêm: `platform l1 increase-validator-balance --validation-id <id> --balance <AVAX>`.
 - Chạy các bộ kiểm trên Fuji: đặt `SEALED_NODE_URLS`, `SEALED_RPC_PATH`, `SEALED_ADMIN_KEY`, `SEALED_RELAYER_KEY`, `SEALED_DEPLOYER_KEY`, `SEALED_AGENT_KEY`, `SEALED_SEED_FUNDING` rồi `pnpm --filter attacks seed` và `leaked-key`. Trang đã triển khai: `pnpm --filter web e2e:live`.
 
-## 8. Xem log
+## 8. Cổng RPC và thử thách mở
+```bash
+GATEWAY_IP_SALT=<chuỗi bí mật ≥ 16 ký tự> SEALED_RPC_URL=<RPC của node> pnpm --filter rpc-gateway start   # cổng 4050
+pnpm --filter rpc-gateway localnet-check        # trên mạng local: giao dịch bị cấm được ghi đúng lý do, không lưu IP
+```
+- Trên Fuji: Caddy chuyển `POST /rpc` vào cổng, mở `GET /attempts/summary` và `/attempts/recent`.
+- Mở thử thách (chạy lại được): `pnpm --filter attacks arena-open` với `SEALED_*` của mạng đích, `SEALED_OWNER_P256_KEY` (bí mật), `ARENA_RECORDER`, `ARENA_PAYEES`, `ARENA_FUNDING`, `ARENA_EXPIRY`. Script từ chối chạy nếu thiếu khoá chủ ví bí mật.
+- Trang: `/arena`, `/arena/rules`. Relayer cần `RELAYER_ARENA_RECORDER` để bật `/arena`.
+
+## 9. Xem log
 ```bash
 docker logs -f sealed-node                       # log dựng mạng và log node đầu tiên
 docker exec sealed-node cat /data/sealed.json    # thư mục mạng, subnet ID, blockchain ID, URI các node
@@ -110,7 +119,7 @@ docker exec sealed-node sh -c 'tail -n 100 /data/networks/*/NodeID-*/logs/main.l
 docker exec sealed-node sh -c 'ls /data/networks/*/NodeID-*/logs/'            # log của từng chain (theo blockchain ID)
 ```
 
-## 9. Sự cố thường gặp
+## 10. Sự cố thường gặp
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `failed to connect to the docker API` | Mở Docker Desktop, chờ nó báo đang chạy |
