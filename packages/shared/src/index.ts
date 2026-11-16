@@ -3,3 +3,5 @@ export * from "./agentPolicy.js";
 export { allowListAbi } from "./allowListAbi.js";
 export * from "./chain.js";
 export { nativeMinterAbi } from "./nativeMinterAbi.js";
+export * from "./x402.js";
+export * from "./x402Client.js";

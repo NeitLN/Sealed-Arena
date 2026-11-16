@@ -48,7 +48,8 @@ Transactions from other senders are not affected. Details and the exact contract
 | `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters | Done    |
 | Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)         | Done    |
 | Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Done    |
-| x402 payments with a signed native transaction; buying agent                                                 | Planned |
+| x402 payments with a signed native transaction: facilitator, sample seller, client                           | Done    |
+| Buying agent driven by an LLM                                                                                | Planned |
 | Owner dashboard with passkeys                                                                                | Planned |
 | Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                   | Planned |
 | Open red-team challenge with a public agent key                                                              | Planned |
@@ -56,7 +57,8 @@ Transactions from other senders are not affected. Details and the exact contract
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
 [D3](docs/decisions/D3.md) how the local L1 is built ·
-[D4](docs/decisions/D4.md) precompile address and P-256 support.
+[D4](docs/decisions/D4.md) precompile address and P-256 support ·
+[D5](docs/decisions/D5.md) x402 payment method `signed-native-tx`.
 
 ## Quick start
 
@@ -76,6 +78,7 @@ bash scripts/localnet.sh seed    # test agent with a sample mandate
 bash chain/scripts/smoke.sh      # chain id 261126 and a test transfer
 bash chain/tests/rule/run.sh     # mandate, rejected payments, freeze, concurrent payments
 pnpm --filter attacks leaked-key # someone holding the agent's key tries every way out
+pnpm --filter attacks x402       # x402 purchase end to end, and the payments it must refuse
 bash scripts/localnet.sh down    # stop and delete the local network
 ```
 
@@ -102,6 +105,7 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 - A VM-level test drives the real transaction pool and block builder: 20 payments that are each valid alone are queued at once, and only what fits the daily budget reaches a block.
 - WebAuthn test vectors in [`chain/testvectors/`](chain/testvectors) are shared by the Go precompile tests and the TypeScript encoder tests, so both sides agree byte for byte.
 - `chain/tests/rule/run.sh` checks the same behaviour over RPC on a running local L1 with one and three nodes.
+- The x402 suite (`services/attacks/src/x402.ts`) starts the facilitator and two sample sellers, buys one dataset end to end, then sends each payment that must be refused (wrong payee, price, resource, chain id, signer, reused request id, already broadcast, seller outside the mandate) and checks the agent's balance and nonce do not move.
 - The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 24 ways out (every transaction type, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
 
 ## Security model and limitations
@@ -117,6 +121,7 @@ What it does not give, stated plainly:
 5. **Someone holding the key can grief**: use up the daily budget or occupy nonces.
 6. **Simulation is not admission.** `eth_call` and `eth_estimateGas` do not apply the rule; services read the mandate from the precompile instead.
 7. **The open challenge measures how hard the system was tried, not that it is safe.**
+8. **x402 here needs our payment method.** Sellers must add the network `eip155:261126` and point `/verify` and `/settle` at this facilitator; a standard x402 client (EIP-3009 tokens) cannot pay it. The facilitator holds no keys, but a seller still has to trust it or read the chain itself (the sample seller does both).
 
 Found a problem? See [SECURITY.md](SECURITY.md).
 

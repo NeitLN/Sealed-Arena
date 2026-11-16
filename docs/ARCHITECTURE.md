@@ -161,14 +161,14 @@ Chuẩn `exact` của x402 trên EVM chỉ có ba phương thức (EIP-3009, Per
 
 - `scheme`: `exact`. `network`: `eip155:261126`. `asset`: `native`.
 - `extra.assetTransferMethod`: `signed-native-tx`.
-- Payload người mua gửi: `{ "signedTransaction": "0x..." }`, là giao dịch L1 đã ký bởi khoá agent với:
+- `extra`: `{ assetTransferMethod: "signed-native-tx", paymentFlow: "upfront", requestId, resourceUrl }`. `requestId` (32 byte ngẫu nhiên) cấp mới cho mỗi phản hồi 402.
+- Payload người mua gửi: `{ "signedTransaction": "0x..." }`, là giao dịch L1 (EIP-1559) đã ký bởi khoá agent với:
   - `to` = `payTo` của người bán, `value` = `amount`,
   - `data` = `keccak256(abi.encode(resourceUrl, requestId))` (32 byte), `requestId` do người bán cấp trong phản hồi 402.
-- Facilitator `/verify`: giải mã, kiểm chain id, `to`, `value`, `data`, chữ ký; gọi `eth_call` và đọc `getMandate`/`getSpend` để báo trước lý do từ chối. Không giữ tiền, không giữ khoá của ai.
-- Facilitator `/settle`: `eth_sendRawTransaction`, chờ receipt, trả hash.
-- Người bán chỉ giao hàng sau khi `/settle` trả receipt thành công và `data` khớp với `requestId` đã cấp.
-
-**[cần kiểm T07]** Cách đăng ký phương thức mới với gói `@x402/*` hiện hành. Nếu SDK không mở được điểm mở rộng, tự viết luồng 402 theo đúng định dạng header của đặc tả hiện hành. Không tự nghĩ ra định dạng header.
+- Facilitator `/verify`: giải mã, kiểm chain id, `to`, `value`, `data`, chữ ký; kiểm giao dịch chưa được phát và nonce đúng nonce kế tiếp; kiểm số dư đủ `value + gas × maxFeePerGas`; với agent đã đăng ký, đọc `getMandate`/`getSpend` (qua `eth_call`) và chạy lại quy tắc ở mục 3.3 theo đúng thứ tự (`precheckMandate` trong `packages/shared/src/x402.ts`) để báo trước lý do từ chối. Không giữ tiền, không giữ khoá của ai.
+- Facilitator `/settle`: kiểm lại như `/verify`, `eth_sendRawTransaction`, chờ receipt, trả hash. Hai lần settle cùng một giao dịch cùng lúc chỉ một lần được phát.
+- Người bán giữ điều khoản của chính mình theo `requestId` (không dùng bản người mua gửi lại), đánh dấu `requestId` đã dùng trước khi gọi facilitator, và chỉ giao hàng sau khi `/settle` thành công **và** tự đọc chain thấy receipt thành công với `to`, `value`, `data` đúng như đã cấp.
+- Mã lý do, cách dùng SDK `@x402/core` (facilitator đăng ký qua `x402Facilitator.register`; người bán và client dùng hàm mã hoá header của SDK): xem `docs/decisions/D5.md`.
 
 Hệ quả phải ghi trong README: người bán phải thêm mạng L1 và trỏ sang facilitator này.
 

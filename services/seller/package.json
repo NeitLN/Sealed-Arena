@@ -1,0 +1,23 @@
+{
+  "name": "seller",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.8",
+    "@sealed-arena/shared": "workspace:*",
+    "@x402/core": "2.31.0",
+    "hono": "4.13.17",
+    "viem": "2.57.19"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

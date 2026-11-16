@@ -34,7 +34,7 @@ bash scripts/localnet.sh status    # trạng thái container và eth_chainId
 bash scripts/localnet.sh seed      # agent thử: TxAllowList, cấp coin, đăng ký, uỷ quyền mẫu
 bash scripts/localnet.sh down      # xoá container, volume dữ liệu và network docker
 
-bash scripts/check-localnet.sh     # mạng mới + smoke + seed + bộ tấn công leaked-key + chain/tests/rule/run.sh
+bash scripts/check-localnet.sh     # mạng mới + smoke + seed + bộ tấn công leaked-key + x402 + chain/tests/rule/run.sh
 ```
 - Mặc định 3 node (đổi bằng `SEALED_NODE_COUNT=1`). Các node cùng chạy trong một container; cổng HTTP `9650`, `9652`, `9654` đều được mở ra máy, đường dẫn RPC giống nhau.
 - Genesis: `chain/genesis/sealed-local.json` (giải thích trong `chain/genesis/README.md`). Đổi file genesis bằng `SEALED_GENESIS_FILE=<tên file trong chain/genesis>`.
@@ -45,7 +45,22 @@ bash scripts/check-localnet.sh     # mạng mới + smoke + seed + bộ tấn c�
 - Khởi động lại container (`docker restart sealed-node`) giữ nguyên dữ liệu và blockchain ID; chạy `bash scripts/localnet.sh up` để chờ chain sẵn sàng.
 - Khoá dev của các vai (admin, người triển khai, relayer, facilitator, relayer ICM, agent thử, passkey thử) nằm trong `packages/shared/src/addresses.local.ts`. Đều là khoá công khai, chỉ dùng trên mạng local.
 
-## 4. Xem log
+## 4. Thanh toán x402 trên mạng local
+Cần mạng local đang chạy và đã `seed`. Hai service đọc `SEALED_RPC_URL` (lấy bằng `bash scripts/localnet.sh rpc`); các biến khác xem `.env.example`.
+```bash
+export SEALED_RPC_URL=$(bash scripts/localnet.sh rpc)
+pnpm --filter facilitator start    # http://127.0.0.1:4020: POST /verify, POST /settle, GET /supported
+pnpm --filter seller start         # http://127.0.0.1:4021: /catalog, /free/hello, 3 tài nguyên trả phí dưới /data/
+curl -i http://127.0.0.1:4021/data/weather   # 402, header PAYMENT-REQUIRED (base64) có requestId mới
+
+pnpm --filter attacks x402         # tự dựng facilitator + 2 người bán, mua 1 lần, thử 8 cách trả sai
+```
+- Người bán mặc định nhận tiền ở người nhận đầu tiên của uỷ quyền mẫu (`SELLER_PAY_TO` để đổi).
+- Mỗi 402 cấp một `requestId` mới, sống 5 phút, dùng một lần. Khởi động lại người bán thì 402 cũ hết hiệu lực.
+- Facilitator không cần khoá: giao dịch do agent ký và agent trả gas.
+- Định dạng trên dây: `docs/decisions/D5.md`.
+
+## 5. Xem log
 ```bash
 docker logs -f sealed-node                       # log dựng mạng và log node đầu tiên
 docker exec sealed-node cat /data/sealed.json    # thư mục mạng, subnet ID, blockchain ID, URI các node
@@ -54,7 +69,7 @@ docker exec sealed-node sh -c 'tail -n 100 /data/networks/*/NodeID-*/logs/main.l
 docker exec sealed-node sh -c 'ls /data/networks/*/NodeID-*/logs/'            # log của từng chain (theo blockchain ID)
 ```
 
-## 5. Sự cố thường gặp
+## 6. Sự cố thường gặp
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `failed to connect to the docker API` | Mở Docker Desktop, chờ nó báo đang chạy |
