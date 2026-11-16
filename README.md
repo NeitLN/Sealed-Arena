@@ -42,19 +42,19 @@ Transactions from other senders are not affected. Details and the exact contract
 
 ## Status
 
-| Component                                                                                                       | Status  |
-| --------------------------------------------------------------------------------------------------------------- | ------- |
-| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                    | Done    |
-| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters    | Done    |
-| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)            | Done    |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite                                               | Done    |
-| x402 payments with a signed native transaction: facilitator, sample seller, client                              | Done    |
-| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                    | Done    |
-| Buying agent driven by an LLM; prompt-injection scenarios with recorded transcripts and replay                 | Done    |
-| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese   | Done    |
-| Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done    |
-| Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain              | Done    |
-| Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages    | Done    |
+| Component                                                                                                       | Status |
+| --------------------------------------------------------------------------------------------------------------- | ------ |
+| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                    | Done   |
+| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters    | Done   |
+| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)            | Done   |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                               | Done   |
+| x402 payments with a signed native transaction: facilitator, sample seller, client                              | Done   |
+| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                    | Done   |
+| Buying agent driven by an LLM; prompt-injection scenarios with recorded transcripts and replay                  | Done   |
+| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese   | Done   |
+| Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done   |
+| Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain              | Done   |
+| Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages    | Done   |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
