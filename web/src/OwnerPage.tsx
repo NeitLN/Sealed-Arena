@@ -8,7 +8,6 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { HStack, Layout, LayoutContent, Stack, StackItem, VStack } from "@astryxdesign/core/Layout";
 import { Section } from "@astryxdesign/core/Section";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -36,7 +35,7 @@ import {
   type PublicClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { type Lang, useI18n } from "./i18n.js";
+import { useI18n } from "./i18n.js";
 import {
   type AgentView,
   chainClient,
@@ -52,6 +51,7 @@ import {
   signWithPasskey,
   withCode,
 } from "./owner.js";
+import { SiteHeader } from "./SiteHeader.js";
 
 // Layout from the Astryx payment-form template: form column and a sticky summary column.
 const formColBasis: CSSProperties = { flexBasis: 0 };
@@ -371,28 +371,10 @@ export default function OwnerPage() {
                 <Banner status="warning" title={t("testnet")} />
 
                 {/* Page header */}
-                <VStack gap={6}>
-                  <VStack gap={2}>
-                    <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
-                      <Text type="display-1" as="h1">
-                        Sealed Arena · {t("title")}
-                      </Text>
-                      <SegmentedControl
-                        label={t("language")}
-                        value={lang}
-                        onChange={(v) => setLang(v as Lang)}
-                        size="sm"
-                      >
-                        <SegmentedControlItem value="en" label="EN" />
-                        <SegmentedControlItem value="vi" label="VI" />
-                      </SegmentedControl>
-                    </HStack>
-                    <Text type="body" color="secondary">
-                      {t("intro")}
-                    </Text>
-                  </VStack>
-                  <Divider />
-                </VStack>
+                <SiteHeader title={t("title")} lang={lang} setLang={setLang} current="owner" />
+                <Text type="body" color="secondary">
+                  {t("intro")}
+                </Text>
 
                 {boot ? <Banner status="error" title={t(boot)} /> : null}
                 {outcome ? (
