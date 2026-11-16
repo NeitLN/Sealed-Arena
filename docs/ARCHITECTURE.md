@@ -73,7 +73,12 @@ Khi qua (chỉ ở `preCheck`): `spentToday += charge`, `totalCharged += charge`
 
 `from` không phải agent đã đăng ký: quy tắc không áp, chỉ còn TxAllowList.
 
-Lỗi trả về dùng các biến lỗi riêng (`ErrAgentPayeeNotAllowed`, `ErrAgentBudgetExceeded`, `ErrAgentFrozen`, `ErrAgentMandateExpired`, `ErrAgentContractCreation`, `ErrAgentPayeeHasCode`) để cổng RPC và giao diện hiển thị đúng lý do.
+Lỗi trả về dùng các biến lỗi riêng (`ErrAgentPayeeNotAllowed`, `ErrAgentBudgetExceeded`, `ErrAgentFrozen`, `ErrAgentMandateExpired`, `ErrAgentContractCreation`, `ErrAgentPayeeHasCode`, `ErrAgentTxTypeNotAllowed`) để cổng RPC và giao diện hiển thị đúng lý do.
+Chuỗi lỗi qua RPC có tiền tố `agent:` (ví dụ `agent: payee not allowed: 0x…`, `agent: budget exceeded: …`, `agent: frozen`). Agent chỉ được gửi giao dịch loại 0, 1, 2; loại khác trả `ErrAgentTxTypeNotAllowed` (T05).
+
+Đã triển khai ở T05 (`chain/patches/0003-agent-rule.patch`): hàm chung `core.CheckAgentTx`. `preCheck` kiểm ngay sau TxAllowList và ghi bộ đếm ở bước cuối, sau `buyGas`. Txpool kiểm chỉ đọc theo `max(thời gian block đầu chain, đồng hồ máy)` (trường `Time` mới của `ValidationOptionsWithState`, hàm `txpool.PoolTime`), để sang ngày mới thì pool nhận lại thanh toán kể cả khi chain đứng yên; `preCheck` luôn dùng thời gian block.
+
+Precompile có trạng thái (dải `0x02…`, `0x03…`, kể cả AgentPolicy) có code giữ chỗ, nên điều kiện 3 từ chối chúng. Precompile gốc của EVM (`0x01`–`0x0a`, `0x100`) không có code trong state: chủ ví có thể đưa chúng vào danh sách người nhận, và một lời gọi tới chúng có thể thất bại lúc thực thi. Khi đó giao dịch vẫn vào block với receipt thất bại và vẫn bị tính đủ `charge` (bộ đếm được ghi trong `preCheck`, trước khi thực thi). Coin gửi tới địa chỉ precompile thì không lấy lại được; giao diện chủ ví nên cảnh báo khi danh sách người nhận có địa chỉ precompile.
 
 **Bất biến dùng để phát hiện vi phạm** (ArenaRecorder dựa vào đây):
 `balance(agent) ≥ tổng tiền đã nạp cho agent − totalCharged(agent)`.

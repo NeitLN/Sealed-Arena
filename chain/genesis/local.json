@@ -10,6 +10,9 @@
       "maxBlockGasCost": 1000000,
       "targetBlockRate": 2,
       "blockGasCostStep": 200000
+    },
+    "agentPolicyConfig": {
+      "blockTimestamp": 0
     }
   },
   "alloc": {

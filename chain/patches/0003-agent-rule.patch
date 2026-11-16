@@ -1,0 +1,1020 @@
+diff --git a/graft/subnet-evm/core/agent_rule.go b/graft/subnet-evm/core/agent_rule.go
+new file mode 100644
+index 0000000..0625333
+--- /dev/null
++++ b/graft/subnet-evm/core/agent_rule.go
+@@ -0,0 +1,109 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package core
++
++import (
++	"errors"
++	"fmt"
++	"math/big"
++	"slices"
++
++	"github.com/ava-labs/libevm/common"
++
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++)
++
++// Sealed Arena validity rule (docs/ARCHITECTURE.md 3.1). A transaction whose sender is
++// a registered agent is valid only inside the agent's mandate. Violations are returned
++// from preCheck, which makes the transaction invalid (it cannot be part of a block),
++// and from the txpool, which refuses it.
++var (
++	ErrAgentContractCreation = errors.New("agent: contract creation not allowed")
++	ErrAgentPayeeNotAllowed  = errors.New("agent: payee not allowed")
++	ErrAgentPayeeHasCode     = errors.New("agent: payee has code")
++	ErrAgentFrozen           = errors.New("agent: frozen")
++	ErrAgentMandateExpired   = errors.New("agent: mandate expired")
++	ErrAgentBudgetExceeded   = errors.New("agent: budget exceeded")
++	ErrAgentTxTypeNotAllowed = errors.New("agent: transaction type not allowed")
++)
++
++// AgentRuleState is the read access the rule needs. Both the EVM state in preCheck
++// and the txpool state satisfy it.
++type AgentRuleState interface {
++	contract.StateReader
++	GetCodeSize(common.Address) int
++}
++
++// AgentTx is the part of a transaction the rule looks at.
++type AgentTx struct {
++	From      common.Address
++	To        *common.Address
++	Value     *big.Int
++	GasLimit  uint64
++	GasFeeCap *big.Int // legacy and access-list transactions: the gas price
++	// Plain is true for transaction types 0, 1 and 2, the only types an agent may send.
++	Plain bool
++}
++
++// AgentCharge returns value + gasLimit * gasFeeCap, the most the transaction can take
++// from the sender. The rule charges this amount, not the gas actually used.
++func AgentCharge(tx AgentTx) *big.Int {
++	charge := new(big.Int).SetUint64(tx.GasLimit)
++	if tx.GasFeeCap != nil {
++		charge.Mul(charge, tx.GasFeeCap)
++	} else {
++		charge.SetUint64(0)
++	}
++	if tx.Value != nil {
++		charge.Add(charge, tx.Value)
++	}
++	return charge
++}
++
++// CheckAgentTx applies the rule. It only reads state. `applies` is false when the
++// sender is not a registered agent, in which case the rule does not constrain the
++// transaction. When `applies` is true and err is nil, `charge` is the amount the
++// caller must record with agentpolicy.ChargeSpend (preCheck only).
++//
++// The caller decides whether the rule is active (AgentPolicy enabled at the block time).
++func CheckAgentTx(state AgentRuleState, timestamp uint64, tx AgentTx) (charge *big.Int, applies bool, err error) {
++	registered, m, frozen, _ := agentpolicy.GetMandateForRule(state, tx.From)
++	if !registered {
++		return nil, false, nil
++	}
++	if !tx.Plain {
++		return nil, true, ErrAgentTxTypeNotAllowed
++	}
++	// 1. no contract creation
++	if tx.To == nil {
++		return nil, true, ErrAgentContractCreation
++	}
++	// 2. payee in the mandate
++	if !slices.Contains(m.Payees, *tx.To) {
++		return nil, true, fmt.Errorf("%w: %s", ErrAgentPayeeNotAllowed, tx.To.Hex())
++	}
++	// 3. payee has no code
++	if state.GetCodeSize(*tx.To) > 0 {
++		return nil, true, fmt.Errorf("%w: %s", ErrAgentPayeeHasCode, tx.To.Hex())
++	}
++	// 4. not frozen
++	if frozen {
++		return nil, true, ErrAgentFrozen
++	}
++	// 5. block.timestamp < expiry
++	if timestamp >= m.Expiry {
++		return nil, true, ErrAgentMandateExpired
++	}
++	// 6. charge <= perTxCap
++	charge = AgentCharge(tx)
++	if charge.Cmp(m.PerTxCap) > 0 {
++		return nil, true, fmt.Errorf("%w: charge %s above perTxCap %s", ErrAgentBudgetExceeded, charge, m.PerTxCap)
++	}
++	// 7. spentToday + charge <= dailyCap (spentToday is zero on a new UTC day)
++	spent := agentpolicy.SpendForDay(state, tx.From, timestamp).SpentToday
++	if total := new(big.Int).Add(spent, charge); total.Cmp(m.DailyCap) > 0 {
++		return nil, true, fmt.Errorf("%w: spentToday %s + charge %s above dailyCap %s", ErrAgentBudgetExceeded, spent, charge, m.DailyCap)
++	}
++	return charge, true, nil
++}
+diff --git a/graft/subnet-evm/core/agent_rule_test.go b/graft/subnet-evm/core/agent_rule_test.go
+new file mode 100644
+index 0000000..f280f75
+--- /dev/null
++++ b/graft/subnet-evm/core/agent_rule_test.go
+@@ -0,0 +1,443 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package core
++
++import (
++	"crypto/ecdsa"
++	"crypto/elliptic"
++	"crypto/rand"
++	"crypto/sha256"
++	"encoding/base64"
++	"math/big"
++	"strings"
++	"testing"
++
++	"github.com/ava-labs/libevm/accounts/abi"
++	"github.com/ava-labs/libevm/common"
++	"github.com/ava-labs/libevm/core/rawdb"
++	"github.com/ava-labs/libevm/core/types"
++	"github.com/ava-labs/libevm/core/vm"
++	"github.com/ava-labs/libevm/crypto"
++	"github.com/ava-labs/libevm/ethdb"
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/graft/evm/utils"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++)
++
++// ---- fixtures ------------------------------------------------------------------
++
++var (
++	arAgentKey, _   = crypto.HexToECDSA(strings.Repeat("11", 32))
++	arAgent         = crypto.PubkeyToAddress(arAgentKey.PublicKey)
++	arRelayerKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
++	arRelayer       = crypto.PubkeyToAddress(arRelayerKey.PublicKey)
++	arPayee         = common.HexToAddress("0x00000000000000000000000000000000000000A1")
++	arStranger      = common.HexToAddress("0x00000000000000000000000000000000000000B2")
++	arCodePayee     = common.HexToAddress("0x00000000000000000000000000000000000000C3")
++
++	arCoin       = new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)
++	arFeeCap     = big.NewInt(1_000_000_000_000) // 1000 gwei, above any base fee in these tests
++	arTip        = big.NewInt(1_000_000_000)
++	arAgentFunds = new(big.Int).Mul(arCoin, big.NewInt(100))
++	arTransfer   = uint64(21_000)
++	// charge of a plain transfer with value v: v + 21000 * 1000 gwei
++	arGasCharge = new(big.Int).Mul(new(big.Int).SetUint64(arTransfer), arFeeCap)
++)
++
++func arCharge(value *big.Int, gas uint64) *big.Int {
++	return new(big.Int).Add(value, new(big.Int).Mul(new(big.Int).SetUint64(gas), arFeeCap))
++}
++
++func arConfig() *params.ChainConfig {
++	return params.WithExtra(
++		&params.ChainConfig{
++			ChainID:             big.NewInt(1),
++			HomesteadBlock:      big.NewInt(0),
++			EIP150Block:         big.NewInt(0),
++			EIP155Block:         big.NewInt(0),
++			EIP158Block:         big.NewInt(0),
++			ByzantiumBlock:      big.NewInt(0),
++			ConstantinopleBlock: big.NewInt(0),
++			PetersburgBlock:     big.NewInt(0),
++			IstanbulBlock:       big.NewInt(0),
++			MuirGlacierBlock:    big.NewInt(0),
++			BerlinBlock:         big.NewInt(0),
++			LondonBlock:         big.NewInt(0),
++		},
++		&extras.ChainConfig{
++			FeeConfig: params.DefaultFeeConfig,
++			NetworkUpgrades: extras.NetworkUpgrades{
++				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
++			},
++			GenesisPrecompiles: extras.Precompiles{
++				agentpolicy.ConfigKey: agentpolicy.NewConfig(utils.PointerTo[uint64](0)),
++			},
++		},
++	)
++}
++
++// arEnv is a chain where block 1 registers the agent (and sets its mandate, if any),
++// with helpers to extend it by valid blocks and to try hand-built invalid blocks.
++type arEnv struct {
++	t       *testing.T
++	chain   *BlockChain
++	gspec   *Genesis
++	gendb   ethdb.Database
++	signer  types.Signer
++	owner   *ecdsa.PrivateKey
++	nonces  map[common.Address]uint64
++	ownerNo uint64
++	head    *types.Block
++}
++
++func newArEnv(t *testing.T, m *agentpolicy.IAgentPolicyMandate) *arEnv {
++	t.Helper()
++	config := arConfig()
++	gspec := &Genesis{
++		Config: config,
++		Alloc: types.GenesisAlloc{
++			arAgent:     {Balance: arAgentFunds},
++			arRelayer:   {Balance: new(big.Int).Mul(arCoin, big.NewInt(1000))},
++			arCodePayee: {Balance: common.Big0, Code: []byte{0x00}}, // STOP
++		},
++		GasLimit: params.GetExtra(config).FeeConfig.GasLimit.Uint64(),
++	}
++	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
++	require.NoError(t, err)
++	t.Cleanup(chain.Stop)
++
++	owner, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++	require.NoError(t, err)
++	e := &arEnv{t: t, chain: chain, gspec: gspec, signer: types.LatestSigner(config), owner: owner, nonces: map[common.Address]uint64{}}
++
++	setup := []*types.Transaction{e.relayerCall(e.registerData(), 300_000)}
++	if m != nil {
++		setup = append(setup, e.relayerCall(e.setMandateData(*m), 1_000_000))
++	}
++	gendb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewCoinbaseFaker(), 1, 10, func(_ int, b *BlockGen) {
++		for _, tx := range setup {
++			b.AddTx(tx)
++		}
++	})
++	require.NoError(t, err)
++	e.gendb = gendb
++	e.insert(blocks[0])
++	return e
++}
++
++func (e *arEnv) chainID() *big.Int { return e.gspec.Config.ChainID }
++
++func (e *arEnv) sign(key *ecdsa.PrivateKey, to *common.Address, value *big.Int, gas uint64, data []byte) *types.Transaction {
++	from := crypto.PubkeyToAddress(key.PublicKey)
++	tx, err := types.SignNewTx(key, e.signer, &types.DynamicFeeTx{
++		ChainID: e.chainID(), Nonce: e.nonces[from], GasTipCap: arTip, GasFeeCap: arFeeCap,
++		Gas: gas, To: to, Value: value, Data: data,
++	})
++	require.NoError(e.t, err)
++	e.nonces[from]++ // undone by e.bad when the block is rejected
++	return tx
++}
++
++func (e *arEnv) agentTx(to *common.Address, value *big.Int, gas uint64, data []byte) *types.Transaction {
++	return e.sign(arAgentKey, to, value, gas, data)
++}
++
++func (e *arEnv) pay(value int64) *types.Transaction {
++	return e.agentTx(&arPayee, big.NewInt(value), arTransfer, nil)
++}
++
++func (e *arEnv) relayerCall(data []byte, gas uint64) *types.Transaction {
++	to := agentpolicy.ContractAddress
++	return e.sign(arRelayerKey, &to, common.Big0, gas, data)
++}
++
++func (e *arEnv) registerData() []byte {
++	x, y := [32]byte(common.BigToHash(e.owner.X)), [32]byte(common.BigToHash(e.owner.Y))
++	sig, err := crypto.Sign(agentpolicy.RegisterDigest(e.chainID(), arAgent, x, y).Bytes(), arAgentKey)
++	require.NoError(e.t, err)
++	data, err := agentpolicy.PackRegister(agentpolicy.RegisterInput{Agent: arAgent, OwnerX: x, OwnerY: y, AgentSig: sig})
++	require.NoError(e.t, err)
++	return data
++}
++
++// assertion signs `challenge` with the owner passkey as a WebAuthn authenticator would.
++func (e *arEnv) assertion(challenge common.Hash) []byte {
++	authData := append(make([]byte, 32), 0x05, 0, 0, 0, 1)
++	clientData := []byte(`{"type":"webauthn.get","challenge":"` + base64.RawURLEncoding.EncodeToString(challenge.Bytes()) + `"}`)
++	ch := sha256.Sum256(clientData)
++	digest := sha256.Sum256(append(append([]byte{}, authData...), ch[:]...))
++	r, s, err := ecdsa.Sign(rand.Reader, e.owner, digest[:])
++	require.NoError(e.t, err)
++	if half := new(big.Int).Rsh(elliptic.P256().Params().N, 1); s.Cmp(half) > 0 {
++		s.Sub(elliptic.P256().Params().N, s)
++	}
++	tBytes, _ := abi.NewType("bytes", "", nil)
++	tB32, _ := abi.NewType("bytes32", "", nil)
++	auth, err := abi.Arguments{{Type: tBytes}, {Type: tBytes}, {Type: tB32}, {Type: tB32}}.Pack(
++		authData, clientData, [32]byte(common.BigToHash(r)), [32]byte(common.BigToHash(s)))
++	require.NoError(e.t, err)
++	return auth
++}
++
++func (e *arEnv) setMandateData(m agentpolicy.IAgentPolicyMandate) []byte {
++	nonce := new(big.Int).SetUint64(e.ownerNo)
++	auth := e.assertion(agentpolicy.SetMandateChallenge(e.chainID(), arAgent, m, nonce))
++	data, err := agentpolicy.PackSetMandate(agentpolicy.SetMandateInput{Agent: arAgent, M: m, Nonce: nonce, Auth: auth})
++	require.NoError(e.t, err)
++	e.ownerNo++
++	return data
++}
++
++func (e *arEnv) freezeData(freeze bool) []byte {
++	nonce := new(big.Int).SetUint64(e.ownerNo)
++	var data []byte
++	var err error
++	if freeze {
++		data, err = agentpolicy.PackFreeze(agentpolicy.FreezeInput{Agent: arAgent, Nonce: nonce, Auth: e.assertion(agentpolicy.FreezeChallenge(e.chainID(), arAgent, nonce))})
++	} else {
++		data, err = agentpolicy.PackUnfreeze(agentpolicy.UnfreezeInput{Agent: arAgent, Nonce: nonce, Auth: e.assertion(agentpolicy.UnfreezeChallenge(e.chainID(), arAgent, nonce))})
++	}
++	require.NoError(e.t, err)
++	e.ownerNo++
++	return data
++}
++
++func (e *arEnv) insert(b *types.Block) {
++	e.t.Helper()
++	_, err := e.chain.InsertChain(types.Blocks{b})
++	require.NoError(e.t, err)
++	e.head = b
++}
++
++// good builds and inserts one valid block `gap` seconds after the head; it returns the receipts.
++func (e *arEnv) good(gap uint64, txs ...*types.Transaction) types.Receipts {
++	e.t.Helper()
++	blocks, receipts, err := GenerateChain(e.gspec.Config, e.head, dummy.NewCoinbaseFaker(), e.gendb, 1, gap, func(_ int, b *BlockGen) {
++		for _, tx := range txs {
++			b.AddTx(tx)
++		}
++	})
++	require.NoError(e.t, err)
++	e.insert(blocks[0])
++	return receipts[0]
++}
++
++// bad builds a block by hand that contains `txs` (no validity check while building)
++// and returns the error from inserting it. The chain head must not move.
++func (e *arEnv) bad(txs ...*types.Transaction) error {
++	e.t.Helper()
++	block := GenerateBadBlock(e.head, dummy.NewCoinbaseFaker(), txs, e.gspec.Config)
++	_, err := e.chain.InsertChain(types.Blocks{block})
++	require.Equal(e.t, e.head.Hash(), e.chain.CurrentBlock().Hash(), "rejected block must not become head")
++	for _, tx := range txs {
++		from, _ := types.Sender(e.signer, tx)
++		e.nonces[from]--
++	}
++	return err
++}
++
++func (e *arEnv) spend() agentpolicy.Spend {
++	st, err := e.chain.State()
++	require.NoError(e.t, err)
++	return agentpolicy.SpendForDay(st, arAgent, e.head.Time())
++}
++
++func (e *arEnv) balance(a common.Address) *big.Int {
++	st, err := e.chain.State()
++	require.NoError(e.t, err)
++	return st.GetBalance(a).ToBig()
++}
++
++// checkInvariant: balance(agent) >= funded - totalCharged (docs/ARCHITECTURE.md 3.1).
++func (e *arEnv) checkInvariant() {
++	e.t.Helper()
++	floor := new(big.Int).Sub(arAgentFunds, e.spend().TotalCharged)
++	require.GreaterOrEqual(e.t, e.balance(arAgent).Cmp(floor), 0, "balance %s below funded - totalCharged %s", e.balance(arAgent), floor)
++}
++
++func arMandate(payees []common.Address, perTx, daily *big.Int, expiry uint64) *agentpolicy.IAgentPolicyMandate {
++	return &agentpolicy.IAgentPolicyMandate{Payees: payees, PerTxCap: perTx, DailyCap: daily, Expiry: expiry}
++}
++
++var arFarFuture = uint64(4_102_444_800)
++
++func arBigMandate() *agentpolicy.IAgentPolicyMandate {
++	return arMandate([]common.Address{arPayee, arCodePayee, agentpolicy.ContractAddress}, arCoin, new(big.Int).Mul(arCoin, big.NewInt(5)), arFarFuture)
++}
++
++// ---- tests -----------------------------------------------------------------------
++
++func TestAgentRuleRegisteredWithoutMandateRejectsEverything(t *testing.T) {
++	e := newArEnv(t, nil)
++	require.ErrorIs(t, e.bad(e.pay(1)), ErrAgentPayeeNotAllowed)
++	require.ErrorIs(t, e.bad(e.agentTx(&arStranger, big.NewInt(1), arTransfer, nil)), ErrAgentPayeeNotAllowed)
++	require.ErrorIs(t, e.bad(e.agentTx(nil, common.Big0, 100_000, []byte{0x00})), ErrAgentContractCreation)
++	e.checkInvariant()
++}
++
++func TestAgentRuleAllowedPaymentIsChargedAtMaximum(t *testing.T) {
++	e := newArEnv(t, arBigMandate())
++	value := big.NewInt(12345)
++	receipts := e.good(10, e.pay(value.Int64()))
++	require.Equal(t, types.ReceiptStatusSuccessful, receipts[0].Status)
++	require.Equal(t, value, e.balance(arPayee))
++
++	want := arCharge(value, arTransfer)
++	sp := e.spend()
++	require.Equal(t, 0, want.Cmp(sp.SpentToday), "spentToday %s want %s", sp.SpentToday, want)
++	require.Equal(t, 0, want.Cmp(sp.TotalCharged))
++	// The counter is at least what really left the account (gas is charged at the cap).
++	left := new(big.Int).Sub(arAgentFunds, e.balance(arAgent))
++	require.GreaterOrEqual(t, sp.TotalCharged.Cmp(left), 0)
++	e.checkInvariant()
++}
++
++func TestAgentRuleConditions(t *testing.T) {
++	t.Run("1 contract creation", func(t *testing.T) {
++		e := newArEnv(t, arBigMandate())
++		require.ErrorIs(t, e.bad(e.agentTx(nil, common.Big0, 100_000, []byte{0x60, 0x00})), ErrAgentContractCreation)
++	})
++
++	t.Run("2 payee not in the mandate", func(t *testing.T) {
++		e := newArEnv(t, arBigMandate())
++		require.ErrorIs(t, e.bad(e.agentTx(&arStranger, big.NewInt(1), arTransfer, nil)), ErrAgentPayeeNotAllowed)
++		e.good(10, e.pay(1)) // a listed payee goes through
++	})
++
++	t.Run("3 listed payee with code", func(t *testing.T) {
++		e := newArEnv(t, arBigMandate())
++		require.ErrorIs(t, e.bad(e.agentTx(&arCodePayee, big.NewInt(1), 50_000, nil)), ErrAgentPayeeHasCode)
++	})
++
++	t.Run("5 expiry: valid before, rejected from timestamp == expiry", func(t *testing.T) {
++		// Block 1 is at t=10. Expiry 40: blocks at 20 and 30 pass, the block at 40 fails.
++		e := newArEnv(t, arMandate([]common.Address{arPayee}, arCoin, new(big.Int).Mul(arCoin, big.NewInt(5)), 40))
++		e.good(10, e.pay(1))
++		e.good(10, e.pay(1))
++		require.Equal(t, uint64(30), e.head.Time())
++		require.ErrorIs(t, e.bad(e.pay(1)), ErrAgentMandateExpired) // GenerateBadBlock uses parent + 10 = 40
++	})
++
++	t.Run("6 perTxCap: charge == cap passes, cap + 1 fails", func(t *testing.T) {
++		perTx := new(big.Int).Mul(arCoin, big.NewInt(1))
++		e := newArEnv(t, arMandate([]common.Address{arPayee}, perTx, new(big.Int).Mul(arCoin, big.NewInt(5)), arFarFuture))
++		atCap := new(big.Int).Sub(perTx, arGasCharge)
++		over := new(big.Int).Add(atCap, common.Big1)
++		require.ErrorIs(t, e.bad(e.agentTx(&arPayee, over, arTransfer, nil)), ErrAgentBudgetExceeded)
++		e.good(10, e.agentTx(&arPayee, atCap, arTransfer, nil))
++		require.Equal(t, 0, perTx.Cmp(e.spend().SpentToday))
++	})
++
++	t.Run("7 dailyCap: spent + charge == cap passes, one more wei fails (hand-built block)", func(t *testing.T) {
++		value := big.NewInt(1000)
++		charge := arCharge(value, arTransfer)
++		daily := new(big.Int).Mul(charge, big.NewInt(3))
++		e := newArEnv(t, arMandate([]common.Address{arPayee}, charge, daily, arFarFuture))
++		e.good(10, e.pay(1000), e.pay(1000), e.pay(1000))
++		require.Equal(t, 0, daily.Cmp(e.spend().SpentToday))
++		require.ErrorIs(t, e.bad(e.pay(0)), ErrAgentBudgetExceeded)
++
++		// Same budget, but the third payment is 1 wei over: the block holding all three fails.
++		e2 := newArEnv(t, arMandate([]common.Address{arPayee}, new(big.Int).Add(charge, common.Big1), daily, arFarFuture))
++		require.ErrorIs(t, e2.bad(e2.pay(1000), e2.pay(1000), e2.pay(1001)), ErrAgentBudgetExceeded)
++		e2.checkInvariant()
++	})
++
++	t.Run("other transaction types", func(t *testing.T) {
++		e := newArEnv(t, arBigMandate())
++		st, err := e.chain.State()
++		require.NoError(t, err)
++		_, applies, err := CheckAgentTx(st, e.head.Time(), AgentTx{From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap, Plain: false})
++		require.True(t, applies)
++		require.ErrorIs(t, err, ErrAgentTxTypeNotAllowed)
++	})
++}
++
++// Stateful precompiles (AgentPolicy and the other 0x02…/0x03… modules) carry
++// placeholder code, so they count as "payee has code" and are refused.
++func TestAgentRulePrecompileAddressesCountAsCode(t *testing.T) {
++	e := newArEnv(t, arBigMandate())
++	to := agentpolicy.ContractAddress
++	require.ErrorIs(t, e.bad(e.agentTx(&to, common.Big0, 60_000, []byte{0xde, 0xad, 0xbe, 0xef})), ErrAgentPayeeHasCode)
++	e.checkInvariant()
++}
++
++// Native precompiles (0x01–0x0a, 0x100) have no code in state, so an owner may
++// list one as a payee. A call to it with bad input fails during execution after
++// preCheck has recorded the spend: the transaction is included with a failed
++// receipt and the full charge stays on the counter.
++func TestAgentRuleRevertedExecutionIsStillCharged(t *testing.T) {
++	bn256Add := common.BytesToAddress([]byte{0x06})
++	m := arMandate([]common.Address{arPayee, bn256Add}, arCoin, new(big.Int).Mul(arCoin, big.NewInt(5)), arFarFuture)
++	e := newArEnv(t, m)
++	gas := uint64(100_000)
++	bad := make([]byte, 128)
++	for i := range bad {
++		bad[i] = 0xff // not points on the curve: the precompile returns an error
++	}
++	receipts := e.good(10, e.agentTx(&bn256Add, common.Big0, gas, bad))
++	require.Equal(t, types.ReceiptStatusFailed, receipts[0].Status)
++	want := arCharge(common.Big0, gas)
++	sp := e.spend()
++	require.Equal(t, 0, want.Cmp(sp.TotalCharged), "totalCharged %s want %s", sp.TotalCharged, want)
++	require.Equal(t, 0, want.Cmp(sp.SpentToday))
++	e.checkInvariant()
++}
++
++// Gas below the intrinsic cost is not a revert: the transaction is invalid, the
++// block holding it is rejected, and nothing is charged.
++func TestAgentRuleIntrinsicGasFailureIsInvalidNotCharged(t *testing.T) {
++	e := newArEnv(t, arBigMandate())
++	require.ErrorIs(t, e.bad(e.agentTx(&arPayee, big.NewInt(1), 20_000, nil)), ErrIntrinsicGas)
++	require.Equal(t, 0, e.spend().TotalCharged.Sign())
++}
++
++func TestAgentRuleNewDayResetsDailyBudget(t *testing.T) {
++	value := big.NewInt(1000)
++	charge := arCharge(value, arTransfer)
++	e := newArEnv(t, arMandate([]common.Address{arPayee}, charge, charge, arFarFuture))
++	e.good(10, e.pay(1000))
++	require.ErrorIs(t, e.bad(e.pay(1000)), ErrAgentBudgetExceeded)
++
++	e.good(86_400, e.pay(1000)) // next UTC day
++	sp := e.spend()
++	require.Equal(t, 0, charge.Cmp(sp.SpentToday))
++	require.Equal(t, 0, new(big.Int).Mul(charge, big.NewInt(2)).Cmp(sp.TotalCharged), "totalCharged keeps history")
++	e.checkInvariant()
++}
++
++func TestAgentRuleFreezeAndUnfreeze(t *testing.T) {
++	e := newArEnv(t, arBigMandate())
++	e.good(10, e.pay(1))
++	r := e.good(10, e.relayerCall(e.freezeData(true), 300_000)) // block N
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	require.ErrorIs(t, e.bad(e.pay(1)), ErrAgentFrozen) // block N+1
++
++	r = e.good(10, e.relayerCall(e.freezeData(false), 300_000))
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	e.good(10, e.pay(1))
++	e.checkInvariant()
++}
++
++func TestAgentRuleMandateChangeTakesEffectNextTx(t *testing.T) {
++	e := newArEnv(t, arBigMandate())
++	e.good(10, e.pay(1))
++	// The owner removes every payee; the agent's next payment is invalid.
++	e.good(10, e.relayerCall(e.setMandateData(*arMandate(nil, arCoin, arCoin, arFarFuture)), 1_000_000))
++	require.ErrorIs(t, e.bad(e.pay(1)), ErrAgentPayeeNotAllowed)
++}
++
++func TestAgentRuleOtherSendersUnaffected(t *testing.T) {
++	e := newArEnv(t, arBigMandate())
++	r := e.good(10,
++		e.sign(arRelayerKey, &arStranger, big.NewInt(7), arTransfer, nil),
++		e.sign(arRelayerKey, nil, common.Big0, 100_000, []byte{0x60, 0x00, 0x60, 0x00, 0xf3}),
++	)
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	require.Equal(t, types.ReceiptStatusSuccessful, r[1].Status)
++	require.Equal(t, big.NewInt(7), e.balance(arStranger))
++}
+diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
+index 415a986..789b90b 100644
+--- a/graft/subnet-evm/core/state_transition.go
++++ b/graft/subnet-evm/core/state_transition.go
+@@ -33,6 +33,7 @@ import (
+ 
+ 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+ 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
+ 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+ 	"github.com/ava-labs/libevm/common"
+ 	cmath "github.com/ava-labs/libevm/common/math"
+@@ -168,6 +169,10 @@ type StateTransition struct {
+ 	initialGas   uint64
+ 	state        vm.StateDB
+ 	evm          *vm.EVM
++
++	// agentCharge is set by preCheck when the sender is a registered agent and the
++	// transaction is inside its mandate (Sealed Arena rule).
++	agentCharge *big.Int
+ }
+ 
+ // NewStateTransition initialises and returns a new state transition object.
+@@ -257,6 +262,25 @@ func (st *StateTransition) preCheck() error {
+ 				return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, msg.From)
+ 			}
+ 		}
++
++		// Sealed Arena: an agent transaction outside its mandate is invalid, not reverted.
++		// Only read here; the spend is recorded after buyGas, once every check passed.
++		if params.GetExtra(st.evm.ChainConfig()).IsPrecompileEnabled(agentpolicy.ContractAddress, st.evm.Context.Time) {
++			charge, applies, err := CheckAgentTx(st.state, st.evm.Context.Time, AgentTx{
++				From:      msg.From,
++				To:        msg.To,
++				Value:     msg.Value,
++				GasLimit:  msg.GasLimit,
++				GasFeeCap: msg.GasFeeCap,
++				Plain:     msg.BlobHashes == nil,
++			})
++			if err != nil {
++				return err
++			}
++			if applies {
++				st.agentCharge = charge
++			}
++		}
+ 	}
+ 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
+ 	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
+@@ -315,7 +339,16 @@ func (st *StateTransition) preCheck() error {
+ 			}
+ 		}
+ 	}
+-	return st.buyGas()
++	if err := st.buyGas(); err != nil {
++		return err
++	}
++	// Sealed Arena: record the agent's spend. This is the last step of preCheck, so it
++	// happens only for a transaction that is valid and will be part of the block, and
++	// it is before execution, so a later revert does not undo it.
++	if st.agentCharge != nil {
++		return agentpolicy.ChargeSpend(st.state, st.msg.From, st.agentCharge, st.evm.Context.Time)
++	}
++	return nil
+ }
+ 
+ // TransitionDb will transition the state by applying the current message and
+diff --git a/graft/subnet-evm/core/txpool/legacypool/legacypool.go b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
+index cb2602f..8a025e0 100644
+--- a/graft/subnet-evm/core/txpool/legacypool/legacypool.go
++++ b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
+@@ -707,6 +707,7 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
+ 			params.IsMergeTODO,
+ 			pool.currentHead.Load().Time,
+ 		),
++		Time:       txpool.PoolTime(pool.currentHead.Load().Time),
+ 		MinimumFee: pool.minimumFee,
+ 
+ 		FirstNonceGap: nil, // Pool allows arbitrary arrival order, don't invalidate nonce gaps
+diff --git a/graft/subnet-evm/core/txpool/validation.go b/graft/subnet-evm/core/txpool/validation.go
+index 1827192..946d92f 100644
+--- a/graft/subnet-evm/core/txpool/validation.go
++++ b/graft/subnet-evm/core/txpool/validation.go
+@@ -31,10 +31,12 @@ import (
+ 	"crypto/sha256"
+ 	"fmt"
+ 	"math/big"
++	"time"
+ 
+ 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+ 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+ 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
+ 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+ 	"github.com/ava-labs/libevm/common"
+ 	ethcore "github.com/ava-labs/libevm/core"
+@@ -190,10 +192,28 @@ func validateBlobSidecar(hashes []common.Hash, sidecar *types.BlobTxSidecar) err
+ 	return nil
+ }
+ 
++// Now is the clock the pools use for time-based admission rules. It is not used
++// in consensus code; tests may replace it.
++var Now = time.Now
++
++// PoolTime is the time the agent rule uses for pool admission: the later of the
++// head block time and the local clock. With only the head time, an agent whose
++// daily budget ran out in the last block before midnight could not get a payment
++// into the pool on an idle chain (no new block, so no new day). Block validity
++// (preCheck) always uses the block time.
++func PoolTime(headTime uint64) uint64 {
++	now := Now().Unix()
++	if now < 0 {
++		return headTime
++	}
++	return max(headTime, uint64(now))
++}
++
+ // ValidationOptionsWithState define certain differences between stateful transaction
+ // validation across the different pools without having to duplicate those checks.
+ type ValidationOptionsWithState struct {
+ 	State *state.StateDB // State database to check nonces and balances against
++	Time  uint64         // Time for time-based admission rules (Sealed Arena agent rule), see PoolTime
+ 
+ 	// FirstNonceGap is an optional callback to retrieve the first nonce gap in
+ 	// the list of pooled transactions of a specific account. If this method is
+@@ -285,5 +305,20 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
+ 		}
+ 	}
+ 
++	// Sealed Arena: read-only check of the agent rule; preCheck enforces it in blocks.
++	if params.GetRulesExtra(opts.Rules).IsPrecompileEnabled(agentpolicy.ContractAddress) {
++		plain := tx.Type() == types.LegacyTxType || tx.Type() == types.AccessListTxType || tx.Type() == types.DynamicFeeTxType
++		if _, _, err := core.CheckAgentTx(opts.State, opts.Time, core.AgentTx{
++			From:      from,
++			To:        tx.To(),
++			Value:     tx.Value(),
++			GasLimit:  tx.Gas(),
++			GasFeeCap: tx.GasFeeCap(),
++			Plain:     plain,
++		}); err != nil {
++			return err
++		}
++	}
++
+ 	return nil
+ }
+diff --git a/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
+new file mode 100644
+index 0000000..47f769e
+--- /dev/null
++++ b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
+@@ -0,0 +1,249 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package evm
++
++import (
++	"crypto/ecdsa"
++	"crypto/elliptic"
++	"crypto/rand"
++	"crypto/sha256"
++	"encoding/base64"
++	"math/big"
++	"testing"
++	"time"
++
++	"github.com/ava-labs/libevm/accounts/abi"
++	"github.com/ava-labs/libevm/common"
++	"github.com/ava-labs/libevm/core/types"
++	"github.com/ava-labs/libevm/crypto"
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/graft/evm/utils"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
++	"github.com/ava-labs/avalanchego/vms/components/chain"
++)
++
++func agentAssertion(t *testing.T, owner *ecdsa.PrivateKey, challenge common.Hash) []byte {
++	t.Helper()
++	authData := append(make([]byte, 32), 0x05, 0, 0, 0, 1)
++	clientData := []byte(`{"type":"webauthn.get","challenge":"` + base64.RawURLEncoding.EncodeToString(challenge.Bytes()) + `"}`)
++	ch := sha256.Sum256(clientData)
++	digest := sha256.Sum256(append(append([]byte{}, authData...), ch[:]...))
++	r, s, err := ecdsa.Sign(rand.Reader, owner, digest[:])
++	require.NoError(t, err)
++	if half := new(big.Int).Rsh(elliptic.P256().Params().N, 1); s.Cmp(half) > 0 {
++		s.Sub(elliptic.P256().Params().N, s)
++	}
++	tBytes, _ := abi.NewType("bytes", "", nil)
++	tB32, _ := abi.NewType("bytes32", "", nil)
++	auth, err := abi.Arguments{{Type: tBytes}, {Type: tBytes}, {Type: tB32}, {Type: tB32}}.Pack(
++		authData, clientData, [32]byte(common.BigToHash(r)), [32]byte(common.BigToHash(s)))
++	require.NoError(t, err)
++	return auth
++}
++
++// TestAgentRuleConcurrentPaymentsThroughPoolAndBuilder exercises the real txpool and
++// block builder: 20 payments that are each valid on their own sit in the pool at once;
++// the built block holds only as many as the daily budget allows, the rest never make
++// it into a block, and the block verifies.
++func TestAgentRuleConcurrentPaymentsThroughPoolAndBuilder(t *testing.T) {
++	genesis := &core.Genesis{}
++	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))))
++	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
++		agentpolicy.ConfigKey: agentpolicy.NewConfig(utils.PointerTo[uint64](0)),
++	}
++	genesisJSON, err := genesis.MarshalJSON()
++	require.NoError(t, err)
++
++	fork := upgradetest.Latest
++	tvm := newVM(t, testVMConfig{fork: &fork, genesisJSON: string(genesisJSON)})
++	defer func() { require.NoError(t, tvm.vm.Shutdown(t.Context())) }()
++
++	chainID := tvm.vm.chainConfig.ChainID
++	signer := types.LatestSignerForChainID(chainID)
++	relayerKey, agentKey := testKeys[0].ToECDSA(), testKeys[1].ToECDSA()
++	agent := testEthAddrs[1]
++	payee := common.HexToAddress("0x00000000000000000000000000000000000000A1")
++	stranger := common.HexToAddress("0x00000000000000000000000000000000000000B2")
++	gasPrice := big.NewInt(testMinGasPrice)
++
++	nonces := map[common.Address]uint64{}
++	send := func(key *ecdsa.PrivateKey, to *common.Address, value *big.Int, gas uint64, data []byte) *types.Transaction {
++		from := crypto.PubkeyToAddress(key.PublicKey)
++		tx, err := types.SignNewTx(key, signer, &types.LegacyTx{Nonce: nonces[from], GasPrice: gasPrice, Gas: gas, To: to, Value: value, Data: data})
++		require.NoError(t, err)
++		nonces[from]++
++		return tx
++	}
++	precompile := agentpolicy.ContractAddress
++	// Move the VM clock well past the minimum block delay before each build, so the
++	// test does not depend on wall-clock timing between blocks.
++	nextBlock := func() {
++		tvm.vm.clock.Set(tvm.vm.clock.Time().Add(5 * time.Second))
++	}
++
++	// Block 1: register the agent and set its mandate (relayer sends, passkey signs).
++	owner, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++	require.NoError(t, err)
++	x, y := [32]byte(common.BigToHash(owner.X)), [32]byte(common.BigToHash(owner.Y))
++	sig, err := crypto.Sign(agentpolicy.RegisterDigest(chainID, agent, x, y).Bytes(), agentKey)
++	require.NoError(t, err)
++	regData, err := agentpolicy.PackRegister(agentpolicy.RegisterInput{Agent: agent, OwnerX: x, OwnerY: y, AgentSig: sig})
++	require.NoError(t, err)
++
++	value := big.NewInt(1_000)
++	charge := new(big.Int).Add(value, new(big.Int).Mul(big.NewInt(21_000), gasPrice))
++	const fits = 7
++	daily := new(big.Int).Mul(charge, big.NewInt(fits))
++	m := agentpolicy.IAgentPolicyMandate{Payees: []common.Address{payee}, PerTxCap: charge, DailyCap: daily, Expiry: 4_102_444_800}
++	auth := agentAssertion(t, owner, agentpolicy.SetMandateChallenge(chainID, agent, m, common.Big0))
++	mandateData, err := agentpolicy.PackSetMandate(agentpolicy.SetMandateInput{Agent: agent, M: m, Nonce: common.Big0, Auth: auth})
++	require.NoError(t, err)
++
++	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{
++		send(relayerKey, &precompile, common.Big0, 300_000, regData),
++		send(relayerKey, &precompile, common.Big0, 1_000_000, mandateData),
++	})
++	require.NoError(t, errs[0])
++	require.NoError(t, errs[1])
++	nextBlock()
++	issueAndAccept(t, tvm.vm)
++
++	// The pool refuses forbidden agent transactions with the rule's error.
++	forbidden := send(agentKey, &stranger, value, 21_000, nil)
++	nonces[agent]--
++	require.ErrorIs(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{forbidden})[0], core.ErrAgentPayeeNotAllowed)
++	creation := send(agentKey, nil, common.Big0, 100_000, []byte{0x00})
++	nonces[agent]--
++	require.ErrorIs(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{creation})[0], core.ErrAgentContractCreation)
++
++	// 20 payments, each within perTxCap and each passing the pool check on its own.
++	payments := make([]*types.Transaction, 20)
++	for i := range payments {
++		payments[i] = send(agentKey, &payee, value, 21_000, nil)
++	}
++	for i, err := range tvm.vm.txPool.AddRemotesSync(payments) {
++		require.NoError(t, err, "payment %d", i)
++	}
++
++	nextBlock()
++	blk := issueAndAccept(t, tvm.vm) // builds, verifies and accepts
++	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
++	included := 0
++	total := new(big.Int)
++	for _, tx := range ethBlock.Transactions() {
++		if from, _ := types.Sender(signer, tx); from == agent {
++			included++
++			total.Add(total, new(big.Int).Add(tx.Value(), new(big.Int).Mul(new(big.Int).SetUint64(tx.Gas()), tx.GasPrice())))
++		}
++	}
++	require.Equal(t, fits, included)
++	require.LessOrEqual(t, total.Cmp(daily), 0, "charged %s above dailyCap %s", total, daily)
++
++	state, err := tvm.vm.blockChain.StateAt(ethBlock.Root())
++	require.NoError(t, err)
++	sp := agentpolicy.SpendForDay(state, agent, ethBlock.Time())
++	require.Equal(t, 0, total.Cmp(sp.SpentToday))
++	require.Equal(t, uint64(fits), state.GetNonce(agent))
++	require.Equal(t, new(big.Int).Mul(value, big.NewInt(fits)), state.GetBalance(payee).ToBig())
++
++	// Invariant: balance(agent) >= funded - totalCharged.
++	floor := new(big.Int).Sub(initialFund, sp.TotalCharged)
++	require.GreaterOrEqual(t, state.GetBalance(agent).ToBig().Cmp(floor), 0)
++
++	// The remaining payments are not included in a later block of the same day.
++	nextBlock()
++	_, err = tvm.vm.BuildBlock(t.Context())
++	require.Error(t, err, "nothing left that fits the budget")
++}
++
++// An agent that spent its whole daily budget in the last block of a day must be able
++// to pay again after midnight even if no other transaction has moved the chain on:
++// the pool admits by the later of head time and its clock, and the block (built at
++// the new day's time) accepts the payment.
++func TestAgentRuleDailyRolloverOnIdleChain(t *testing.T) {
++	genesis := &core.Genesis{}
++	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))))
++	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
++		agentpolicy.ConfigKey: agentpolicy.NewConfig(utils.PointerTo[uint64](0)),
++	}
++	genesisJSON, err := genesis.MarshalJSON()
++	require.NoError(t, err)
++	fork := upgradetest.Latest
++	tvm := newVM(t, testVMConfig{fork: &fork, genesisJSON: string(genesisJSON)})
++	defer func() { require.NoError(t, tvm.vm.Shutdown(t.Context())) }()
++
++	// The pool reads the VM's (mock) clock in this test.
++	prevNow := txpool.Now
++	txpool.Now = tvm.vm.clock.Time
++	defer func() { txpool.Now = prevNow }()
++
++	chainID := tvm.vm.chainConfig.ChainID
++	signer := types.LatestSignerForChainID(chainID)
++	relayerKey, agentKey := testKeys[0].ToECDSA(), testKeys[1].ToECDSA()
++	agent := testEthAddrs[1]
++	payee := common.HexToAddress("0x00000000000000000000000000000000000000A1")
++	gasPrice := big.NewInt(testMinGasPrice)
++	nonces := map[common.Address]uint64{}
++	send := func(key *ecdsa.PrivateKey, to *common.Address, value *big.Int, gas uint64, data []byte) *types.Transaction {
++		from := crypto.PubkeyToAddress(key.PublicKey)
++		tx, err := types.SignNewTx(key, signer, &types.LegacyTx{Nonce: nonces[from], GasPrice: gasPrice, Gas: gas, To: to, Value: value, Data: data})
++		require.NoError(t, err)
++		nonces[from]++
++		return tx
++	}
++	advance := func(d time.Duration) { tvm.vm.clock.Set(tvm.vm.clock.Time().Add(d)) }
++	precompile := agentpolicy.ContractAddress
++
++	owner, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
++	require.NoError(t, err)
++	x, y := [32]byte(common.BigToHash(owner.X)), [32]byte(common.BigToHash(owner.Y))
++	sig, err := crypto.Sign(agentpolicy.RegisterDigest(chainID, agent, x, y).Bytes(), agentKey)
++	require.NoError(t, err)
++	regData, err := agentpolicy.PackRegister(agentpolicy.RegisterInput{Agent: agent, OwnerX: x, OwnerY: y, AgentSig: sig})
++	require.NoError(t, err)
++	value := big.NewInt(1_000)
++	charge := new(big.Int).Add(value, new(big.Int).Mul(big.NewInt(21_000), gasPrice))
++	m := agentpolicy.IAgentPolicyMandate{Payees: []common.Address{payee}, PerTxCap: charge, DailyCap: charge, Expiry: 4_102_444_800}
++	auth := agentAssertion(t, owner, agentpolicy.SetMandateChallenge(chainID, agent, m, common.Big0))
++	mandateData, err := agentpolicy.PackSetMandate(agentpolicy.SetMandateInput{Agent: agent, M: m, Nonce: common.Big0, Auth: auth})
++	require.NoError(t, err)
++	for _, err := range tvm.vm.txPool.AddRemotesSync([]*types.Transaction{
++		send(relayerKey, &precompile, common.Big0, 300_000, regData),
++		send(relayerKey, &precompile, common.Big0, 1_000_000, mandateData),
++	}) {
++		require.NoError(t, err)
++	}
++	advance(5 * time.Second)
++	issueAndAccept(t, tvm.vm)
++
++	// Spend the whole daily budget; the pool is then empty.
++	require.NoError(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{send(agentKey, &payee, value, 21_000, nil)})[0])
++	advance(5 * time.Second)
++	issueAndAccept(t, tvm.vm)
++
++	// Same day: refused by the pool.
++	over := send(agentKey, &payee, value, 21_000, nil)
++	require.ErrorIs(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{over})[0], core.ErrAgentBudgetExceeded)
++
++	// Next day, no block in between: admitted and included.
++	advance(24 * time.Hour)
++	require.NoError(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{over})[0])
++	blk := issueAndAccept(t, tvm.vm)
++	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
++	require.Len(t, ethBlock.Transactions(), 1)
++	require.Equal(t, over.Hash(), ethBlock.Transactions()[0].Hash())
++
++	state, err := tvm.vm.blockChain.StateAt(ethBlock.Root())
++	require.NoError(t, err)
++	sp := agentpolicy.SpendForDay(state, agent, ethBlock.Time())
++	require.Equal(t, 0, charge.Cmp(sp.SpentToday))
++	require.Equal(t, 0, new(big.Int).Mul(charge, big.NewInt(2)).Cmp(sp.TotalCharged))
++}
+diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
+index 225e4fa..6b9a4fc 100644
+--- a/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
++++ b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
+@@ -694,3 +694,13 @@ func TestAgentPolicyNonCanonicalAuth(t *testing.T) {
+ 	require.ErrorIs(t, err, ErrBadAuthEncoding)
+ 	require.Equal(t, uint64(0), ownerNonceOf(t, e, v.Agent))
+ }
++
++func TestAgentPolicyChargeSpendOverflow(t *testing.T) {
++	e := newEnv(t, big.NewInt(261126))
++	agent := common.HexToAddress("0x00000000000000000000000000000000000000a2")
++	maxU256 := new(big.Int).Sub(new(big.Int).Lsh(common.Big1, 256), common.Big1)
++	require.NoError(t, ChargeSpend(e.db, agent, maxU256, 100))
++	require.ErrorIs(t, ChargeSpend(e.db, agent, common.Big1, 100), ErrCounterOverflow)
++	require.Equal(t, 0, SpendForDay(e.db, agent, 100).TotalCharged.Cmp(maxU256), "nothing written on overflow")
++	require.ErrorIs(t, ChargeSpend(e.db, agent, big.NewInt(-1), 100), ErrCounterOverflow)
++}
+diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
+index 8ac7ba6..9ae38e8 100644
+--- a/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
++++ b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
+@@ -180,9 +180,17 @@ func SpendForDay(s contract.StateReader, agent common.Address, timestamp uint64)
+ // ChargeSpend adds `charge` to the agent's spend counters at `timestamp`
+ // (spentToday resets when the UTC day changes; totalCharged never resets).
+ // Callers must check the mandate first; this function only records.
+-func ChargeSpend(s StateReadWriter, agent common.Address, charge *big.Int, timestamp uint64) {
++// It returns ErrCounterOverflow, and writes nothing, if a counter would not fit in
++// 256 bits; storing it would otherwise truncate it silently.
++func ChargeSpend(s StateReadWriter, agent common.Address, charge *big.Int, timestamp uint64) error {
+ 	sp := SpendForDay(s, agent, timestamp)
+-	setBig(s, agent, fieldSpentToday, new(big.Int).Add(sp.SpentToday, charge))
++	spent := new(big.Int).Add(sp.SpentToday, charge)
++	total := new(big.Int).Add(sp.TotalCharged, charge)
++	if charge.Sign() < 0 || spent.BitLen() > 256 || total.BitLen() > 256 {
++		return ErrCounterOverflow
++	}
++	setBig(s, agent, fieldSpentToday, spent)
+ 	setUint64(s, agent, fieldDayIndex, sp.DayIndex)
+-	setBig(s, agent, fieldTotalCharged, new(big.Int).Add(sp.TotalCharged, charge))
++	setBig(s, agent, fieldTotalCharged, total)
++	return nil
+ }
+diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go b/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
+index 95a5767..a939043 100644
+--- a/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
++++ b/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
+@@ -39,6 +39,7 @@ var (
+ 	ErrNoChainID           = errors.New("agentpolicy: chain id unavailable")
+ 	ErrNonceExhausted      = errors.New("agentpolicy: owner nonce exhausted")
+ 	ErrAuthTooLarge        = errors.New("agentpolicy: auth larger than MaxAuthSize")
++	ErrCounterOverflow     = errors.New("agentpolicy: spend counter overflow")
+ )
+ 
+ var (
