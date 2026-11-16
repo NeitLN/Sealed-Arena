@@ -1,0 +1,1 @@
+ava-labs/builders-hub 921957a7d9c42746e6917050ef15e21f58cb337b contracts/icm-contracts/compiled/TeleporterMessenger.json (deployedBytecode)

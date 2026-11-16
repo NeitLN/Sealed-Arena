@@ -1,4 +1,10 @@
-import { AGENT_POLICY_ADDRESS, CHAIN_ID, LOCAL_ROLES } from "@sealed-arena/shared";
+import {
+  AGENT_POLICY_ADDRESS,
+  allowListAbi,
+  CHAIN_ID,
+  LOCAL_ROLES,
+  PRECOMPILES,
+} from "@sealed-arena/shared";
 import { createPublicClient, createWalletClient, defineChain, type Hex, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { RelayChain } from "./app.js";
@@ -31,6 +37,15 @@ export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
     chainId: CHAIN_ID,
     async simulate(data) {
       await pub.call({ account: account.address, to: AGENT_POLICY_ADDRESS, data });
+    },
+    async canSend(agent) {
+      const role = await pub.readContract({
+        address: PRECOMPILES.txAllowList,
+        abi: allowListAbi,
+        functionName: "readAllowList",
+        args: [agent],
+      });
+      return role > 0n;
     },
     async send(data) {
       const gas = await pub.estimateGas({

@@ -63,9 +63,8 @@ const matches = (r: CaseResult) =>
   r.result === r.expected &&
   (r.expectedReason === undefined || r.reason.includes(r.expectedReason));
 
-// SEALED_AGENT_KEY: run against another registered agent (the ArenaRecorder check uses a fresh one).
-const agentKey = process.env.SEALED_AGENT_KEY;
-const agent = agentKey ? privateKeyToAccount(agentKey as `0x${string}`) : accounts.agent;
+// SEALED_AGENT_KEY picks another registered agent (the ArenaRecorder check, the Fuji run).
+const agent = accounts.agent;
 const GAS_PRICE = 25_000_000_000n; // 25 gwei, above the local minimum base fee
 const TIP = 1_000_000_000n;
 const ALL = nodes();

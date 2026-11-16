@@ -1,0 +1,45 @@
+{
+  "abandoned": [
+    {
+      "reason": "genesis activated Warp before Fuji Durango; chain failed to start; never converted",
+      "subnetID": "N8um7AkUiXtS9iZzeM1S47jSuSLV3AfQ3riXqNpBi4dTjKN1H",
+      "chainID": "2ng8zEuCuk3PrSbZPaAKSQx49H6ShNWY9Bouwf1oHQPG54veB4",
+      "validatorManager": "0x5b77458a9449ac6d49bbfd7b59030f77b473a4cf"
+    }
+  ],
+  "subnetID": "xeBXaUqytA93ZuEKUm34LaYEy4UVqAGGrD6LCwNS8TWmCrJkG",
+  "subnetIDHex": "0x7e56ff62dc6b254366a6d567afa02b9f0c9588be96557e899f72807323397b24",
+  "validatorMessages": "0x74767b2ea532f4340d7e24fc9df1d262496b370d",
+  "validatorManager": "0x69112c469092fed092d958d42a2c0f4fe16e6676",
+  "vmcAdmin": "0x25Af860bC832EaAD3136b69779ed5F795C4E290b",
+  "vmcInitTx": "0xdfb842533adde051f24c47e1948eae20bd9e3b030d0cfd51125851f9fd272e10",
+  "network": "fuji",
+  "blockchainID": "UFo3xChM9b9efQkg93qPnswkJi7VR1XW7KQg9wE7gnCULfbYo",
+  "evmChainId": 261126,
+  "vmID": "srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy",
+  "validatorManagerChain": "yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp",
+  "convertTx": "eyr7ALwYzm33BsN7CpxtaXN5p5x5GuZVNgrbooqGd2bp13ACs",
+  "validators": [
+    {
+      "nodeID": "NodeID-6TgSfU7azciZHPtkWZ6qnc8wsqMHyTTGL",
+      "initialBalanceAVAX": 0.4
+    }
+  ],
+  "genesisSha256": "8682a20af59549e4813014369eb163eb8e9b200830f204c67f6bd1cf40fc5a00",
+  "firstBlockTx": "0x43351d3b257a37f2b553f46970b650378337ba5cd191b211b5aaafac41011c1e",
+  "ictt": {
+    "l1Registry": "0x24f5d5665a36572bf9d8254d4b05a1349d53dbdd",
+    "home": "0x980619791b89410b03ce02a479b032bddfe46d2d",
+    "initialReserveImbalance": "4000000000000000000",
+    "remote": "0x0fb5053b11fefc69ac31e3e87f60ce8677f6483e",
+    "minterEnabledTx": "0x7e18373b4a55a9fa8e1182c75f89fa925f2a790a2aaeb82f4fad6f8844590756",
+    "registerTx": "0xbc1a21b16382f1e83a64e6b92cd7fc1c99e0a5a40dfd129b9a2919c31f11d129",
+    "collateralTx": "0x6155d923287568cf0399aa2875c961885a305ed9741fc31a7dde566da752f222"
+  },
+  "arenaRecorder": {
+    "address": "0x60d046fa32a101229f78d69b655a91193cdf4f77",
+    "admin": "0xbc772eD06fe4344B939680aaaEF2e399Df6FD45b",
+    "note": "admin = L1 deployer key"
+  },
+  "testAgent": "0x74eB5a86cC5ACB477C1F10379b9303157A4A3626"
+}

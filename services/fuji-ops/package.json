@@ -1,0 +1,19 @@
+{
+  "name": "fuji-ops",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy-vmc": "tsx src/deploy-vmc.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "ictt": "tsx src/ictt.ts"
+  },
+  "dependencies": {
+    "@sealed-arena/shared": "workspace:*",
+    "viem": "2.57.19"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}
