@@ -20,8 +20,6 @@ AI agents now hold wallets and pay for APIs and data on their own (for example w
 
 ## How it works
 
-_The ownership and mandate part (step 1) is on `main`; the enforcement in steps 2 and 3 is in review in [#5](https://github.com/NeitLN/Sealed-Arena/pull/5)._
-
 ```mermaid
 flowchart LR
     owner["Owner<br/>(passkey on phone/laptop)"] -- "WebAuthn proof<br/>setMandate / freeze" --> relayer["Relayer"]
@@ -44,16 +42,16 @@ Transactions from other senders are not affected. Details and the exact contract
 
 ## Status
 
-| Component                                                                                                    | Status                                                          |
-| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                 | Done                                                            |
-| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters | Done                                                            |
-| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)         | In review ([#5](https://github.com/NeitLN/Sealed-Arena/pull/5)) |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Next                                                            |
-| x402 payments with a signed native transaction; buying agent                                                 | Planned                                                         |
-| Owner dashboard with passkeys                                                                                | Planned                                                         |
-| Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                   | Planned                                                         |
-| Open red-team challenge with a public agent key                                                              | Planned                                                         |
+| Component                                                                                                    | Status  |
+| ------------------------------------------------------------------------------------------------------------ | ------- |
+| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                 | Done    |
+| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters | Done    |
+| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)         | Done    |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Next    |
+| x402 payments with a signed native transaction; buying agent                                                 | Planned |
+| Owner dashboard with passkeys                                                                                | Planned |
+| Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                   | Planned |
+| Open red-team challenge with a public agent key                                                              | Planned |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
@@ -75,6 +73,7 @@ bash chain/scripts/fetch.sh      # avalanchego v1.15.3 at the pinned commit, pat
 bash chain/scripts/build.sh      # node image sealed-node:dev
 bash scripts/localnet.sh up      # local Sealed L1 (SEALED_NODE_COUNT=3 for three validators)
 bash chain/scripts/smoke.sh      # chain id 261126 and a test transfer
+bash chain/tests/rule/run.sh     # mandate, rejected payments, freeze, concurrent payments
 bash scripts/localnet.sh down    # stop and delete the local network
 ```
 
@@ -98,9 +97,9 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 `bash scripts/check.sh` is the single quick check and runs in CI on every pull request. Highlights:
 
 - Go tests run against hand-built blocks: a block that contains a forbidden agent transaction must be rejected at import, for every transaction type.
-- A VM-level test (in review, [#5](https://github.com/NeitLN/Sealed-Arena/pull/5)) drives the real transaction pool and block builder: 20 payments that are each valid alone are queued at once, and only what fits the daily budget reaches a block.
+- A VM-level test drives the real transaction pool and block builder: 20 payments that are each valid alone are queued at once, and only what fits the daily budget reaches a block.
 - WebAuthn test vectors in [`chain/testvectors/`](chain/testvectors) are shared by the Go precompile tests and the TypeScript encoder tests, so both sides agree byte for byte.
-- Network scripts check the same behaviour over RPC on a running local L1 (the full rule script, with one and three nodes, is part of #5).
+- `chain/tests/rule/run.sh` checks the same behaviour over RPC on a running local L1 with one and three nodes.
 
 ## Security model and limitations
 
