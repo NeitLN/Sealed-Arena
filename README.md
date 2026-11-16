@@ -49,6 +49,7 @@ Transactions from other senders are not affected. Details and the exact contract
 | Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)         | Done    |
 | Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Done    |
 | x402 payments with a signed native transaction: facilitator, sample seller, client                           | Done    |
+| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                 | Done    |
 | Buying agent driven by an LLM                                                                                | Planned |
 | Owner dashboard with passkeys                                                                                | Planned |
 | Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                   | Planned |
@@ -106,6 +107,7 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 - WebAuthn test vectors in [`chain/testvectors/`](chain/testvectors) are shared by the Go precompile tests and the TypeScript encoder tests, so both sides agree byte for byte.
 - `chain/tests/rule/run.sh` checks the same behaviour over RPC on a running local L1 with one and three nodes.
 - The x402 suite (`services/attacks/src/x402.ts`) starts the facilitator and two sample sellers, buys one dataset end to end, then sends each payment that must be refused (wrong payee, price, resource, chain id, signer, reused request id, already broadcast, seller outside the mandate) and checks the agent's balance and nonce do not move.
+- `ArenaRecorder` has Foundry tests for the score, the invariant, breaches and direct deposits (with a fuzz test), and `services/attacks/src/arena.ts` runs the leaked-key suite against an agent funded only through the recorder, then checks that a checkpoint finds no breach.
 - The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 24 ways out (every transaction type, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
 
 ## Security model and limitations

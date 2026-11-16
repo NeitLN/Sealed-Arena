@@ -5,7 +5,8 @@
 #   2. smoke test, seed the test agent
 #   3. leaked-key attack suite (services/attacks)
 #   4. x402 signed-native-tx end to end (services/attacks/src/x402.ts)
-#   5. rule script (chain/tests/rule/run.sh)
+#   5. ArenaRecorder: deploy, fund a fresh agent through it, leaked-key suite on it, checkpoint (services/attacks/src/arena.ts)
+#   6. rule script (chain/tests/rule/run.sh)
 # Leaves the network running; stop it with `bash scripts/localnet.sh down`.
 # Usage: bash scripts/check-localnet.sh
 set -uo pipefail
@@ -19,6 +20,7 @@ STEPS=(
   "seed|bash scripts/localnet.sh seed"
   "leaked-key|pnpm --filter attacks run --silent leaked-key"
   "x402|pnpm --filter attacks run --silent x402"
+  "arena|bash scripts/forge.sh build >/dev/null && pnpm --filter attacks run --silent arena"
   "rule|bash chain/tests/rule/run.sh"
 )
 

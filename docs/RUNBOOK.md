@@ -34,7 +34,7 @@ bash scripts/localnet.sh status    # trạng thái container và eth_chainId
 bash scripts/localnet.sh seed      # agent thử: TxAllowList, cấp coin, đăng ký, uỷ quyền mẫu
 bash scripts/localnet.sh down      # xoá container, volume dữ liệu và network docker
 
-bash scripts/check-localnet.sh     # mạng mới + smoke + seed + bộ tấn công leaked-key + x402 + chain/tests/rule/run.sh
+bash scripts/check-localnet.sh     # mạng mới + smoke + seed + leaked-key + x402 + ArenaRecorder + chain/tests/rule/run.sh
 ```
 - Mặc định 3 node (đổi bằng `SEALED_NODE_COUNT=1`). Các node cùng chạy trong một container; cổng HTTP `9650`, `9652`, `9654` đều được mở ra máy, đường dẫn RPC giống nhau.
 - Genesis: `chain/genesis/sealed-local.json` (giải thích trong `chain/genesis/README.md`). Đổi file genesis bằng `SEALED_GENESIS_FILE=<tên file trong chain/genesis>`.
@@ -60,7 +60,15 @@ pnpm --filter attacks x402         # tự dựng facilitator + 3 người bán, 
 - Facilitator không cần khoá: giao dịch do agent ký và agent trả gas.
 - Định dạng trên dây: `docs/decisions/D5.md`.
 
-## 5. Xem log
+## 5. ArenaRecorder trên mạng local
+```bash
+bash scripts/forge.sh build            # cần artifact contracts/out/ArenaRecorder.sol
+pnpm --filter attacks arena            # triển khai, enroll + fund 50 coin cho agent mới, chạy leaked-key, checkpoint
+```
+- Người triển khai (khoá `deployer` trong `addresses.local.ts`) là admin của recorder.
+- Bộ leaked-key nhận agent khác qua `SEALED_AGENT_KEY`; mặc định là agent của `seed`.
+
+## 6. Xem log
 ```bash
 docker logs -f sealed-node                       # log dựng mạng và log node đầu tiên
 docker exec sealed-node cat /data/sealed.json    # thư mục mạng, subnet ID, blockchain ID, URI các node
@@ -69,7 +77,7 @@ docker exec sealed-node sh -c 'tail -n 100 /data/networks/*/NodeID-*/logs/main.l
 docker exec sealed-node sh -c 'ls /data/networks/*/NodeID-*/logs/'            # log của từng chain (theo blockchain ID)
 ```
 
-## 6. Sự cố thường gặp
+## 7. Sự cố thường gặp
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `failed to connect to the docker API` | Mở Docker Desktop, chờ nó báo đang chạy |
