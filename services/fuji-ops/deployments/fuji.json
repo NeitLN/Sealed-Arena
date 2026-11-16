@@ -41,5 +41,28 @@
     "admin": "0xbc772eD06fe4344B939680aaaEF2e399Df6FD45b",
     "note": "admin = L1 deployer key"
   },
-  "testAgent": "0x74eB5a86cC5ACB477C1F10379b9303157A4A3626"
+  "testAgent": "0x74eB5a86cC5ACB477C1F10379b9303157A4A3626",
+  "reputation": {
+    "publisher": "0xebed39ffed9499e4f813a074f3fe4a36cd2bb3a3",
+    "setPublisherTx": "0xbfad1df9992e31c74385b40bb821dbed07f1f63f2833666b2297373c9b3cb0f9",
+    "agentId": "303",
+    "identityTx": "0x431597289e599ccdcd12b9531e55f3595e200a4caf9ed422091c383b44fd5aa2",
+    "receiver": "0x3c99b37bf7279220ae2f09f12bbdc0742b056fda",
+    "mapTx": "0x5511833bfedc628b0efd69ebaedbd579a7ca2f091ba633b8eda149aa4b37d99d",
+    "setReceiverTx": "0x6ab24151135831f7e97854f29e36836481da20e08ffdd4085649384ca2f6acda",
+    "lastPublishTx": "0xff02c17ce278d00e8e5bcbbf8be25bc95675b05f45b26a259a644241e88791aa",
+    "firstDeliveryTx": "0x6351fcb7702d332b32cbc2e6dcab9d38c66ece19aea629b9b8fc8c9c75c80ea6",
+    "identityRegistry": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+    "reputationRegistry": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+    "firstRecord": {
+      "agentId": 303,
+      "client": "0x3c99b37bf7279220ae2f09f12bbdc0742b056fda",
+      "index": 1,
+      "value": 2,
+      "valueDecimals": 0,
+      "tag1": "sealed-arena",
+      "tag2": "survival",
+      "meaning": "coin-hours survived, read with ReputationRegistry.readFeedback(303, receiver, 1)"
+    }
+  }
 }

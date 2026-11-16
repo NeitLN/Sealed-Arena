@@ -7,7 +7,8 @@
     "deploy-vmc": "tsx src/deploy-vmc.ts",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run",
-    "ictt": "tsx src/ictt.ts"
+    "ictt": "tsx src/ictt.ts",
+    "reputation": "tsx src/reputation.ts"
   },
   "dependencies": {
     "@sealed-arena/shared": "workspace:*",

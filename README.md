@@ -53,7 +53,7 @@ Transactions from other senders are not affected. Details and the exact contract
 | Buying agent driven by an LLM                                                                                   | Planned |
 | Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese   | Done    |
 | Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done    |
-| Survival record sent over ICM to the ERC-8004 registry                                                          | Planned |
+| Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain              | Done    |
 | Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages    | Done    |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
@@ -134,7 +134,8 @@ What it does not give, stated plainly:
 5. **Someone holding the key can grief**: use up the daily budget or occupy nonces.
 6. **Simulation is not admission.** `eth_call` and `eth_estimateGas` do not apply the rule; services read the mandate from the precompile instead.
 7. **The open challenge measures how hard the system was tried, not that it is safe.**
-8. **x402 here needs our payment method.** Sellers must add the network `eip155:261126` and point `/verify` and `/settle` at this facilitator; a standard x402 client (EIP-3009 tokens) cannot pay it. The facilitator holds no keys, but a seller still has to trust it or read the chain itself (the sample seller does both).
+8. **The ERC-8004 record is only as trustworthy as its writer.** Anyone can give feedback in ERC-8004; read the survival record as feedback whose client is our ReputationReceiver (address in `services/fuji-ops/deployments/fuji.json`). ICM only carries this record; it plays no part in keeping funds safe, which is the L1 node's rule.
+9. **x402 here needs our payment method.** Sellers must add the network `eip155:261126` and point `/verify` and `/settle` at this facilitator; a standard x402 client (EIP-3009 tokens) cannot pay it. The facilitator holds no keys, but a seller still has to trust it or read the chain itself (the sample seller does both).
 
 Found a problem? See [SECURITY.md](SECURITY.md).
 

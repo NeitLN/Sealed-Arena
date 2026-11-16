@@ -194,7 +194,7 @@ Hệ quả phải ghi trong README: người bán phải thêm mạng L1 và tr�
 - Đã triển khai ở T10: `contracts/src/ArenaRecorder.sol`, ABI ở `packages/shared/src/arenaRecorderAbi.ts`.
 - Số lượt thử không nằm trong contract (giao dịch bị từ chối không vào chain). Cổng RPC đếm ở ngoài chain và giao diện ghi rõ đó là số đo ngoài chain.
 
-ReputationReceiver (Fuji C-Chain): chỉ nhận tin từ Teleporter với nguồn là đúng chain id và đúng địa chỉ ArenaRecorder; ghi vào registry ERC-8004. **[cần kiểm T13]** chữ ký hàm ghi của registry đang triển khai trên Fuji (reputation hay validation), đọc từ ABI thật, không viết theo trí nhớ.
+Đường đi (T13, quyết định D7): `ArenaRecorder.publish(agent)` → `TeleporterPublisher` (L1; chỉ ArenaRecorder gọi được) → TeleporterMessenger → relayer ICM → `ReputationReceiver` (Fuji C-Chain) → `ReputationRegistry.giveFeedback` của ERC-8004. ReputationReceiver chỉ nhận tin khi người gọi là TeleporterMessenger, chain nguồn là L1 Sealed và người gửi gốc là TeleporterPublisher; bỏ tin không mới hơn tin đã nhận. Giá trị: coin·giờ sống sót, tag `sealed-arena`/`survival`; vi phạm ghi `-1`, tag `breached`. Danh tính ERC-8004 của agent do ví vận hành đăng ký (registry cấm chủ sở hữu tự ghi feedback). Teleporter đang chạy là bản có `feeInfo`.
 
 Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. README phải nói điều này.
 
