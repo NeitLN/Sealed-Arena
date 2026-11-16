@@ -2,3 +2,5 @@ packages:
   - packages/*
   - services/*
   - web
+allowBuilds:
+  esbuild: true

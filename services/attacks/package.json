@@ -1,0 +1,18 @@
+{
+  "name": "attacks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "tsx src/seed.ts",
+    "leaked-key": "tsx src/leaked-key.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@sealed-arena/shared": "workspace:*",
+    "viem": "2.57.19"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

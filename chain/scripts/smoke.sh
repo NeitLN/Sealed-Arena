@@ -12,7 +12,7 @@ FOUNDRY_IMAGE="ghcr.io/foundry-rs/foundry:v1.9.0@sha256:3a392c18f9b16e665e932de1
 DOCKER_NETWORK="sealed-localnet_default"
 
 # Well-known local development key (the "ewoq" key published in avalanchego).
-# Funded only in chain/genesis/local.json. Never use it on any public network.
+# Admin of the allow-lists in chain/genesis/sealed-local.json. Never use it on any public network.
 DEV_KEY="0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 AMOUNT_WEI="1000000000000000000"
 

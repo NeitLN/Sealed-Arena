@@ -7,7 +7,7 @@
 // Environment:
 //
 //	SEALED_NODE_COUNT   number of validator nodes (default 1)
-//	SEALED_GENESIS      path to the Subnet-EVM genesis (default /sealed/genesis/local.json)
+//	SEALED_GENESIS      path to the Subnet-EVM genesis (default /sealed/genesis/sealed-local.json)
 //	SEALED_DATA_DIR     root for network data and the state file (default /data)
 //	AVALANCHEGO_PATH    path to the avalanchego binary (default /avalanchego/avalanchego)
 //	SEALED_PLUGIN_DIR   plugin directory holding the Subnet-EVM binary (default /avalanchego/plugins)
@@ -117,7 +117,7 @@ func newNetwork() (*tmpnet.Network, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid SEALED_BASE_PORT")
 	}
-	genesisBytes, err := os.ReadFile(env("SEALED_GENESIS", "/sealed/genesis/local.json"))
+	genesisBytes, err := os.ReadFile(env("SEALED_GENESIS", "/sealed/genesis/sealed-local.json"))
 	if err != nil {
 		return nil, fmt.Errorf("read genesis: %w", err)
 	}
@@ -151,7 +151,7 @@ func newNetwork() (*tmpnet.Network, error) {
 			Chains: []*tmpnet.Chain{{
 				VMID:         vmID,
 				Genesis:      genesisBytes,
-				// The ewoq key is the account funded in chain/genesis/local.json.
+				// The ewoq key is the admin account funded in chain/genesis/sealed-local.json.
 				PreFundedKey: genesis.EWOQKey,
 			}},
 			ValidatorIDs: validatorIDs,

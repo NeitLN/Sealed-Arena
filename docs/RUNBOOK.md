@@ -27,17 +27,23 @@ Thời gian đo ngày 15/11 trên máy phát triển: build lần đầu 126 gi�
 
 ## 3. Dựng, kiểm và hạ mạng local
 ```bash
-bash scripts/localnet.sh up        # chạy container sealed-node, chờ chain Sealed trả eth_chainId (tối đa 600 giây)
+bash scripts/localnet.sh up        # 3 validator trong container sealed-node, chờ chain Sealed trả eth_chainId (tối đa 600 giây)
 bash chain/scripts/smoke.sh        # kiểm khói: chain id 261126, chuyển 1 coin, kiểm số dư
 bash scripts/localnet.sh rpc       # in URL RPC của chain Sealed trên máy
 bash scripts/localnet.sh status    # trạng thái container và eth_chainId
+bash scripts/localnet.sh seed      # agent thử: TxAllowList, cấp coin, đăng ký, uỷ quyền mẫu
 bash scripts/localnet.sh down      # xoá container, volume dữ liệu và network docker
+
+bash scripts/check-localnet.sh     # mạng mới + smoke + seed + bộ tấn công leaked-key + chain/tests/rule/run.sh
 ```
-- Mạng nhiều node: `SEALED_NODE_COUNT=3 bash scripts/localnet.sh up`. Các node cùng chạy trong một container, cổng HTTP `9650, 9652, 9654`, chỉ `9650` được mở ra máy.
+- Mặc định 3 node (đổi bằng `SEALED_NODE_COUNT=1`). Các node cùng chạy trong một container; cổng HTTP `9650`, `9652`, `9654` đều được mở ra máy, đường dẫn RPC giống nhau.
+- Genesis: `chain/genesis/sealed-local.json` (giải thích trong `chain/genesis/README.md`). Đổi file genesis bằng `SEALED_GENESIS_FILE=<tên file trong chain/genesis>`.
+- TxAllowList đang bật: chỉ admin, người triển khai, relayer, facilitator, relayer ICM và các agent đã được admin thêm mới gửi được giao dịch.
+- **Tắt 1 trong 3 node** (đo ngày 16/11): chain ngừng tạo block; giao dịch hợp lệ gửi lúc đó không vào block trong 120 giây và mất khỏi mempool khi khởi động lại. Bật lại đủ node (`docker restart sealed-node`, rồi `up`) thì cả 3 node cùng block và chain chạy tiếp. Với 3 validator ngang stake, mất 1 node là dừng.
 - Đổi thời gian chờ: `SEALED_UP_TIMEOUT=900 bash scripts/localnet.sh up`.
 - **Blockchain ID đổi sau mỗi lần `down` rồi `up`** (mạng mới). Luôn lấy URL bằng `bash scripts/localnet.sh rpc`, không chép cứng. Chain id EVM luôn là `261126`.
 - Khởi động lại container (`docker restart sealed-node`) giữ nguyên dữ liệu và blockchain ID; chạy `bash scripts/localnet.sh up` để chờ chain sẵn sàng.
-- Tài khoản dev có coin trong genesis: `0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC`. Khoá của nó là khoá dev "ewoq" đã công khai trong mã nguồn avalanchego, ghi trong `chain/scripts/smoke.sh`. Chỉ dùng trên mạng local.
+- Khoá dev của các vai (admin, người triển khai, relayer, facilitator, relayer ICM, agent thử, passkey thử) nằm trong `packages/shared/src/addresses.local.ts`. Đều là khoá công khai, chỉ dùng trên mạng local.
 
 ## 4. Xem log
 ```bash
