@@ -110,7 +110,16 @@ pnpm --filter rpc-gateway localnet-check        # trên mạng local: giao dịc
 - Mở thử thách (chạy lại được): `pnpm --filter attacks arena-open` với `SEALED_*` của mạng đích, `SEALED_OWNER_P256_KEY` (bí mật), `ARENA_RECORDER`, `ARENA_PAYEES`, `ARENA_FUNDING`, `ARENA_EXPIRY`. Script từ chối chạy nếu thiếu khoá chủ ví bí mật.
 - Trang: `/arena`, `/arena/rules`. Relayer cần `RELAYER_ARENA_RECORDER` để bật `/arena`.
 
-## 9. Xem log
+## 9. Bản ghi sống sót sang ERC-8004
+```bash
+bash scripts/forge.sh build
+pnpm --filter fuji-ops reputation deploy    # TeleporterPublisher (L1), danh tính ERC-8004, ReputationReceiver (Fuji); chạy lại được
+pnpm --filter fuji-ops reputation publish   # ArenaRecorder.publish trên L1 (relayer ICM chuyển sang Fuji)
+pnpm --filter fuji-ops reputation read      # đọc feedback do ReputationReceiver ghi
+```
+- Quyết định và bằng chứng: `docs/decisions/D7.md`.
+
+## 10. Xem log
 ```bash
 docker logs -f sealed-node                       # log dựng mạng và log node đầu tiên
 docker exec sealed-node cat /data/sealed.json    # thư mục mạng, subnet ID, blockchain ID, URI các node
@@ -119,7 +128,7 @@ docker exec sealed-node sh -c 'tail -n 100 /data/networks/*/NodeID-*/logs/main.l
 docker exec sealed-node sh -c 'ls /data/networks/*/NodeID-*/logs/'            # log của từng chain (theo blockchain ID)
 ```
 
-## 10. Sự cố thường gặp
+## 11. Sự cố thường gặp
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `failed to connect to the docker API` | Mở Docker Desktop, chờ nó báo đang chạy |
