@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+# Public, non-secret build settings of the web app.
+!web/.env.production
 *.pem
 *.key
 staking/
