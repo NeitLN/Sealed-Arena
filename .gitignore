@@ -1,10 +1,3 @@
-# Chỉ dùng trên máy, không đưa lên GitHub
-CLAUDE.md
-.claude/
-idea-debate/
-Y_TUONG_CHOT_*.md
-UniHack_2026_brief.md
-
 # Secret
 .env
 .env.*
