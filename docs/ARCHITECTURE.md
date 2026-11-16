@@ -202,7 +202,7 @@ Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. R
 |---|---|---|
 | Admin L1 | `.env` trên máy vận hành | Quản lý allow-list, enroll agent |
 | Người triển khai | `.env` | Triển khai contract |
-| Relayer | `.env` của web | Gửi hộ thao tác passkey của chủ ví |
+| Relayer | `.env` của `services/relayer` (`RELAYER_PRIVATE_KEY`; trên mạng local mặc định là khoá dev) | Gửi hộ thao tác passkey của chủ ví |
 | Facilitator | `.env` của facilitator | Phát giao dịch đã ký của agent (không cần tiền nếu chỉ `sendRawTransaction`) |
 | Relayer ICM | cấu hình relayer | Chuyển tin ICM |
 | Agent thử thách | **công khai có chủ đích** trên trang thử thách | Bị tấn công |
@@ -210,6 +210,13 @@ Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. R
 | Passkey chủ ví | thiết bị của chủ ví | Đặt uỷ quyền, dừng |
 
 Không dùng lại khoá agent thử thách cho bất kỳ vai nào khác, trên bất kỳ chain nào.
+
+### 7.1 Trang chủ ví và relayer (T09)
+
+- `web/` (Vite, React, thư viện giao diện Astryx): chủ ví tạo passkey (WebAuthn, ES256), gắn agent, đặt uỷ quyền, dừng và mở lại. Trang đọc chain trực tiếp qua RPC. Giao diện song ngữ Anh/Việt.
+- Passkey: `(x, y)` lấy từ `getPublicKey()` (SPKI P-256). Chữ ký DER của trình duyệt được đổi sang `(r, s)` với `s` ở nửa thấp, rồi thành `auth` theo mục 3.3 (`packages/shared/src/webauthn.ts`). RP ID là tên miền của trang, nên trang phải chạy trên tên miền (hoặc `localhost`), không chạy trên địa chỉ IP.
+- Gắn agent: khoá agent ký `registerDigest` (hash thô, không tiền tố). Trên mạng local được dán private key của agent để ký ngay trong trình duyệt; khoá không được gửi đi.
+- `services/relayer` (Hono): `POST /relay { data }` chỉ nhận `register`, `setMandate`, `freeze`, `unfreeze` tới `0x0300…01`; chạy thử bằng `eth_call` trước, nếu chain sẽ từ chối thì trả lý do và không gửi; giới hạn 10 yêu cầu/phút mỗi địa chỉ khách. `GET /info` trả địa chỉ relayer, chain id và URL RPC cho trang. Relayer không làm giả được thao tác (precompile kiểm passkey) nhưng có thể từ chối gửi; khi đó ai cũng có thể tự gửi cùng dữ liệu.
 
 ## 8. Quy ước
 

@@ -4,3 +4,6 @@ packages:
   - web
 allowBuilds:
   esbuild: true
+  # Their install scripts only print a setup hint.
+  "@astryxdesign/core": false
+  "@astryxdesign/cli": false

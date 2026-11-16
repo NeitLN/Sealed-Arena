@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./localnet": "./src/localnet.ts"
+  },
   "scripts": {
     "seed": "tsx src/seed.ts",
     "leaked-key": "tsx src/leaked-key.ts",
