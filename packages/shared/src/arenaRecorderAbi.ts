@@ -348,6 +348,12 @@ export const arenaRecorderAbi = [
         internalType: "address",
       },
       {
+        name: "balanceAtEnroll",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
         name: "chargedAtEnroll",
         type: "uint256",
         indexed: false,

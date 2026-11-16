@@ -19,7 +19,7 @@ interface IReputationPublisher {
 ///
 /// For an enrolled agent the chain rule must keep
 ///     balance(agent) >= funded(agent) - chargedSinceEnroll(agent)
-/// where `funded` counts only coins sent through `fund`, and `chargedSinceEnroll` is the rule's
+/// where `funded` is the agent's balance at enrollment plus coins sent through `fund`, and `chargedSinceEnroll` is the rule's
 /// `totalCharged` minus its value at enrollment. The rule charges every payment at its maximum
 /// cost before the coins leave, so valid payments never break this. Coins leaving the agent by
 /// any path outside the rule do. Anyone can check it at any time; a break is permanent.
@@ -27,9 +27,10 @@ interface IReputationPublisher {
 /// Score is the time integral of the accounted balance `min(balance, funded - charged)`, sampled at
 /// each checkpoint for the time since the previous one.
 ///
-/// Coins sent straight to the agent are not funding and do not raise the score. They do raise
-/// `balance`, so a leak no larger than such deposits would not show as a break. The challenge
-/// funds agents only through `fund`.
+/// Coins sent straight to the agent after enrollment are not funding and do not raise the score.
+/// They do raise `balance`, so a leak no larger than such deposits would not show as a break. The
+/// rule charges gas at its maximum, so unused gas is a second, small slack of the same kind. The
+/// challenge funds agents only through `fund`.
 contract ArenaRecorder {
     IAgentPolicy public constant POLICY = IAgentPolicy(0x0300000000000000000000000000000000000001);
 
@@ -47,7 +48,7 @@ contract ArenaRecorder {
     IReputationPublisher public publisher;
     mapping(address => Record) internal records;
 
-    event Enrolled(address indexed agent, uint256 chargedAtEnroll);
+    event Enrolled(address indexed agent, uint256 balanceAtEnroll, uint256 chargedAtEnroll);
     event Funded(address indexed agent, address indexed from, uint256 amount);
     event Checkpoint(address indexed agent, uint256 score, uint256 balance, uint256 required);
     event Breach(address indexed agent, address indexed finder, uint256 balance, uint256 required);
@@ -80,7 +81,9 @@ contract ArenaRecorder {
         r.enrolled = true;
         r.lastCheckpoint = uint64(block.timestamp);
         r.chargedAtEnroll = _totalCharged(agent);
-        emit Enrolled(agent, r.chargedAtEnroll);
+        // Coins the agent already holds count as funding, so they cannot hide a later leak.
+        r.funded = agent.balance;
+        emit Enrolled(agent, r.funded, r.chargedAtEnroll);
     }
 
     function setPublisher(IReputationPublisher p) external onlyAdmin {

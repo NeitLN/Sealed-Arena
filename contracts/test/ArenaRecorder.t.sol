@@ -122,6 +122,32 @@ contract ArenaRecorderTest is Test {
         recorder.fund{value: 1 ether}(agent);
     }
 
+    function test_BalanceHeldAtEnrollmentCountsAsFunding() public {
+        vm.deal(agent, 5 ether);
+        _enrollAndFund(10 ether);
+        assertEq(recorder.funded(agent), 15 ether);
+        // So it cannot hide a leak: one wei leaving without a charge is a breach.
+        vm.deal(agent, agent.balance - 1);
+        recorder.checkpoint(agent);
+        assertTrue(recorder.breached(agent));
+    }
+
+    function test_BalanceExactlyAtTheRequiredAmountIsNotABreach() public {
+        _enrollAndFund(10 ether);
+        policy.charge(agent, 1 ether);
+        vm.deal(agent, 9 ether); // exactly funded - charged
+        recorder.checkpoint(agent);
+        assertFalse(recorder.breached(agent));
+    }
+
+    function test_OneWeiBelowTheRequiredAmountIsABreach() public {
+        _enrollAndFund(10 ether);
+        policy.charge(agent, 1 ether);
+        vm.deal(agent, 9 ether - 1);
+        recorder.checkpoint(agent);
+        assertTrue(recorder.breached(agent));
+    }
+
     function test_ChargesBeforeEnrollmentDoNotCount() public {
         policy.charge(agent, 5 ether);
         _enrollAndFund(10 ether);
