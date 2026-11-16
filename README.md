@@ -50,7 +50,7 @@ Transactions from other senders are not affected. Details and the exact contract
 | Genesis with allow-lists, 3-node network, leaked-key attack suite                                               | Done    |
 | x402 payments with a signed native transaction: facilitator, sample seller, client                              | Done    |
 | `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                    | Done    |
-| Buying agent driven by an LLM                                                                                   | Planned |
+| Buying agent driven by an LLM; prompt-injection scenarios with recorded transcripts and replay                 | Done    |
 | Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese   | Done    |
 | Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done    |
 | Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain              | Done    |
