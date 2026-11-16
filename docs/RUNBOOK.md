@@ -80,7 +80,28 @@ pnpm --filter web e2e              # build trang, tự bật relayer, Chromium v
 - Ngoài mạng local, relayer cần `RELAYER_PRIVATE_KEY` (địa chỉ phải có trong TxAllowList và có coin trả gas).
 - E2E cần Chromium của Playwright: `pnpm --filter web exec playwright install chromium` nếu máy chưa có.
 
-## 7. Xem log
+## 7. L1 Sealed trên Fuji
+Mã định danh, địa chỉ hợp đồng và giao dịch: `services/fuji-ops/deployments/fuji.json`. Khoá chỉ nằm trong `.env` (không push) và trên máy chạy node.
+
+**Dùng:** RPC `https://sealed-arena.duckdns.org/rpc` (chain id 261126), trang chủ ví `https://sealed-arena.vercel.app`.
+
+**Dựng lại từ đầu** (tiêu AVAX trên Fuji; đổi L1 không đảo ngược):
+```bash
+node chain/genesis/make-fuji.mjs                       # genesis từ bản local + địa chỉ vai trong .env
+platform subnet create --network fuji                  # Platform CLI v2.4.0, khoá qua AVALANCHE_PRIVATE_KEY
+pnpm --filter fuji-ops deploy-vmc <subnetID>           # ValidatorManager trên C-Chain, initialize cùng lúc
+platform chain create --network fuji --subnet-id <subnetID> --genesis sealed-fuji.json --name sealed
+# node: --network-id=fuji --partial-sync-primary-network=true --track-subnets=<subnetID>
+platform subnet convert-to-l1 --network fuji --subnet-id <subnetID> \
+  --chain-id <Fuji C-Chain ID> --manager <ValidatorManager> --validators 127.0.0.1:9650 --validator-balance 0.4
+pnpm --filter fuji-ops ictt contracts                  # rồi: relayer-config (chạy icm-relayer v1.8.4), register, collateral
+pnpm --filter fuji-ops ictt send <USDC> <địa chỉ trên L1>
+```
+- Genesis local đặt Warp từ 2020; trên Fuji như vậy chain không khởi động ("warp cannot be activated before Durango"). `make-fuji.mjs` đặt Warp từ 1709740800 và tự kiểm.
+- Số dư validator giảm khoảng 0,044 AVAX/ngày; nạp thêm: `platform l1 increase-validator-balance --validation-id <id> --balance <AVAX>`.
+- Chạy các bộ kiểm trên Fuji: đặt `SEALED_NODE_URLS`, `SEALED_RPC_PATH`, `SEALED_ADMIN_KEY`, `SEALED_RELAYER_KEY`, `SEALED_DEPLOYER_KEY`, `SEALED_AGENT_KEY`, `SEALED_SEED_FUNDING` rồi `pnpm --filter attacks seed` và `leaked-key`. Trang đã triển khai: `pnpm --filter web e2e:live`.
+
+## 8. Xem log
 ```bash
 docker logs -f sealed-node                       # log dựng mạng và log node đầu tiên
 docker exec sealed-node cat /data/sealed.json    # thư mục mạng, subnet ID, blockchain ID, URI các node
@@ -89,7 +110,7 @@ docker exec sealed-node sh -c 'tail -n 100 /data/networks/*/NodeID-*/logs/main.l
 docker exec sealed-node sh -c 'ls /data/networks/*/NodeID-*/logs/'            # log của từng chain (theo blockchain ID)
 ```
 
-## 8. Sự cố thường gặp
+## 9. Sự cố thường gặp
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `failed to connect to the docker API` | Mở Docker Desktop, chờ nó báo đang chạy |

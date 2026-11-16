@@ -155,6 +155,16 @@ Precompile kiểm: `auth` mã hoá đúng chuẩn (mã hoá lại phải ra đú
 
 Hàm mã hoá challenge ở phía TypeScript đặt trong `packages/shared/` và phải có test đối chiếu với Go bằng cùng bộ vector.
 
+### 3.4 Bản trên Fuji (T12)
+
+Mã định danh và địa chỉ: `services/fuji-ops/deployments/fuji.json`.
+
+- Genesis `chain/genesis/sealed-fuji.json`, sinh từ bản local bằng `chain/genesis/make-fuji.mjs`: khoá vai riêng cho Fuji, cấp rất ít coin, TeleporterMessenger cài sẵn ở `0x253b…5fcf` (bytecode ghim bằng sha256), Warp bật sau Durango và nhận message từ C-Chain khi có chữ ký của validator mạng chính (`requirePrimaryNetworkSigners: true`). Chain id, các precompile và AgentPolicy giữ nguyên.
+- L1 quản lý validator kiểu PoA. Hợp đồng ValidatorManager đặt trên Fuji C-Chain (không cần proxy trong genesis), khởi tạo ngay sau khi triển khai. Một validator; số dư validator do ví vận hành nạp qua P-Chain.
+- Coin gốc là USDC của Fuji chuyển sang qua ICTT: ERC20TokenHome trên C-Chain giữ USDC, NativeTokenRemote trên L1 tạo coin qua NativeMinter. Coin trong genesis được thế chấp 1:1 bằng USDC trước khi cầu mở. Relayer ICM tự chạy.
+- Ra Internet chỉ có: RPC của L1 (`POST /rpc`), relayer passkey (`/relayer/*`), qua HTTPS (Caddy, Let's Encrypt). Cổng RPC của node không mở. Trang chủ ví chạy trên Vercel; relayer chỉ nhận trình duyệt từ tên miền của trang.
+- Relayer chỉ gửi `register` cho agent đã có quyền gửi giao dịch (TxAllowList), để không bị rút gas.
+
 ## 4. Thanh toán x402 trên L1
 
 Chuẩn `exact` của x402 trên EVM chỉ có ba phương thức (EIP-3009, Permit2, ERC-7710); coin gốc không dùng được cả ba. Dự án thêm một phương thức mới.

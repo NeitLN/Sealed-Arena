@@ -48,8 +48,13 @@ export function makeFujiGenesis(local, roles, teleporterCode) {
   c.contractNativeMinterConfig = { blockTimestamp: 0, adminAddresses: [roles.admin] };
   // The L1's validators do not validate the Primary Network, so messages from the C-Chain must be
   // signed by Primary Network validators (same as Builder Hub's genesis).
-  c.warpConfig = { ...c.warpConfig, blockTimestamp: WARP_TIMESTAMP, requirePrimaryNetworkSigners: true };
-  if (c.warpConfig.blockTimestamp < FUJI_DURANGO) throw new Error("warp would activate before Durango");
+  c.warpConfig = {
+    ...c.warpConfig,
+    blockTimestamp: WARP_TIMESTAMP,
+    requirePrimaryNetworkSigners: true,
+  };
+  if (c.warpConfig.blockTimestamp < FUJI_DURANGO)
+    throw new Error("warp would activate before Durango");
   // Small allocation: every genesis coin is unbacked and must be collateralised 1:1 in USDC
   // before the ICTT bridge mints (NativeTokenRemote initialReserveImbalance).
   g.alloc = {

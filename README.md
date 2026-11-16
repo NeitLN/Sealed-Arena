@@ -42,24 +42,33 @@ Transactions from other senders are not affected. Details and the exact contract
 
 ## Status
 
-| Component                                                                                                     | Status  |
-| ------------------------------------------------------------------------------------------------------------- | ------- |
-| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                  | Done    |
-| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters  | Done    |
-| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)          | Done    |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite                                             | Done    |
-| x402 payments with a signed native transaction: facilitator, sample seller, client                            | Done    |
-| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                  | Done    |
-| Buying agent driven by an LLM                                                                                 | Planned |
-| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese | Done    |
-| Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                    | Planned |
-| Open red-team challenge with a public agent key                                                               | Planned |
+| Component                                                                                                       | Status  |
+| --------------------------------------------------------------------------------------------------------------- | ------- |
+| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                    | Done    |
+| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters    | Done    |
+| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)            | Done    |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                               | Done    |
+| x402 payments with a signed native transaction: facilitator, sample seller, client                              | Done    |
+| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                    | Done    |
+| Buying agent driven by an LLM                                                                                   | Planned |
+| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese   | Done    |
+| Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done    |
+| Survival record sent over ICM to the ERC-8004 registry                                                          | Planned |
+| Open red-team challenge with a public agent key                                                                 | Planned |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
 [D3](docs/decisions/D3.md) how the local L1 is built ·
 [D4](docs/decisions/D4.md) precompile address and P-256 support ·
 [D5](docs/decisions/D5.md) x402 payment method `signed-native-tx`.
+
+## Try it on Fuji (testnet)
+
+- RPC: `https://sealed-arena.duckdns.org/rpc` (chain id `261126`, native coin: USDC bridged from Fuji with ICTT)
+- Owner console: https://sealed-arena.vercel.app
+- Addresses and transactions: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
+
+The operator runs the only validator. See "Security model and limitations" below.
 
 ## Quick start
 
