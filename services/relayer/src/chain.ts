@@ -56,7 +56,9 @@ export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
       const hash = await wallet.sendTransaction({
         to,
         data,
-        gas: (gas * 12n) / 10n,
+        // Generous: gas can depend on the block time (an ArenaRecorder checkpoint writes a score
+        // that is zero when simulated and non-zero a block later). Unused gas is refunded.
+        gas: (gas * 3n) / 2n + 50_000n,
       });
       const receipt = await pub.waitForTransactionReceipt({ hash });
       return { transaction: hash, status: receipt.status };
