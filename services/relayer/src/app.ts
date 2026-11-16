@@ -1,9 +1,16 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { AGENT_POLICY_ADDRESS, agentPolicyAbi } from "@sealed-arena/shared";
+import { AGENT_POLICY_ADDRESS, agentPolicyAbi, arenaRecorderAbi } from "@sealed-arena/shared";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
-import { type Address, decodeFunctionData, type Hex, isHex } from "viem";
+import {
+  type Address,
+  decodeFunctionData,
+  encodeFunctionData,
+  type Hex,
+  isAddress,
+  isHex,
+} from "viem";
 
 /** The owner actions the relayer sends. Each carries the owner's passkey proof, checked by the precompile. */
 export const RELAYED = new Set(["register", "setMandate", "freeze", "unfreeze"]);
@@ -12,12 +19,12 @@ export const RELAYED = new Set(["register", "setMandate", "freeze", "unfreeze"])
 export type RelayChain = {
   relayer: Address;
   chainId: number;
-  /** eth_call of the action from the relayer; throws with the node's message if it would revert. */
-  simulate(data: Hex): Promise<void>;
+  /** eth_call of the action from the relayer (to AgentPolicy unless `to` is given); throws with the node's message if it would revert. */
+  simulate(data: Hex, to?: Address): Promise<void>;
   /** Whether `agent` may send transactions (TxAllowList role > 0). Only those are registered. */
   canSend(agent: Address): Promise<boolean>;
   /** Sends the action from the relayer and waits for the receipt. */
-  send(data: Hex): Promise<{ transaction: Hex; status: "success" | "reverted" }>;
+  send(data: Hex, to?: Address): Promise<{ transaction: Hex; status: "success" | "reverted" }>;
 };
 
 export type RelayerOptions = {
@@ -28,6 +35,8 @@ export type RelayerOptions = {
   trustProxy?: boolean;
   /** RPC URL the web app should read the chain from (returned by /info). */
   publicRpc?: string;
+  /** ArenaRecorder address: enables POST /arena (checkpoint, reportBreach) for the open challenge. */
+  arenaRecorder?: Address;
   /** Allowed browser origins (CORS). Default: any. */
   origins?: string[];
 };
@@ -122,6 +131,46 @@ export function createRelayerApp(o: RelayerOptions) {
         { ok: false, error: "send_failed", function: name, reason: revertReason(e) },
         502,
       );
+    }
+  });
+
+  // The open challenge's players are not on the TxAllowList, so the relayer sends the two public
+  // ArenaRecorder calls for them. It builds the calldata itself; callers only choose the action and agent.
+  // On chain the caller (and so the recorded finder) is the relayer.
+  app.post("/arena", async (c) => {
+    if (!o.arenaRecorder) return c.json({ ok: false, error: "no_arena" }, 404);
+    const ip = client(c);
+    const now = Date.now();
+    const recent = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
+    if (recent.length >= perMinute) return c.json({ ok: false, error: "rate_limited" }, 429);
+    recent.push(now);
+    hits.set(ip, recent);
+    const body = (await c.req.json().catch(() => undefined)) as
+      | { action?: unknown; agent?: unknown }
+      | undefined;
+    const action = body?.action;
+    const agent = body?.agent;
+    if (
+      (action !== "checkpoint" && action !== "reportBreach") ||
+      typeof agent !== "string" ||
+      !isAddress(agent)
+    ) {
+      return c.json({ ok: false, error: "bad_request" }, 400);
+    }
+    const data = encodeFunctionData({ abi: arenaRecorderAbi, functionName: action, args: [agent] });
+    try {
+      await o.chain.simulate(data, o.arenaRecorder);
+    } catch (e) {
+      return c.json({ ok: false, error: "reverted", reason: revertReason(e) }, 422);
+    }
+    try {
+      const r = await o.chain.send(data, o.arenaRecorder);
+      return c.json(
+        { ok: r.status === "success", function: action, ...r },
+        r.status === "success" ? 200 : 422,
+      );
+    } catch (e) {
+      return c.json({ ok: false, error: "send_failed", reason: revertReason(e) }, 502);
     }
   });
 

@@ -35,8 +35,8 @@ export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
   return {
     relayer: account.address,
     chainId: CHAIN_ID,
-    async simulate(data) {
-      await pub.call({ account: account.address, to: AGENT_POLICY_ADDRESS, data });
+    async simulate(data, to = AGENT_POLICY_ADDRESS) {
+      await pub.call({ account: account.address, to, data });
     },
     async canSend(agent) {
       const role = await pub.readContract({
@@ -47,14 +47,14 @@ export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
       });
       return role > 0n;
     },
-    async send(data) {
+    async send(data, to = AGENT_POLICY_ADDRESS) {
       const gas = await pub.estimateGas({
         account: account.address,
-        to: AGENT_POLICY_ADDRESS,
+        to,
         data,
       });
       const hash = await wallet.sendTransaction({
-        to: AGENT_POLICY_ADDRESS,
+        to,
         data,
         gas: (gas * 12n) / 10n,
       });
