@@ -34,7 +34,8 @@ export function derToRS(der: Uint8Array): { r: Hex; s: Hex } {
   const rv = BigInt(toHex(r.value));
   const sv = BigInt(toHex(s.value));
   if (rv === 0n || sv === 0n) throw new Error("signature: zero r or s");
-  return { r: hex32(r.value), s: toHex(normalizeLowS(sv), { size: 32 }) };
+  // From the integer, not the bytes: viem pads a byte array on the right, and DER drops leading zero bytes.
+  return { r: toHex(rv, { size: 32 }), s: toHex(normalizeLowS(sv), { size: 32 }) };
 }
 
 /** DER prefix of a P-256 SubjectPublicKeyInfo with an uncompressed point (91 bytes in all). */
