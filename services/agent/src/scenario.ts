@@ -4,7 +4,7 @@
 //                                                                         agent followed the injected instruction
 //   pnpm --filter agent scenario --replay transcripts/<file>.json         no LLM: re-runs the recorded tool calls
 // Each run uses a fresh agent key whose mandate lists the three sellers only. Test keys only.
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LOCAL_PAYEES } from "@sealed-arena/shared";
@@ -224,6 +224,7 @@ async function main() {
           "transcripts",
           `${scenario}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
         );
+        mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, `${JSON.stringify(r.transcript, null, 2)}\n`);
         console.log(`  transcript: ${file}`);
         if (r.transcript.notes.length > 0)
