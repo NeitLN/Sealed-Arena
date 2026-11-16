@@ -13,18 +13,18 @@ pnpm --filter attacks leaked-key  # or: bash scripts/check-localnet.sh
 
 The seeded agent's key is in `packages/shared/src/addresses.local.ts` on purpose: it plays a leaked key. Its mandate allows two plain payees, 1 coin per transaction and 3 coins per day, for 7 days.
 
-Each case returns `{ name, expected, result, reason }`. A case is **blocked** when the transaction never reaches a block (in practice the RPC refuses it with the rule's error); **succeeded** when it is included.
+Each case returns `{ name, expected, result, reason }`. A case is **blocked** when the transaction never reaches a block (in practice the RPC refuses it with the rule's error); **succeeded** when it is included. A blocked case must also fail with the expected error (for example `agent: payee has code`), so a rejection for an unrelated reason does not count.
 
-| Group            | Cases                                                                                                                                              |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Positive control | pay an allowed payee inside the mandate (must succeed)                                                                                             |
-| Payee            | stranger with legacy, EIP-2930 and EIP-1559 transactions; each of the three nodes directly                                                         |
-| Amount           | above `perTxCap`; a gas price high enough to burn coins through fees                                                                               |
-| Code             | create a contract; call an existing contract; pay a listed payee that has code                                                                     |
-| Rules            | `setMandate`, `unfreeze`, `register` on AgentPolicy with the agent key; NativeMinter, TxAllowList and ContractDeployerAllowList with the agent key |
-| State            | while frozen; after expiry                                                                                                                         |
-| Replay           | the control transaction again; same nonce with a higher fee to a stranger                                                                          |
-| Budget           | sequential payments past `dailyCap`; 20 payments at once                                                                                           |
+| Group            | Cases                                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Positive control | pay an allowed payee inside the mandate (must succeed)                                                                                                       |
+| Payee            | stranger with legacy, EIP-2930 and EIP-1559 transactions; each of the three nodes directly                                                                   |
+| Amount           | above `perTxCap`; a gas price high enough to burn coins through fees                                                                                         |
+| Code             | create a contract; call an existing contract; pay a listed payee that has code                                                                               |
+| Rules            | `setMandate`, `freeze`, `unfreeze`, `register` on AgentPolicy with the agent key; NativeMinter, TxAllowList and ContractDeployerAllowList with the agent key |
+| State            | while frozen; after expiry                                                                                                                                   |
+| Replay           | the control transaction again; same nonce with a higher fee to a stranger                                                                                    |
+| Budget           | sequential payments past `dailyCap`; 20 payments at once                                                                                                     |
 
 After the cases it checks:
 

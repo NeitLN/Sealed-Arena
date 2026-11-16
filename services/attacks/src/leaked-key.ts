@@ -33,7 +33,35 @@ import {
 import { SAMPLE_MANDATE } from "./seed.js";
 
 type Outcome = "blocked" | "succeeded";
-export type CaseResult = { name: string; expected: Outcome; result: Outcome; reason: string };
+export type CaseResult = {
+  name: string;
+  expected: Outcome;
+  result: Outcome;
+  reason: string;
+  /** For blocked cases: the rejection reason must contain this text. */
+  expectedReason?: string;
+};
+
+/** The error each blocked case must be rejected with, matched on the case name. */
+const EXPECTED_REASONS: Array<[RegExp, string]> = [
+  [/stranger/, "agent: payee not allowed"],
+  [/above perTxCap|huge gas fee|past dailyCap/, "agent: budget exceeded"],
+  [/create a contract/, "agent: contract creation not allowed"],
+  [/call an existing contract/, "agent: payee not allowed"],
+  [/listed payee that has code/, "agent: payee has code"],
+  [
+    /with the agent key|NativeMinter|TxAllowList admin|contract deployer/,
+    "agent: payee not allowed",
+  ],
+  [/replay/, "nonce too low"],
+  [/while frozen/, "agent: frozen"],
+  [/expired/, "agent: mandate expired"],
+];
+
+const expectedReasonFor = (name: string) => EXPECTED_REASONS.find(([re]) => re.test(name))?.[1];
+const matches = (r: CaseResult) =>
+  r.result === r.expected &&
+  (r.expectedReason === undefined || r.reason.includes(r.expectedReason));
 
 const agent = accounts.agent;
 const GAS_PRICE = 25_000_000_000n; // 25 gwei, above the local minimum base fee
@@ -136,8 +164,18 @@ const sampleMandate = (
 async function run(): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   const add = (name: string, expected: Outcome, r: { result: Outcome; reason: string }) => {
-    results.push({ name, expected, ...r });
-    const mark = r.result === expected ? "ok " : "!! ";
+    const expectedReason =
+      expected === "blocked" && !name.startsWith("20 payments")
+        ? expectedReasonFor(name)
+        : undefined;
+    const entry: CaseResult = {
+      name,
+      expected,
+      ...r,
+      ...(expectedReason ? { expectedReason } : {}),
+    };
+    results.push(entry);
+    const mark = matches(entry) ? "ok " : "!! ";
     console.log(`${mark} ${name}: ${r.result} (${r.reason})`);
   };
   const forbidden = async (name: string, a: Attempt, n: Node = N0) =>
@@ -204,6 +242,16 @@ async function run(): Promise<CaseResult[]> {
           0n,
           "0x",
         ],
+      }),
+    ),
+  );
+  await forbidden(
+    "freeze with the agent key",
+    policyCall(
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "freeze",
+        args: [agent.address, 0n, "0x"],
       }),
     ),
   );
@@ -378,7 +426,7 @@ async function main(): Promise<void> {
     `Nodes agree on block ${common}: ${agree ? "PASS" : "FAIL"} (${hashes.map((h) => h.slice(0, 10)).join(", ")})`,
   );
 
-  const mismatches = results.filter((r) => r.result !== r.expected);
+  const mismatches = results.filter((r) => !matches(r));
   const ok = mismatches.length === 0 && invariant && strangerBalance === 0n && agree;
   console.log(
     `\nleaked-key: ${ok ? "PASS" : "FAIL"} (${results.length} cases, ${mismatches.length} unexpected)`,
