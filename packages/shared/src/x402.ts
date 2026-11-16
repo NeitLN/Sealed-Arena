@@ -111,7 +111,7 @@ export async function checkSignedNativeTx(raw: Hex, want: ExpectedPayment): Prom
   };
 }
 
-/** What the chain rule charges a payment: value + gasLimit × maxFeePerGas (docs/ARCHITECTURE.md 3.3). */
+/** What the chain rule charges a payment: value + gasLimit × maxFeePerGas (docs/ARCHITECTURE.md 3.1). */
 export function paymentCharge(tx: { value: bigint; gas: bigint; maxFeePerGas: bigint }): bigint {
   return tx.value + tx.gas * tx.maxFeePerGas;
 }

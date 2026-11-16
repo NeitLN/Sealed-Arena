@@ -20,7 +20,7 @@ import type {
   VerifyResponse,
 } from "@x402/core/types";
 import { type Context, Hono } from "hono";
-import { type Address, type Hex, isAddressEqual, isHex, type PublicClient } from "viem";
+import { type Address, type Hex, isAddressEqual, isHex, keccak256, type PublicClient } from "viem";
 
 /** One paid dataset. Prices are in wei of the native coin (18 decimals). */
 export type Product = { path: string; description: string; price: bigint; data: unknown };
@@ -50,7 +50,10 @@ type Issued = {
   path: string;
   amount: bigint;
   expires: number;
-  state: "issued" | "settling" | "used";
+  /** pending: settle did not confirm after the payment may have been broadcast; only that same transaction can still complete it. */
+  state: "issued" | "settling" | "pending" | "used";
+  /** Hash of the signed payment once it passed /verify. */
+  txHash?: Hex;
 };
 
 export type SellerOptions = {
@@ -169,13 +172,39 @@ export function createSellerApp(o: SellerOptions) {
       const requestId = payload.accepted?.extra?.requestId;
       const entry = isHex(requestId) ? issued.get(requestId) : undefined;
       if (!entry || entry.path !== p.path) return paymentRequired(c, p, "unknown_request_id");
+      const raw = (payload.payload as { signedTransaction?: unknown }).signedTransaction;
+      // The seller's own terms, never the copy the buyer sent back.
+      const req = requirements(p, requestId as Hex);
+
+      /** Delivers if `hash` is on chain with a successful receipt and the issued to/value/data. */
+      const deliverIfOnChain = async (hash: Hex, payer?: string) => {
+        if (!(await settledOnChain(hash, req).catch(() => false))) return undefined;
+        entry.state = "used";
+        const settled: SettleResponse = {
+          success: true,
+          transaction: hash,
+          network: X402_NETWORK,
+          amount: req.amount,
+          ...(payer ? { payer } : {}),
+        };
+        c.header("PAYMENT-RESPONSE", encodePaymentResponseHeader(settled));
+        return c.json({ resource: resourceUrl(p.path), data: p.data });
+      };
+
+      // A retry after an unconfirmed settle: only the same signed transaction, and only once it is on chain.
+      if (entry.state === "pending") {
+        if (!isHex(raw) || keccak256(raw) !== entry.txHash) {
+          return paymentRequired(c, p, "request_id_already_used");
+        }
+        return (
+          (await deliverIfOnChain(entry.txHash)) ?? paymentRequired(c, p, "settlement_pending")
+        );
+      }
       if (entry.state !== "issued") return paymentRequired(c, p, "request_id_already_used");
       if (entry.expires < Date.now()) return paymentRequired(c, p, "request_id_expired");
 
       // Single use: claimed before any await, so a concurrent retry sees it as taken.
       entry.state = "settling";
-      // The seller's own terms, never the copy the buyer sent back.
-      const req = requirements(p, requestId as Hex);
 
       const verified = await post<VerifyResponse>("/verify", payload, req).catch(
         (): VerifyResponse => ({ isValid: false, invalidReason: "facilitator_unreachable" }),
@@ -185,6 +214,12 @@ export function createSellerApp(o: SellerOptions) {
         entry.state = "used";
         return paymentRequired(c, p, verified.invalidReason ?? "invalid_payment");
       }
+      if (!isHex(raw)) {
+        entry.state = "used";
+        return paymentRequired(c, p, "invalid_payload");
+      }
+      const txHash = keccak256(raw);
+      entry.txHash = txHash;
 
       const settled = await post<SettleResponse>("/settle", payload, req).catch(
         (): SettleResponse => ({
@@ -194,16 +229,13 @@ export function createSellerApp(o: SellerOptions) {
           network: X402_NETWORK,
         }),
       );
-      entry.state = "used";
-      if (
-        !settled.success ||
-        !(await settledOnChain(settled.transaction, req).catch(() => false))
-      ) {
-        return paymentRequired(c, p, settled.errorReason ?? "settlement_not_confirmed");
-      }
-
-      c.header("PAYMENT-RESPONSE", encodePaymentResponseHeader(settled));
-      return c.json({ resource: resourceUrl(p.path), data: p.data });
+      // Whatever the facilitator said, the chain decides: the payment may have landed even if
+      // the answer was lost or timed out. Check the signed transaction itself.
+      const delivered = await deliverIfOnChain(txHash, settled.payer);
+      if (delivered) return delivered;
+      // Not on chain (yet): keep the id for this one transaction, so the buyer can retry it.
+      entry.state = "pending";
+      return paymentRequired(c, p, settled.errorReason ?? "settlement_not_confirmed");
     });
   }
 

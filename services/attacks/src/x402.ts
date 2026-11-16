@@ -18,7 +18,7 @@ import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402
 import type { PaymentPayload, PaymentRequired, PaymentRequirements } from "@x402/core/types";
 import { createFacilitatorApp } from "facilitator";
 import { createSellerApp } from "seller";
-import { type Address, encodeFunctionData, type Hex } from "viem";
+import { type Address, encodeFunctionData, type Hex, keccak256 } from "viem";
 import { generatePrivateKey, type PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
 import {
   accounts,
@@ -76,13 +76,31 @@ async function main(): Promise<void> {
     createFacilitatorApp(n.client, { receiptTimeoutMs: 30_000 }).fetch,
   );
   /** A seller on its own port; the app is built once the port (its base URL) is known. */
-  const startSeller = async (to: Address): Promise<Server> => {
+  // A facilitator whose /settle answer is lost: it settles for real in the background but
+  // reports a failure at once, before the payment is in a block.
+  const lossy = await listen(async (r) => {
+    const url = new URL(r.url);
+    const forwarded = fetch(`${facilitator.url}${url.pathname}`, {
+      method: r.method,
+      headers: r.headers,
+      ...(r.method === "POST" ? { body: await r.text() } : {}),
+    });
+    if (url.pathname !== "/settle") return forwarded;
+    forwarded.then((res) => res.text()).catch(() => undefined);
+    return Response.json({
+      success: false,
+      errorReason: "facilitator_unreachable",
+      transaction: "",
+      network: "eip155:261126",
+    });
+  });
+  const startSeller = async (to: Address, facilitatorUrl = facilitator.url): Promise<Server> => {
     let app: ReturnType<typeof createSellerApp> | undefined;
     const s = await listen((r) => (app ? app.fetch(r) : new Response("starting", { status: 503 })));
     app = createSellerApp({
       baseUrl: s.url,
       payTo: to,
-      facilitatorUrl: facilitator.url,
+      facilitatorUrl,
       client: n.client,
     });
     return s;
@@ -91,6 +109,7 @@ async function main(): Promise<void> {
   const stranger = await startSeller(outsider);
   const sellerUrl = seller.url;
   const strangerUrl = stranger.url;
+  const unlucky = await startSeller(payTo, lossy.url);
 
   const agent = await freshAgent(n, [payTo, LOCAL_PAYEES[1]]);
   console.log(
@@ -315,12 +334,44 @@ async function main(): Promise<void> {
     );
   }
 
+  // 4. Settle answer lost after broadcast: the buyer retries the same payment and gets the data, paid once.
+  {
+    const url = `${unlucky.url}/data/weather`;
+    const before = await state();
+    const { required, req } = await quote(url);
+    const raw = await signFor(req);
+    const first = await pay(url, required, req, raw);
+    // Another payment for the same request id is refused while the first may still land.
+    const other = await pay(
+      url,
+      required,
+      req,
+      await signFor(req, { value: BigInt(req.amount) + 1n }),
+    );
+    await n.client.waitForTransactionReceipt({ hash: keccak256(raw) });
+    const retry = await pay(url, required, req, raw);
+    const after = await state();
+    const paidOnce =
+      after.nonce === before.nonce + 1 && before.balance - after.balance >= BigInt(req.amount);
+    add(
+      "settle answer lost, same payment retried",
+      first.status === 402 &&
+        first.reason === "facilitator_unreachable" &&
+        other.reason === "request_id_already_used" &&
+        retry.status === 200 &&
+        paidOnce,
+      `first ${first.status} ${first.reason}, other tx ${other.reason}, retry ${retry.status}, paid once ${paidOnce}`,
+    );
+  }
+
   const [spentToday] = await readPolicy.spend(n, agent.address);
   console.log(`agent spentToday ${spentToday}`);
 
   facilitator.close();
   seller.close();
   stranger.close();
+  unlucky.close();
+  lossy.close();
 
   const failed = results.filter((r) => !r.ok);
   console.log(`x402: ${results.length - failed.length}/${results.length} cases as expected`);

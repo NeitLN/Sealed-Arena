@@ -53,7 +53,7 @@ pnpm --filter facilitator start    # http://127.0.0.1:4020: POST /verify, POST /
 pnpm --filter seller start         # http://127.0.0.1:4021: /catalog, /free/hello, 3 tài nguyên trả phí dưới /data/
 curl -i http://127.0.0.1:4021/data/weather   # 402, header PAYMENT-REQUIRED (base64) có requestId mới
 
-pnpm --filter attacks x402         # tự dựng facilitator + 2 người bán, mua 1 lần, thử 8 cách trả sai
+pnpm --filter attacks x402         # tự dựng facilitator + 3 người bán, mua 1 lần, thử 8 cách trả sai, 1 ca mất câu trả lời settle
 ```
 - Người bán mặc định nhận tiền ở người nhận đầu tiên của uỷ quyền mẫu (`SELLER_PAY_TO` để đổi).
 - Mỗi 402 cấp một `requestId` mới, sống 5 phút, dùng một lần. Khởi động lại người bán thì 402 cũ hết hiệu lực.
