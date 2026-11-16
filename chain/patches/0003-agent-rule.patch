@@ -710,10 +710,10 @@ index 1827192..946d92f 100644
  }
 diff --git a/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
 new file mode 100644
-index 0000000..47f769e
+index 0000000..612c674
 --- /dev/null
 +++ b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
-@@ -0,0 +1,249 @@
+@@ -0,0 +1,255 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package evm
@@ -831,6 +831,8 @@ index 0000000..47f769e
 +	require.NoError(t, errs[1])
 +	nextBlock()
 +	issueAndAccept(t, tvm.vm)
++	// The pool resets to the new head on a background thread; wait for it before checking admission.
++	require.NoError(t, tvm.vm.txPool.Sync())
 +
 +	// The pool refuses forbidden agent transactions with the rule's error.
 +	forbidden := send(agentKey, &stranger, value, 21_000, nil)
@@ -875,6 +877,7 @@ index 0000000..47f769e
 +	require.GreaterOrEqual(t, state.GetBalance(agent).ToBig().Cmp(floor), 0)
 +
 +	// The remaining payments are not included in a later block of the same day.
++	require.NoError(t, tvm.vm.txPool.Sync())
 +	nextBlock()
 +	_, err = tvm.vm.BuildBlock(t.Context())
 +	require.Error(t, err, "nothing left that fits the budget")
@@ -939,11 +942,14 @@ index 0000000..47f769e
 +	}
 +	advance(5 * time.Second)
 +	issueAndAccept(t, tvm.vm)
++	require.NoError(t, tvm.vm.txPool.Sync())
 +
 +	// Spend the whole daily budget; the pool is then empty.
 +	require.NoError(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{send(agentKey, &payee, value, 21_000, nil)})[0])
 +	advance(5 * time.Second)
 +	issueAndAccept(t, tvm.vm)
++	// The pool resets to the new head on a background thread; wait for it before checking admission.
++	require.NoError(t, tvm.vm.txPool.Sync())
 +
 +	// Same day: refused by the pool.
 +	over := send(agentKey, &payee, value, 21_000, nil)
