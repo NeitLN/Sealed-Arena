@@ -89,7 +89,8 @@ async function main() {
       "",
     ]);
   } finally {
-    server.close();
+    // Wait for the server to close before the process ends (exiting during close crashes libuv on Windows).
+    await new Promise<void>((r) => server.close(() => r()));
     store.close();
     rmSync(dir, { recursive: true, force: true });
   }
@@ -97,7 +98,7 @@ async function main() {
     console.log(`${ok ? "ok " : "!! "} ${name}${detail ? `: ${detail}` : ""}`);
   const failed = checks.filter((c) => !c[1]).length;
   console.log(`gateway: ${failed ? "FAIL" : "PASS"}`);
-  process.exit(failed ? 1 : 0);
+  process.exitCode = failed ? 1 : 0;
 }
 
 main().catch((e) => {
