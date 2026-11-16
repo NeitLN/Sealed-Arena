@@ -6,7 +6,7 @@
 
 **An Avalanche L1 where a payment from an AI agent's key is valid only if it stays inside the mandate its owner set with a passkey.**
 
-Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction: it is an **invalid** transaction that no block can contain.
+Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction: it is an **invalid** transaction that no block accepted by the chain's validators can contain.
 
 > Built for Team1 Vietnam UniHack 2026, _Build on Avalanche_, track AI agents & security. Testnet only.
 
@@ -19,6 +19,8 @@ Give the agent a card, not the whole wallet. If the agent is tricked, or its pri
 AI agents now hold wallets and pay for APIs and data on their own (for example with x402). A prompt injection, a poisoned tool, or a leaked key can make the agent send money anywhere. Today's spending limits live in a server or in a smart-contract wallet that the agent calls, so whoever controls the agent's key can often reach around them.
 
 ## How it works
+
+_The ownership and mandate part (step 1) is on `main`; the enforcement in steps 2 and 3 is in review in [#5](https://github.com/NeitLN/Sealed-Arena/pull/5)._
 
 ```mermaid
 flowchart LR
