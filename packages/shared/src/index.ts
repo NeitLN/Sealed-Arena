@@ -1,6 +1,7 @@
 export * from "./addresses.local.js";
 export * from "./agentPolicy.js";
 export { allowListAbi } from "./allowListAbi.js";
+export { arenaRecorderAbi } from "./arenaRecorderAbi.js";
 export * from "./chain.js";
 export { nativeMinterAbi } from "./nativeMinterAbi.js";
 export * from "./x402.js";

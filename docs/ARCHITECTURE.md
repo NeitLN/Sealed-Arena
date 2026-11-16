@@ -176,9 +176,12 @@ Hệ quả phải ghi trong README: người bán phải thêm mạng L1 và tr�
 
 - `enroll(agent)` (chỉ admin): đưa agent vào thử thách.
 - `fund(agent)` payable: nạp coin gốc cho agent qua recorder để cộng `funded[agent]`. Tiền gửi thẳng cho agent không được tính.
-- `checkpoint(agent)` (ai cũng gọi được): cộng `score += balance × (now − lastCheckpoint)`; kiểm bất biến ở mục 3.1. Bất biến vỡ thì ghi `breached = true`, `score = 0`, phát `Breach`.
-- `reportBreach(agent)`: gọi `checkpoint`; nếu phát hiện vi phạm, ghi `msg.sender` là người tìm ra.
-- `publish(agent)`: gửi `(agent, score, breached, lastCheckpoint, block.chainid)` qua Teleporter tới ReputationReceiver trên Fuji.
+- `checkpoint(agent)` (ai cũng gọi được): kiểm bất biến ở mục 3.1 dưới dạng `balance(agent) ≥ funded − (totalCharged − totalCharged lúc enroll)`; nếu giữ thì cộng `score += min(balance, funded − charged) × (now − lastCheckpoint)`. Bất biến vỡ thì ghi `breached = true`, `score = 0`, ghi người gọi là người tìm ra, phát `Breach`. Vi phạm là vĩnh viễn: sau đó `checkpoint` không đổi gì, `fund` bị từ chối.
+- `reportBreach(agent)`: như `checkpoint`, tên dành cho người đi tìm vi phạm.
+- `publish(agent)`: `checkpoint` rồi gửi `abi.encode(agent, score, breached, lastCheckpoint, block.chainid)` qua `IReputationPublisher` do admin đặt (`setPublisher`). Adapter Teleporter tới ReputationReceiver trên Fuji làm ở T13.
+- `enroll` đòi agent đã đăng ký trong AgentPolicy. Số dư agent đang có lúc enroll được tính vào `funded` (để nó không che được khoản rò sau này); khoản đã tính trước khi enroll không được trừ.
+- Giới hạn: tiền gửi thẳng cho agent sau khi enroll không tăng `funded` và không tăng điểm, nhưng làm tăng `balance`, nên một khoản rò nhỏ hơn số tiền gửi thẳng sẽ không lộ ra. Thử thách chỉ nạp tiền qua `fund`. Tương tự, quy tắc tính gas theo mức tối đa, nên phần gas không dùng tạo một độ hở nhỏ (khoảng 0,0034 coin sau toàn bộ bộ leaked-key): khoản rò nhỏ hơn độ hở này không lộ ra.
+- Đã triển khai ở T10: `contracts/src/ArenaRecorder.sol`, ABI ở `packages/shared/src/arenaRecorderAbi.ts`.
 - Số lượt thử không nằm trong contract (giao dịch bị từ chối không vào chain). Cổng RPC đếm ở ngoài chain và giao diện ghi rõ đó là số đo ngoài chain.
 
 ReputationReceiver (Fuji C-Chain): chỉ nhận tin từ Teleporter với nguồn là đúng chain id và đúng địa chỉ ArenaRecorder; ghi vào registry ERC-8004. **[cần kiểm T13]** chữ ký hàm ghi của registry đang triển khai trên Fuji (reputation hay validation), đọc từ ABI thật, không viết theo trí nhớ.
