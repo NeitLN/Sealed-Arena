@@ -1,5 +1,5 @@
-import { AGENT_POLICY_ADDRESS, agentPolicyAbi } from "@sealed-arena/shared";
-import { encodeFunctionData, erc20Abi, type Hex } from "viem";
+import { AGENT_POLICY_ADDRESS, agentPolicyAbi, arenaRecorderAbi } from "@sealed-arena/shared";
+import { decodeFunctionData, encodeFunctionData, erc20Abi, type Hex } from "viem";
 import { describe, expect, it } from "vitest";
 import { createRelayerApp, type RelayChain } from "./app.js";
 
@@ -12,6 +12,7 @@ const freezeData = encodeFunctionData({
 
 function chain(o: { revert?: string; allowed?: string[] } = {}) {
   const sent: Hex[] = [];
+  const targets: string[] = [];
   const c: RelayChain = {
     relayer: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
     chainId: 261126,
@@ -20,12 +21,13 @@ function chain(o: { revert?: string; allowed?: string[] } = {}) {
     },
     canSend: async (a) =>
       (o.allowed ?? [agent]).map((x) => x.toLowerCase()).includes(a.toLowerCase()),
-    send: async (data) => {
+    send: async (data, to) => {
       sent.push(data);
+      targets.push(to ?? "policy");
       return { transaction: "0xabc", status: "success" };
     },
   };
-  return { c, sent };
+  return { c, sent, targets };
 }
 
 const post = (app: ReturnType<typeof createRelayerApp>, body: unknown, ip = "1.2.3.4") =>
@@ -127,5 +129,40 @@ describe("relayer", () => {
     expect(sent).toEqual([]);
     expect((await post(app, { data: reg(agent) })).status).toBe(200);
     expect(sent).toHaveLength(1);
+  });
+
+  describe("arena actions", () => {
+    const recorder = "0x60d046fa32a101229f78d69b655a91193cdf4f77";
+    const arena = (app: ReturnType<typeof createRelayerApp>, body: unknown) =>
+      app.request("/arena", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.9" },
+        body: JSON.stringify(body),
+      });
+
+    it.each(["checkpoint", "reportBreach"])(
+      "sends %s to the ArenaRecorder, built by the relayer",
+      async (action) => {
+        const { c, sent, targets } = chain();
+        const app = createRelayerApp({ chain: c, trustProxy: true, arenaRecorder: recorder });
+        const res = await arena(app, { action, agent });
+        expect(res.status).toBe(200);
+        expect(targets).toEqual([recorder]);
+        expect(decodeFunctionData({ abi: arenaRecorderAbi, data: sent[0] as Hex })).toEqual({
+          functionName: action,
+          args: [agent],
+        });
+      },
+    );
+
+    it("refuses other actions, bad agents, and works only when a recorder is configured", async () => {
+      const { c, sent } = chain();
+      const app = createRelayerApp({ chain: c, trustProxy: true, arenaRecorder: recorder });
+      expect((await arena(app, { action: "enroll", agent })).status).toBe(400);
+      expect((await arena(app, { action: "checkpoint", agent: "0x1234" })).status).toBe(400);
+      const none = createRelayerApp({ chain: chain().c, trustProxy: true });
+      expect((await arena(none, { action: "checkpoint", agent })).status).toBe(404);
+      expect(sent).toEqual([]);
+    });
   });
 });

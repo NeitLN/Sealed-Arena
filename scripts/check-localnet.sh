@@ -7,7 +7,8 @@
 #   4. x402 signed-native-tx end to end (services/attacks/src/x402.ts)
 #   5. ArenaRecorder: deploy, fund a fresh agent through it, leaked-key suite on it, checkpoint (services/attacks/src/arena.ts)
 #   6. owner console in Chromium with a virtual passkey (web/e2e/owner.e2e.ts)
-#   7. rule script (chain/tests/rule/run.sh)
+#   7. RPC gateway: forbidden payment recorded with its reason (services/rpc-gateway)
+#   8. rule script (chain/tests/rule/run.sh)
 # Leaves the network running; stop it with `bash scripts/localnet.sh down`.
 # Usage: bash scripts/check-localnet.sh
 set -uo pipefail
@@ -23,6 +24,7 @@ STEPS=(
   "x402|pnpm --filter attacks run --silent x402"
   "arena|bash scripts/forge.sh build >/dev/null && pnpm --filter attacks run --silent arena"
   "owner-web|pnpm --filter web run --silent e2e"
+  "gateway|pnpm --filter rpc-gateway run --silent localnet-check"
   "rule|bash chain/tests/rule/run.sh"
 )
 

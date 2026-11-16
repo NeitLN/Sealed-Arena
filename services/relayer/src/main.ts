@@ -13,6 +13,9 @@ const chain = sealedRelayChain(rpc, relayerKey(rpc));
 const app = createRelayerApp({
   chain,
   publicRpc: process.env.RELAYER_PUBLIC_RPC ?? rpc,
+  ...(process.env.RELAYER_ARENA_RECORDER
+    ? { arenaRecorder: process.env.RELAYER_ARENA_RECORDER as `0x${string}` }
+    : {}),
   trustProxy: process.env.RELAYER_TRUST_PROXY === "1",
   ...(origins?.length ? { origins } : {}),
 });

@@ -1,0 +1,24 @@
+{
+  "name": "rpc-gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "localnet-check": "tsx src/localnet-check.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.8",
+    "@sealed-arena/shared": "workspace:*",
+    "hono": "4.13.17",
+    "viem": "2.57.19"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

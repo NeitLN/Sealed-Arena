@@ -109,6 +109,25 @@ importers:
         specifier: 4.23.15
         version: 4.23.15
 
+  services/rpc-gateway:
+    dependencies:
+      '@hono/node-server':
+        specifier: 2.1.8
+        version: 2.1.8(hono@4.13.17)
+      '@sealed-arena/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      hono:
+        specifier: 4.13.17
+        version: 4.13.17
+      viem:
+        specifier: 2.57.19
+        version: 2.57.19(typescript@5.9.3)(zod@4.6.7)
+    devDependencies:
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+
   services/seller:
     dependencies:
       '@hono/node-server':

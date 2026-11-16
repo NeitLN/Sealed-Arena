@@ -54,7 +54,7 @@ Transactions from other senders are not affected. Details and the exact contract
 | Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese   | Done    |
 | Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done    |
 | Survival record sent over ICM to the ERC-8004 registry                                                          | Planned |
-| Open red-team challenge with a public agent key                                                                 | Planned |
+| Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages    | Done    |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
@@ -66,6 +66,7 @@ Each design decision is recorded with its evidence (source lines, commands, resu
 
 - RPC: `https://sealed-arena.duckdns.org/rpc` (chain id `261126`, native coin: USDC bridged from Fuji with ICTT)
 - Owner console: https://sealed-arena.vercel.app
+- Open red-team challenge: https://sealed-arena.vercel.app/arena (rules: [/arena/rules](https://sealed-arena.vercel.app/arena/rules))
 - Addresses and transactions: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
 
 The operator runs the only validator. See "Security model and limitations" below.
