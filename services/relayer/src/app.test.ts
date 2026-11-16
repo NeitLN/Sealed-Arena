@@ -10,7 +10,7 @@ const freezeData = encodeFunctionData({
   args: [agent, 0n, "0x"],
 });
 
-function chain(o: { revert?: string } = {}) {
+function chain(o: { revert?: string; allowed?: string[] } = {}) {
   const sent: Hex[] = [];
   const c: RelayChain = {
     relayer: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
@@ -18,6 +18,8 @@ function chain(o: { revert?: string } = {}) {
     simulate: async () => {
       if (o.revert) throw new Error(o.revert);
     },
+    canSend: async (a) =>
+      (o.allowed ?? [agent]).map((x) => x.toLowerCase()).includes(a.toLowerCase()),
     send: async (data) => {
       sent.push(data);
       return { transaction: "0xabc", status: "success" };
@@ -107,5 +109,23 @@ describe("relayer", () => {
       target: AGENT_POLICY_ADDRESS,
       rpc: "http://rpc.test/",
     });
+  });
+
+  it("registers only agents the admin has allowed to send, so the relayer's gas cannot be drained (A6)", async () => {
+    const stranger = "0x00000000000000000000000000000000000beef1";
+    const reg = (who: string) =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "register",
+        args: [who as `0x${string}`, `0x${"11".repeat(32)}`, `0x${"22".repeat(32)}`, "0x"],
+      });
+    const { c, sent } = chain({ allowed: [agent] });
+    const app = createRelayerApp({ chain: c, trustProxy: true });
+    const refused = await post(app, { data: reg(stranger) });
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ ok: false, error: "agent_not_allowed" });
+    expect(sent).toEqual([]);
+    expect((await post(app, { data: reg(agent) })).status).toBe(200);
+    expect(sent).toHaveLength(1);
   });
 });

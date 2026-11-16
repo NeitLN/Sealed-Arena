@@ -3,7 +3,7 @@
 //   2. admin funds the agent;
 //   3. relayer registers the agent with the owner's test passkey;
 //   4. relayer sets the sample mandate: two plain payees, perTxCap, dailyCap, 7-day expiry.
-import { allowListAbi, LOCAL_AGENT, LOCAL_PAYEES, PRECOMPILES } from "@sealed-arena/shared";
+import { allowListAbi, LOCAL_PAYEES, PRECOMPILES } from "@sealed-arena/shared";
 import { encodeFunctionData } from "viem";
 import {
   accounts,
@@ -21,12 +21,13 @@ export const SAMPLE_MANDATE = {
   perTxCap: coin(1),
   dailyCap: coin(3),
 } as const;
-export const SEED_FUNDING = coin(100);
+/** Coins given to the test agent: SEALED_SEED_FUNDING (whole coins), 100 by default. */
+export const SEED_FUNDING = coin(BigInt(process.env.SEALED_SEED_FUNDING ?? "100"));
 
 export async function seed(): Promise<void> {
   const [n] = nodes();
   if (!n) throw new Error("no node");
-  const agent = LOCAL_AGENT.address;
+  const agent = accounts.agent.address;
 
   if (!(await isTxAllowed(n, agent))) {
     await sendAndWait(n, accounts.admin, {

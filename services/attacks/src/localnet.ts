@@ -57,20 +57,34 @@ export function sealedChain(url: string): Chain {
 
 export type Node = { index: number; url: string; chain: Chain; client: PublicClient };
 
-/** Public clients for the three local nodes. */
+/**
+ * Node base URLs: SEALED_NODE_URLS (comma-separated) to run the same scripts against another
+ * network such as the Sealed L1 on Fuji; the three local nodes otherwise.
+ */
+export function nodeUrls(): readonly string[] {
+  const list = process.env.SEALED_NODE_URLS?.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return list?.length ? list : LOCAL_NODE_URLS;
+}
+
+/** Public clients for the nodes. */
 export function nodes(path = rpcPath()): Node[] {
-  return LOCAL_NODE_URLS.map((base, index) => {
+  return nodeUrls().map((base, index) => {
     const url = `${base}${path}`;
     const chain = sealedChain(url);
     return { index, url, chain, client: createPublicClient({ chain, transport: http(url) }) };
   });
 }
 
+/** A role key from the environment (another network), or the public local development key. */
+const roleKey = (env: string, local: Hex): Hex => (process.env[env] as Hex | undefined) || local;
+
 export const accounts = {
-  admin: privateKeyToAccount(LOCAL_ROLES.admin.privateKey),
-  relayer: privateKeyToAccount(LOCAL_ROLES.relayer.privateKey),
-  deployer: privateKeyToAccount(LOCAL_ROLES.deployer.privateKey),
-  agent: privateKeyToAccount(LOCAL_AGENT.privateKey),
+  admin: privateKeyToAccount(roleKey("SEALED_ADMIN_KEY", LOCAL_ROLES.admin.privateKey)),
+  relayer: privateKeyToAccount(roleKey("SEALED_RELAYER_KEY", LOCAL_ROLES.relayer.privateKey)),
+  deployer: privateKeyToAccount(roleKey("SEALED_DEPLOYER_KEY", LOCAL_ROLES.deployer.privateKey)),
+  agent: privateKeyToAccount(roleKey("SEALED_AGENT_KEY", LOCAL_AGENT.privateKey)),
 };
 
 export function wallet(node: Node, account: PrivateKeyAccount) {

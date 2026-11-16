@@ -14,6 +14,8 @@ export type RelayChain = {
   chainId: number;
   /** eth_call of the action from the relayer; throws with the node's message if it would revert. */
   simulate(data: Hex): Promise<void>;
+  /** Whether `agent` may send transactions (TxAllowList role > 0). Only those are registered. */
+  canSend(agent: Address): Promise<boolean>;
   /** Sends the action from the relayer and waits for the receipt. */
   send(data: Hex): Promise<{ transaction: Hex; status: "success" | "reverted" }>;
 };
@@ -87,13 +89,19 @@ export function createRelayerApp(o: RelayerOptions) {
     const data = body?.data;
     if (!isHex(data)) return c.json({ ok: false, error: "data_invalid" }, 400);
     let name: string;
+    let args: readonly unknown[] | undefined;
     try {
-      name = decodeFunctionData({ abi: agentPolicyAbi, data }).functionName;
+      ({ functionName: name, args } = decodeFunctionData({ abi: agentPolicyAbi, data }));
     } catch {
       return c.json({ ok: false, error: "function_not_allowed" }, 400);
     }
     if (!RELAYED.has(name))
       return c.json({ ok: false, error: "function_not_allowed", function: name }, 400);
+    // A public relayer pays gas for anyone; registering throwaway agents would drain it.
+    // Only agents the admin already allowed to send are registered.
+    if (name === "register" && !(await o.chain.canSend(args?.[0] as Address).catch(() => false))) {
+      return c.json({ ok: false, error: "agent_not_allowed", function: name }, 403);
+    }
 
     try {
       await o.chain.simulate(data);

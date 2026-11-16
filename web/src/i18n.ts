@@ -71,6 +71,9 @@ const en = {
   no_passkey: "Create a passkey first.",
   passkey_unsupported: "This browser cannot create passkeys here (needs HTTPS or localhost).",
   relayer_down: "The relayer is not reachable.",
+  agent_not_allowed:
+    "This agent is not allowed to send on this chain yet. Ask the operator to add it, then link it.",
+  rate_limited: "Too many requests. Wait a minute and try again.",
 };
 
 type Key = keyof typeof en;
@@ -142,6 +145,9 @@ const vi: Record<Key, string> = {
   no_passkey: "Hãy tạo passkey trước.",
   passkey_unsupported: "Trình duyệt này không tạo được passkey ở đây (cần HTTPS hoặc localhost).",
   relayer_down: "Không kết nối được relayer.",
+  agent_not_allowed:
+    "Agent này chưa được phép gửi giao dịch trên chain. Nhờ người vận hành thêm agent rồi gắn lại.",
+  rate_limited: "Quá nhiều yêu cầu. Đợi một phút rồi thử lại.",
 };
 
 const dict: Record<Lang, Record<Key, string>> = { en, vi };
