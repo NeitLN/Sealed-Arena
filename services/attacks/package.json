@@ -6,10 +6,15 @@
   "scripts": {
     "seed": "tsx src/seed.ts",
     "leaked-key": "tsx src/leaked-key.ts",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "x402": "tsx src/x402.ts"
   },
   "dependencies": {
+    "@hono/node-server": "2.1.8",
     "@sealed-arena/shared": "workspace:*",
+    "@x402/core": "2.31.0",
+    "facilitator": "workspace:*",
+    "seller": "workspace:*",
     "viem": "2.57.19"
   },
   "devDependencies": {
