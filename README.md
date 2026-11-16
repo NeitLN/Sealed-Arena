@@ -42,18 +42,18 @@ Transactions from other senders are not affected. Details and the exact contract
 
 ## Status
 
-| Component                                                                                                    | Status  |
-| ------------------------------------------------------------------------------------------------------------ | ------- |
-| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                 | Done    |
-| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters | Done    |
-| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)         | Done    |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Done    |
-| x402 payments with a signed native transaction: facilitator, sample seller, client                           | Done    |
-| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                 | Done    |
-| Buying agent driven by an LLM                                                                                | Planned |
-| Owner dashboard with passkeys                                                                                | Planned |
-| Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                   | Planned |
-| Open red-team challenge with a public agent key                                                              | Planned |
+| Component                                                                                                     | Status  |
+| ------------------------------------------------------------------------------------------------------------- | ------- |
+| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                  | Done    |
+| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters  | Done    |
+| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)          | Done    |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                             | Done    |
+| x402 payments with a signed native transaction: facilitator, sample seller, client                            | Done    |
+| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                  | Done    |
+| Buying agent driven by an LLM                                                                                 | Planned |
+| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese | Done    |
+| Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                    | Planned |
+| Open red-team challenge with a public agent key                                                               | Planned |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
@@ -108,6 +108,7 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 - `chain/tests/rule/run.sh` checks the same behaviour over RPC on a running local L1 with one and three nodes.
 - The x402 suite (`services/attacks/src/x402.ts`) starts the facilitator and two sample sellers, buys one dataset end to end, then sends each payment that must be refused (wrong payee, price, resource, chain id, signer, reused request id, already broadcast, seller outside the mandate) and checks the agent's balance and nonce do not move.
 - `ArenaRecorder` has Foundry tests for the score, the invariant, breaches and direct deposits (with a fuzz test), and `services/attacks/src/arena.ts` runs the leaked-key suite against an agent funded only through the recorder, then checks that a checkpoint finds no breach.
+- `web/e2e/owner.e2e.ts` drives the owner console in Chromium with a virtual passkey on the local network: link an agent, set a mandate, freeze and unfreeze (the agent's payment is refused while frozen), and checks that a different passkey cannot freeze the agent.
 - The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 24 ways out (every transaction type, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
 
 ## Security model and limitations

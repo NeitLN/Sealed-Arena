@@ -68,7 +68,19 @@ pnpm --filter attacks arena            # triển khai, enroll + fund 50 coin cho
 - Người triển khai (khoá `deployer` trong `addresses.local.ts`) là admin của recorder.
 - Bộ leaked-key nhận agent khác qua `SEALED_AGENT_KEY`; mặc định là agent của `seed`.
 
-## 6. Xem log
+## 6. Trang chủ ví và relayer
+```bash
+export SEALED_RPC_URL=$(bash scripts/localnet.sh rpc)
+pnpm --filter relayer start        # http://127.0.0.1:4040: POST /relay, GET /info
+pnpm --filter web dev              # http://localhost:5173 (passkey cần localhost hoặc HTTPS, không dùng 127.0.0.1)
+
+pnpm --filter web e2e              # build trang, tự bật relayer, Chromium với passkey giả lập: gắn agent, uỷ quyền, dừng/mở, passkey khác
+```
+- Web gọi relayer ở `VITE_RELAYER_URL` (mặc định `http://127.0.0.1:4040`), lấy URL RPC từ `/info` của relayer (`RELAYER_PUBLIC_RPC`, mặc định là `SEALED_RPC_URL`).
+- Ngoài mạng local, relayer cần `RELAYER_PRIVATE_KEY` (địa chỉ phải có trong TxAllowList và có coin trả gas).
+- E2E cần Chromium của Playwright: `pnpm --filter web exec playwright install chromium` nếu máy chưa có.
+
+## 7. Xem log
 ```bash
 docker logs -f sealed-node                       # log dựng mạng và log node đầu tiên
 docker exec sealed-node cat /data/sealed.json    # thư mục mạng, subnet ID, blockchain ID, URI các node
@@ -77,7 +89,7 @@ docker exec sealed-node sh -c 'tail -n 100 /data/networks/*/NodeID-*/logs/main.l
 docker exec sealed-node sh -c 'ls /data/networks/*/NodeID-*/logs/'            # log của từng chain (theo blockchain ID)
 ```
 
-## 7. Sự cố thường gặp
+## 8. Sự cố thường gặp
 | Triệu chứng | Cách xử lý |
 |---|---|
 | `failed to connect to the docker API` | Mở Docker Desktop, chờ nó báo đang chạy |
