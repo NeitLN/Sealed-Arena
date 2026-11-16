@@ -8,7 +8,7 @@
 
 Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction: it is an **invalid** transaction that no block can contain.
 
-> Built for Team1 Vietnam UniHack 2026, *Build on Avalanche*, track AI agents & security. Testnet only.
+> Built for Team1 Vietnam UniHack 2026, _Build on Avalanche_, track AI agents & security. Testnet only.
 
 > **Tóm tắt (Tiếng Việt).** Sealed Arena là một Avalanche L1 riêng. Mỗi khoản chi từ khoá của một AI agent chỉ hợp lệ khi nằm trong uỷ quyền mà chủ ví đặt bằng passkey: danh sách người nhận, hạn mức mỗi giao dịch, hạn mức mỗi ngày, hạn dùng. Quy tắc nằm trong điều kiện hợp lệ của giao dịch ở node (Subnet-EVM), nên giao dịch vượt uỷ quyền không vào được block nào, kể cả khi kẻ tấn công cầm được private key của agent. Chủ ví có thể dừng agent bất cứ lúc nào bằng passkey. Dự án chỉ chạy trên testnet; tài sản không có giá trị quy đổi.
 
@@ -42,16 +42,16 @@ Transactions from other senders are not affected. Details and the exact contract
 
 ## Status
 
-| Component | Status |
-|---|---|
-| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes) | Done |
-| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters | Done |
-| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments) | In review ([#5](https://github.com/NeitLN/Sealed-Arena/pull/5)) |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite | Next |
-| x402 payments with a signed native transaction; buying agent | Planned |
-| Owner dashboard with passkeys | Planned |
-| Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry | Planned |
-| Open red-team challenge with a public agent key | Planned |
+| Component                                                                                                    | Status                                                          |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                 | Done                                                            |
+| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters | Done                                                            |
+| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)         | In review ([#5](https://github.com/NeitLN/Sealed-Arena/pull/5)) |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                            | Next                                                            |
+| x402 payments with a signed native transaction; buying agent                                                 | Planned                                                         |
+| Owner dashboard with passkeys                                                                                | Planned                                                         |
+| Deployment to Fuji; survival record sent over ICM to the ERC-8004 registry                                   | Planned                                                         |
+| Open red-team challenge with a public agent key                                                              | Planned                                                         |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
@@ -80,14 +80,14 @@ More, including logs and troubleshooting: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ## Repository layout
 
-| Path | Contents |
-|---|---|
-| [`chain/`](chain) | Patches on avalanchego (`patches/`), pinned upstream, node Dockerfile, local network launcher, Go-side tests and network test scripts |
-| [`contracts/`](contracts) | Solidity (Foundry, run in Docker) |
-| [`packages/shared/`](packages/shared) | Chain id, addresses, ABI, and the encoders for passkey challenges and proofs, shared by every service |
-| `services/`, `web/`, `infra/` | x402 facilitator, demo seller, buying agent, RPC gateway, web app, deployment (in progress) |
-| [`scripts/`](scripts) | `check.sh`, `localnet.sh`, `forge.sh` |
-| [`docs/`](docs) | Architecture, runbook, decision records |
+| Path                                  | Contents                                                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| [`chain/`](chain)                     | Patches on avalanchego (`patches/`), pinned upstream, node Dockerfile, local network launcher, Go-side tests and network test scripts |
+| [`contracts/`](contracts)             | Solidity (Foundry, run in Docker)                                                                                                     |
+| [`packages/shared/`](packages/shared) | Chain id, addresses, ABI, and the encoders for passkey challenges and proofs, shared by every service                                 |
+| `services/`, `web/`, `infra/`         | x402 facilitator, demo seller, buying agent, RPC gateway, web app, deployment (in progress)                                           |
+| [`scripts/`](scripts)                 | `check.sh`, `localnet.sh`, `forge.sh`                                                                                                 |
+| [`docs/`](docs)                       | Architecture, runbook, decision records                                                                                               |
 
 Only our changes to avalanchego live in this repository, as patch files applied to a pinned tag, so reviewers can read exactly what we wrote.
 
