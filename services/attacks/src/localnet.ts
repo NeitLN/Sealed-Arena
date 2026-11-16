@@ -105,7 +105,11 @@ export async function sendAndWait(
 
 // ---- owner passkey stand-in (P-256 test key) ----------------------------------
 
-const d = Buffer.from(LOCAL_OWNER_P256_KEY.slice(2), "hex");
+// SEALED_OWNER_P256_KEY: a secret owner key for agents others must not control (the open challenge).
+const d = Buffer.from(
+  ((process.env.SEALED_OWNER_P256_KEY as string | undefined) ?? LOCAL_OWNER_P256_KEY).slice(2),
+  "hex",
+);
 const ecdh = createECDH("prime256v1");
 ecdh.setPrivateKey(d);
 const pub = ecdh.getPublicKey();
