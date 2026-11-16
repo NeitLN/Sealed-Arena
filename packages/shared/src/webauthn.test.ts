@@ -39,6 +39,24 @@ describe("derToRS", () => {
     }
   });
 
+  it("keeps the value of an r shorter than 32 bytes (DER drops leading zero bytes)", () => {
+    const r = 0x00ab_cdefn << 200n; // first byte zero: 31 bytes in DER
+    const out = derToRS(der(r, 7n));
+    expect(hexToBytes(out.r)).toHaveLength(32);
+    expect(BigInt(out.r)).toBe(r);
+    expect(BigInt(derToRS(der(5n, 7n)).r)).toBe(5n);
+  });
+
+  it("verifies a platform signature whose r starts with a zero byte", () => {
+    let p1363: Buffer;
+    do p1363 = sign("sha256", msg, { key: privateKey, dsaEncoding: "ieee-p1363" });
+    while (p1363[0] !== 0);
+    const r = BigInt(toHex(p1363.subarray(0, 32)));
+    const s = BigInt(toHex(p1363.subarray(32)));
+    const out = derToRS(der(r, s));
+    expect(verifies(out.r, out.s)).toBe(true);
+  });
+
   it("moves a high s to the low half, n - s (E4)", () => {
     const p1363 = sign("sha256", msg, { key: privateKey, dsaEncoding: "ieee-p1363" });
     const r = BigInt(toHex(p1363.subarray(0, 32)));
