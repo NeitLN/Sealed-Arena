@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import ArenaPage from "./ArenaPage.js";
 import ComparePage from "./ComparePage.js";
+import LandingPage from "./LandingPage.js";
 import OwnerPage from "./OwnerPage.js";
 import RulesPage from "./RulesPage.js";
 
@@ -14,7 +15,8 @@ function Page() {
   if (path === "/arena/rules") return <RulesPage />;
   if (path === "/arena") return <ArenaPage />;
   if (path === "/compare") return <ComparePage />;
-  return <OwnerPage />;
+  if (path === "/console") return <OwnerPage />;
+  return <LandingPage />;
 }
 
 const root = document.getElementById("root");

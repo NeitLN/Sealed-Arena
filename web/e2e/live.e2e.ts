@@ -29,7 +29,7 @@ try {
 } catch {
   // keys may come from the environment
 }
-const PAGE = process.env.LIVE_URL ?? "https://sealed-arena.vercel.app/";
+const PAGE = process.env.LIVE_URL ?? "https://sealed-arena.vercel.app/console";
 const RPC = process.env.LIVE_RPC ?? "https://sealed-arena.duckdns.org/rpc";
 const adminKey = (process.env.SEALED_ADMIN_KEY ?? process.env.FUJI_L1_ADMIN_PRIVATE_KEY) as
   | Hex

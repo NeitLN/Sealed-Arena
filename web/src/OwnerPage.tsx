@@ -2,13 +2,11 @@ import { Badge } from "@astryxdesign/core/Badge";
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
-import { Center } from "@astryxdesign/core/Center";
 import { Divider } from "@astryxdesign/core/Divider";
 import { Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { HStack, Layout, LayoutContent, Stack, StackItem, VStack } from "@astryxdesign/core/Layout";
-import { Section } from "@astryxdesign/core/Section";
-import { Text } from "@astryxdesign/core/Text";
+import { HStack, Stack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import {
@@ -51,7 +49,7 @@ import {
   signWithPasskey,
   withCode,
 } from "./owner.js";
-import { SiteHeader } from "./SiteHeader.js";
+import { SiteShell } from "./SiteShell.js";
 
 // Layout from the Astryx payment-form template: form column and a sticky summary column.
 const formColBasis: CSSProperties = { flexBasis: 0 };
@@ -361,220 +359,209 @@ export default function OwnerPage() {
   );
 
   return (
-    <Layout
-      height="fill"
-      content={
-        <LayoutContent padding={0}>
-          <Center axis="horizontal">
-            <Section variant="transparent" maxWidth={1100} width="100%" padding={isMobile ? 4 : 6}>
-              <VStack gap={5}>
-                <Banner status="warning" title={t("testnet")} />
+    <SiteShell lang={lang} setLang={setLang} current="owner">
+      <VStack gap={5}>
+        {/* Page header */}
+        <Heading level={1} type="display-2">
+          {t("title")}
+        </Heading>
+        <Text type="body" color="secondary">
+          {t("intro")}
+        </Text>
 
-                {/* Page header */}
-                <SiteHeader title={t("title")} lang={lang} setLang={setLang} current="owner" />
-                <Text type="body" color="secondary">
-                  {t("intro")}
+        {boot ? <Banner status="error" title={t(boot)} /> : null}
+        {outcome ? (
+          <Banner
+            status={outcome.kind === "ok" ? "success" : "error"}
+            title={outcome.kind === "ok" ? t("done") : `${t("failed")}: ${outcome.text}`}
+            description={outcome.tx ? `${t("tx")} ${outcome.tx}` : undefined}
+            isDismissable
+            onDismiss={() => setOutcome(undefined)}
+          />
+        ) : null}
+        {busy ? <Banner status="info" title={t("working")} /> : null}
+
+        <Stack direction={isMobile ? "vertical" : "horizontal"} gap={8} vAlign="start">
+          <StackItem size="fill" style={isMobile ? undefined : formColBasis}>
+            <VStack gap={8}>
+              {/* 1. Passkey */}
+              <VStack gap={3}>
+                <Text type="large" weight="bold">
+                  {t("passkeySection")}
                 </Text>
-
-                {boot ? <Banner status="error" title={t(boot)} /> : null}
-                {outcome ? (
-                  <Banner
-                    status={outcome.kind === "ok" ? "success" : "error"}
-                    title={outcome.kind === "ok" ? t("done") : `${t("failed")}: ${outcome.text}`}
-                    description={outcome.tx ? `${t("tx")} ${outcome.tx}` : undefined}
-                    isDismissable
-                    onDismiss={() => setOutcome(undefined)}
-                  />
-                ) : null}
-                {busy ? <Banner status="info" title={t("working")} /> : null}
-
-                <Stack direction={isMobile ? "vertical" : "horizontal"} gap={8} vAlign="start">
-                  <StackItem size="fill" style={isMobile ? undefined : formColBasis}>
-                    <VStack gap={8}>
-                      {/* 1. Passkey */}
-                      <VStack gap={3}>
-                        <Text type="large" weight="bold">
-                          {t("passkeySection")}
-                        </Text>
-                        <Text type="supporting" color="secondary">
-                          {t("passkeyHelp")}
-                        </Text>
-                        {saved.passkey ? (
-                          <VStack gap={2}>
-                            <HStack gap={2} vAlign="center">
-                              <Badge variant="success" label={t("passkeyReady")} />
-                              <Text type="supporting" color="secondary" style={mono}>
-                                {t("publicKey")} {short(saved.passkey.x)}
-                              </Text>
-                            </HStack>
-                            <HStack gap={2}>
-                              <Button
-                                label={t("forgetPasskey")}
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  remember({ ...(saved.agent ? { agent: saved.agent } : {}) })
-                                }
-                              />
-                            </HStack>
-                          </VStack>
-                        ) : (
-                          <HStack gap={3} vAlign="center" wrap="wrap">
-                            <Button
-                              label={t("createPasskey")}
-                              variant="primary"
-                              onClick={onCreatePasskey}
-                            />
-                            <Text type="supporting" color="secondary">
-                              {t("passkeyMissing")}
-                            </Text>
-                          </HStack>
-                        )}
-                      </VStack>
-
-                      {/* 2. Agent */}
-                      <VStack gap={3}>
-                        <HStack gap={2} hAlign="between" vAlign="center">
-                          <Text type="large" weight="bold">
-                            {t("agentSection")}
-                          </Text>
-                          {registrationBadge}
-                        </HStack>
-                        <TextInput
-                          label={t("agentAddress")}
-                          description={t("agentHelp")}
-                          value={agentInput}
-                          onChange={(v) => {
-                            setAgentInput(v.trim());
-                            if (isAddress(v.trim())) remember({ ...saved, agent: v.trim() });
-                          }}
-                          placeholder="0x…"
-                          autoComplete="off"
-                          hasSpellCheck={false}
-                          {...(agentInput && !agent
-                            ? { status: { type: "error" as const, message: t("address_invalid") } }
-                            : {})}
-                        />
-                        {agent && view && !view.registered ? (
-                          <VStack gap={3}>
-                            {digest ? (
-                              <VStack gap={1}>
-                                <Text type="supporting" color="secondary">
-                                  {t("registerHelp")}
-                                </Text>
-                                <Text type="supporting" style={mono}>
-                                  {digest}
-                                </Text>
-                              </VStack>
-                            ) : (
-                              <Text type="supporting" color="secondary">
-                                {t("no_passkey")}
-                              </Text>
-                            )}
-                            <TextInput
-                              label={t("agentSignature")}
-                              value={agentSig}
-                              onChange={(v) => setAgentSig(v.trim())}
-                              placeholder="0x…"
-                              autoComplete="off"
-                              hasSpellCheck={false}
-                            />
-                            {local ? (
-                              <TextInput
-                                type="password"
-                                label={t("agentPrivateKey")}
-                                description={t("privateKeyWarning")}
-                                value={agentKey}
-                                onChange={(v) => setAgentKey(v.trim())}
-                                autoComplete="off"
-                              />
-                            ) : null}
-                            <HStack gap={2}>
-                              <Button
-                                label={t("register")}
-                                variant="primary"
-                                isLoading={busy === "register"}
-                                isDisabled={!saved.passkey || !!busy || (!agentSig && !agentKey)}
-                                onClick={onRegister}
-                              />
-                            </HStack>
-                          </VStack>
-                        ) : null}
-                      </VStack>
-
-                      {/* 3. Mandate */}
-                      {ownedByMe ? (
-                        <VStack gap={3}>
-                          <Text type="large" weight="bold">
-                            {t("mandateSection")}
-                          </Text>
-                          <TextArea
-                            label={t("payees")}
-                            description={t("payeesHelp")}
-                            value={payeesText}
-                            onChange={(v: string) => {
-                              setPayeesText(v);
-                              setWarnings(undefined);
-                            }}
-                            placeholder={"0x…\n0x…"}
-                          />
-                          <Grid columns={isMobile ? 1 : 3} gap={3}>
-                            <TextInput
-                              label={t("perTxCap")}
-                              value={perTx}
-                              onChange={setPerTx}
-                              inputMode="decimal"
-                            />
-                            <TextInput
-                              label={t("dailyCap")}
-                              value={daily}
-                              onChange={setDaily}
-                              inputMode="decimal"
-                            />
-                            <TextInput
-                              label={t("validDays")}
-                              value={days}
-                              onChange={setDays}
-                              inputMode="numeric"
-                            />
-                          </Grid>
-                          {draftError && payeesText ? (
-                            <Banner status="error" title={t(draftError)} />
-                          ) : null}
-                          {typeof draft !== "string" && draft.perTxCap > draft.dailyCap ? (
-                            <Banner status="warning" title={t("capWarning")} />
-                          ) : null}
-                          {warnings?.map((w) => (
-                            <Banner
-                              key={w.address}
-                              status="warning"
-                              title={`${w.address} ${t(w.reason)}`}
-                            />
-                          ))}
-                          <HStack gap={2}>
-                            <Button
-                              label={warnings ? t("signAnyway") : t("signMandate")}
-                              variant="primary"
-                              isLoading={busy === "setMandate"}
-                              isDisabled={!!busy || !!draftError}
-                              onClick={onSetMandate}
-                            />
-                          </HStack>
-                        </VStack>
-                      ) : null}
-                    </VStack>
-                  </StackItem>
-
-                  <StackItem size="fill" style={isMobile ? summaryMobileOrder : summarySticky}>
-                    {summary}
-                  </StackItem>
-                </Stack>
+                <Text type="supporting" color="secondary">
+                  {t("passkeyHelp")}
+                </Text>
+                {saved.passkey ? (
+                  <VStack gap={2}>
+                    <HStack gap={2} vAlign="center">
+                      <Badge variant="success" label={t("passkeyReady")} />
+                      <Text type="supporting" color="secondary" style={mono}>
+                        {t("publicKey")} {short(saved.passkey.x)}
+                      </Text>
+                    </HStack>
+                    <HStack gap={2}>
+                      <Button
+                        label={t("forgetPasskey")}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remember({ ...(saved.agent ? { agent: saved.agent } : {}) })}
+                      />
+                    </HStack>
+                  </VStack>
+                ) : (
+                  <HStack gap={3} vAlign="center" wrap="wrap">
+                    <Button
+                      label={t("createPasskey")}
+                      variant="primary"
+                      onClick={onCreatePasskey}
+                    />
+                    <Text type="supporting" color="secondary">
+                      {t("passkeyMissing")}
+                    </Text>
+                  </HStack>
+                )}
               </VStack>
-            </Section>
-          </Center>
-        </LayoutContent>
-      }
-    />
+
+              {/* 2. Agent */}
+              <VStack gap={3}>
+                <HStack gap={2} hAlign="between" vAlign="center">
+                  <Text type="large" weight="bold">
+                    {t("agentSection")}
+                  </Text>
+                  {registrationBadge}
+                </HStack>
+                <TextInput
+                  label={t("agentAddress")}
+                  description={t("agentHelp")}
+                  value={agentInput}
+                  onChange={(v) => {
+                    setAgentInput(v.trim());
+                    if (isAddress(v.trim())) remember({ ...saved, agent: v.trim() });
+                  }}
+                  placeholder="0x…"
+                  autoComplete="off"
+                  hasSpellCheck={false}
+                  {...(agentInput && !agent
+                    ? { status: { type: "error" as const, message: t("address_invalid") } }
+                    : {})}
+                />
+                {agent && view && !view.registered ? (
+                  <VStack gap={3}>
+                    {digest ? (
+                      <VStack gap={1}>
+                        <Text type="supporting" color="secondary">
+                          {t("registerHelp")}
+                        </Text>
+                        <Text type="supporting" style={mono}>
+                          {digest}
+                        </Text>
+                      </VStack>
+                    ) : (
+                      <Text type="supporting" color="secondary">
+                        {t("no_passkey")}
+                      </Text>
+                    )}
+                    <TextInput
+                      label={t("agentSignature")}
+                      value={agentSig}
+                      onChange={(v) => setAgentSig(v.trim())}
+                      placeholder="0x…"
+                      autoComplete="off"
+                      hasSpellCheck={false}
+                    />
+                    {local ? (
+                      <TextInput
+                        type="password"
+                        label={t("agentPrivateKey")}
+                        description={t("privateKeyWarning")}
+                        value={agentKey}
+                        onChange={(v) => setAgentKey(v.trim())}
+                        autoComplete="off"
+                      />
+                    ) : null}
+                    <HStack gap={2}>
+                      <Button
+                        label={t("register")}
+                        variant="primary"
+                        isLoading={busy === "register"}
+                        isDisabled={!saved.passkey || !!busy || (!agentSig && !agentKey)}
+                        onClick={onRegister}
+                      />
+                    </HStack>
+                  </VStack>
+                ) : null}
+              </VStack>
+
+              {/* 3. Mandate */}
+              {ownedByMe ? (
+                <VStack gap={3}>
+                  <Text type="large" weight="bold">
+                    {t("mandateSection")}
+                  </Text>
+                  <TextArea
+                    label={t("payees")}
+                    description={t("payeesHelp")}
+                    value={payeesText}
+                    onChange={(v: string) => {
+                      setPayeesText(v);
+                      setWarnings(undefined);
+                    }}
+                    placeholder={"0x…\n0x…"}
+                  />
+                  <Grid columns={isMobile ? 1 : 3} gap={3}>
+                    <TextInput
+                      label={t("perTxCap")}
+                      value={perTx}
+                      onChange={setPerTx}
+                      inputMode="decimal"
+                    />
+                    <TextInput
+                      label={t("dailyCap")}
+                      value={daily}
+                      onChange={setDaily}
+                      inputMode="decimal"
+                    />
+                    <TextInput
+                      label={t("validDays")}
+                      value={days}
+                      onChange={setDays}
+                      inputMode="numeric"
+                    />
+                  </Grid>
+                  {draftError && payeesText ? (
+                    <Banner status="error" title={t(draftError)} />
+                  ) : null}
+                  {typeof draft !== "string" && draft.perTxCap > draft.dailyCap ? (
+                    <Banner status="warning" title={t("capWarning")} />
+                  ) : null}
+                  {warnings?.map((w) => (
+                    <Banner
+                      key={w.address}
+                      status="warning"
+                      title={`${w.address} ${t(w.reason)}`}
+                    />
+                  ))}
+                  <HStack gap={2}>
+                    <Button
+                      label={warnings ? t("signAnyway") : t("signMandate")}
+                      variant="primary"
+                      isLoading={busy === "setMandate"}
+                      isDisabled={!!busy || !!draftError}
+                      onClick={onSetMandate}
+                    />
+                  </HStack>
+                </VStack>
+              ) : null}
+            </VStack>
+          </StackItem>
+
+          <StackItem size="fill" style={isMobile ? summaryMobileOrder : summarySticky}>
+            {summary}
+          </StackItem>
+        </Stack>
+      </VStack>
+    </SiteShell>
   );
 }
 

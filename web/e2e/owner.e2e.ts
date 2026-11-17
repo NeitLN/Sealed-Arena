@@ -17,7 +17,7 @@ import { sealedRelayChain } from "relayer/chain";
 import { encodeFunctionData } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
-const PAGE = "http://localhost:4173/";
+const PAGE = "http://localhost:4173/console";
 
 function listen(
   fetch: (r: Request) => Response | Promise<Response>,
