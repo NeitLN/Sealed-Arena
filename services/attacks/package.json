@@ -15,6 +15,7 @@
     "arena": "tsx src/arena.ts",
     "arena-open": "tsx src/arena-open.ts",
     "compare": "tsx compare/run.ts",
+    "suite": "tsx suite/run.ts",
     "test": "vitest run"
   },
   "dependencies": {

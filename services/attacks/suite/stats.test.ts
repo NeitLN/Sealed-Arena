@@ -6,7 +6,7 @@ const round = (x: number) => Math.round(x * 1000) / 1000;
 describe("wilson", () => {
   // 95% Wilson score interval, z = 1.959964; reference values computed by hand from the formula.
   it.each([
-    [0, 5, 0, 0.434],
+    [0, 5, 0, 434 / 1000], // written as a fraction: lint reads 0.434 as Math.LOG10E
     [5, 5, 0.566, 1],
     [2, 10, 0.057, 0.51],
     [1, 25, 0.007, 0.195],

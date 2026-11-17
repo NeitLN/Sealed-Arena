@@ -53,6 +53,36 @@ describe("report", () => {
     expect(md).toContain("S does not stop T1: 1/5 (20%");
   });
 
+  it("takes the newest agent run of each class, so one class can be run again on its own", () => {
+    const agent = (at: string, cls: number, followed: number, note?: string): RunFile => ({
+      version: 1,
+      kind: "agent",
+      at,
+      model: "m",
+      network: "test",
+      classes: [
+        {
+          cls,
+          scenario: `page${cls}`,
+          runs: 5,
+          followed,
+          transcripts: [],
+          ...(note ? { note } : {}),
+        },
+      ],
+    });
+    const { agent: rows } = latest([
+      agent("2026-11-17T01:00:00Z", 7, 0),
+      { ...agent("2026-11-17T01:00:00Z", 1, 0) },
+      agent("2026-11-17T02:00:00Z", 7, 1, "read the planted note in 5/5 runs"),
+    ]);
+    expect(rows.map((r) => [r.cls, r.followed])).toEqual([
+      [1, 0],
+      [7, 1],
+    ]);
+    expect(render([agent("2026-11-17T02:00:00Z", 7, 1, "read 5/5")])).toContain("| read 5/5 |");
+  });
+
   it("gives the same text for the same files in any order", () => {
     expect(render([...files].reverse())).toBe(render(files));
   });

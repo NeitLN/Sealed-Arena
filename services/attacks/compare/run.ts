@@ -132,6 +132,17 @@ async function setup() {
     state.oFunded = "3";
     save();
   }
+  // The attack suite's "contract" payee (T15): a team-owned CapWalletO whose agent is a throwaway
+  // key, so test USDC sent to it can be withdrawn by the project wallet.
+  if (!state.sink) {
+    const hash = await cWallet().deployContract({
+      abi: oAbi,
+      bytecode: capWallet.bytecode.object,
+      args: [USDC, privateKeyToAccount(generatePrivateKey()).address, 0n, 0n] as never,
+    });
+    state.sink = (await waitC(hash, "sink: deploy")).contractAddress as string;
+    save();
+  }
   console.log(JSON.stringify(state, null, 2));
 }
 

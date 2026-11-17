@@ -37,7 +37,12 @@ export type AgentClass = {
   /** Runs in which the agent made the payment the page asked for. */
   followed: number;
   transcripts: string[];
+  /** What the transcripts show beyond the count (e.g. whether the planted note was read). */
+  note?: string;
 };
+
+/** An agent-tier class with the run it came from. */
+export type AgentRow = AgentClass & { at: string; model: string; network: string };
 
 export type AgentRun = {
   version: 1;
@@ -57,16 +62,23 @@ const ci = (k: number, n: number) => {
 };
 const usdc = (x: number) => x.toFixed(3);
 
-/** The newest wallet run for each group, and the newest agent run. */
-export function latest(files: RunFile[]): { wallet: WalletRun[]; agent?: AgentRun } {
+/** The newest wallet run for each group, and the newest agent run of each class. */
+export function latest(files: RunFile[]): { wallet: WalletRun[]; agent: AgentRow[] } {
   const byAt = [...files].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   const wallet: WalletRun[] = [];
   for (const g of ["P", "O", "S"] as Group[]) {
     const f = byAt.find((x): x is WalletRun => x.kind === "wallet" && x.group === g);
     if (f) wallet.push(f);
   }
-  const agent = byAt.find((x): x is AgentRun => x.kind === "agent");
-  return agent ? { wallet, agent } : { wallet };
+  // A class can be run again on its own: keep the newest run of each.
+  const agent: AgentRow[] = [];
+  for (const f of byAt)
+    if (f.kind === "agent")
+      for (const c of f.classes)
+        if (!agent.some((a) => a.cls === c.cls))
+          agent.push({ ...c, at: f.at, model: f.model, network: f.network });
+  agent.sort((a, b) => a.cls - b.cls);
+  return { wallet, agent };
 }
 
 const GROUP_NAME: Record<Group, string> = {
@@ -141,16 +153,16 @@ export function render(files: RunFile[]): string {
     }
   }
 
-  if (agent) {
+  if (agent.length) {
     line("## Agent tier");
     line();
-    line(`Model \`${agent.model}\`, run ${agent.at} on ${agent.network}.`);
+    line(`Network: ${agent[0]?.network ?? ""}.`);
     line();
-    line("| Class | Page | Runs | Agent made the payment the page asked for |");
-    line("| --- | --- | --- | --- |");
-    for (const c of [...agent.classes].sort((a, b) => a.cls - b.cls))
+    line("| Class | Page | Model | Run | Agent made the payment the page asked for | Note |");
+    line("| --- | --- | --- | --- | --- | --- |");
+    for (const c of agent)
       line(
-        `| ${c.cls}. ${CLASSES[c.cls] ?? ""} | \`${c.scenario}\` | ${c.runs} | ${ci(c.followed, c.runs)} |`,
+        `| ${c.cls}. ${CLASSES[c.cls] ?? ""} | \`${c.scenario}\` | \`${c.model}\` | ${c.at} | ${ci(c.followed, c.runs)} | ${c.note ?? ""} |`,
       );
     line();
   }
