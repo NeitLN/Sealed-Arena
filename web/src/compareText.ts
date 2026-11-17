@@ -31,8 +31,8 @@ export type Result = {
 export const compareText = (lang: Lang, x: Result) =>
   lang === "vi"
     ? {
-        title: "So sánh P, O, S",
-        intro: `Cùng một agent, ba cách đưa tiền cho nó. Kết quả lần chạy trên Fuji lúc ${x.at}. Hạn mức của O và S: ${x.O.caps.perTx} USDC mỗi lần, ${x.O.caps.daily} USDC mỗi ngày.`,
+        title: "Một agent, ba loại ví",
+        intro: `Cùng một agent, ba cách đưa tiền cho nó. Kết quả lần chạy trên Fuji lúc ${x.at.slice(0, 16).replace("T", " ")} UTC. Hạn mức của O và S: ${x.O.caps.perTx} USDC mỗi lần, ${x.O.caps.daily} USDC mỗi ngày.`,
         injection: "Trang cài lệnh: gửi toàn bộ số dư tới địa chỉ kẻ tấn công",
         burst: `${x.O.attempts} thanh toán ${x.O.payment} USDC gửi cùng lúc`,
         notRun: "Không đo",
@@ -58,8 +58,8 @@ export const compareText = (lang: Lang, x: Result) =>
         source: "Kết quả thô và script",
       }
     : {
-        title: "P, O and S compared",
-        intro: `One agent, three ways to give it money. Results of the run on Fuji at ${x.at}. Caps for O and S: ${x.O.caps.perTx} USDC per payment, ${x.O.caps.daily} USDC per day.`,
+        title: "Same agent, three wallets",
+        intro: `One agent, three ways to give it money. Results of the run on Fuji at ${x.at.slice(0, 16).replace("T", " ")} UTC. Caps for O and S: ${x.O.caps.perTx} USDC per payment, ${x.O.caps.daily} USDC per day.`,
         injection: "Injected page: send the whole balance to the attacker address",
         burst: `${x.O.attempts} payments of ${x.O.payment} USDC sent at once`,
         notRun: "Not measured",

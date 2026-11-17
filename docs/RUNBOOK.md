@@ -83,7 +83,7 @@ pnpm --filter web e2e              # build trang, tự bật relayer, Chromium v
 ## 7. L1 Sealed trên Fuji
 Mã định danh, địa chỉ hợp đồng và giao dịch: `services/fuji-ops/deployments/fuji.json`. Khoá chỉ nằm trong `.env` (không push) và trên máy chạy node.
 
-**Dùng:** RPC `https://sealed-arena.duckdns.org/rpc` (chain id 261126), trang chủ ví `https://sealed-arena.vercel.app`.
+**Dùng:** RPC `https://sealed-arena.duckdns.org/rpc` (chain id 261126), trang chào `https://sealed-arena.vercel.app`, trang chủ ví `https://sealed-arena.vercel.app/console`.
 
 **Dựng lại từ đầu** (tiêu AVAX trên Fuji; đổi L1 không đảo ngược):
 ```bash

@@ -56,6 +56,16 @@ const en = {
   done: "Done on chain",
   failed: "Refused",
   rulesLink: "Read the rules",
+  address: "Address",
+  privateKey: "Private key",
+  spentToday: "Spent today",
+  survival: "Survival",
+  survivalUnit: "USDC·hours",
+  survivalHelp:
+    "Coins kept inside the mandate multiplied by the time they stayed there (coin·seconds on chain, shown here in hours). A breach sets it to zero for good.",
+  emptyHint: "Copy the key above and send a payment outside the mandate.",
+  liveDown: "Live data is unavailable right now; showing the last values.",
+  onChainCheck: "On-chain check",
   // rules page
   rulesTitle: "Challenge rules",
   scopeTitle: "Scope",
@@ -141,6 +151,16 @@ const vi: Text = {
   done: "Đã ghi lên chain",
   failed: "Bị từ chối",
   rulesLink: "Đọc luật",
+  address: "Địa chỉ",
+  privateKey: "Private key",
+  spentToday: "Đã chi hôm nay",
+  survival: "Sống sót",
+  survivalUnit: "USDC·giờ",
+  survivalHelp:
+    "Số coin giữ được trong uỷ quyền nhân với thời gian giữ (coin·giây trên chain, ở đây đổi ra giờ). Vi phạm đưa về 0 vĩnh viễn.",
+  emptyHint: "Copy khoá ở trên và gửi một khoản ra ngoài uỷ quyền.",
+  liveDown: "Hiện chưa lấy được dữ liệu trực tiếp; đang hiện giá trị gần nhất.",
+  onChainCheck: "Kiểm trên chain",
   rulesTitle: "Luật thử thách",
   scopeTitle: "Phạm vi",
   scope:

@@ -1,79 +1,113 @@
-import { Banner } from "@astryxdesign/core/Banner";
-import { Center } from "@astryxdesign/core/Center";
-import { useMediaQuery } from "@astryxdesign/core/hooks";
-import { Layout, LayoutContent, VStack } from "@astryxdesign/core/Layout";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { Code } from "@astryxdesign/core/Code";
+import { Grid } from "@astryxdesign/core/Grid";
+import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
-import { Section } from "@astryxdesign/core/Section";
-import { Text } from "@astryxdesign/core/Text";
+import { Heading, Text } from "@astryxdesign/core/Text";
 import type { ReactNode } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
 import { useI18n } from "./i18n.js";
-import { SiteHeader } from "./SiteHeader.js";
-
-const mono = { fontFamily: "var(--font-family-code, monospace)" };
+import { SiteShell } from "./SiteShell.js";
 
 function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
     <VStack gap={2}>
-      <Text type="large" weight="bold">
-        {title}
-      </Text>
+      <Heading level={2}>{title}</Heading>
       {children}
     </VStack>
   );
 }
 
+/** A tier line ("T0, breach: …") with a badge saying how it counts. */
+function Tier(o: { text: string; variant: "error" | "neutral" | "warning"; badge: string }) {
+  const [head, ...rest] = o.text.split(": ");
+  return (
+    <Card>
+      <VStack gap={2}>
+        <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap">
+          <Text weight="bold">{head}</Text>
+          <Badge variant={o.variant} label={o.badge} />
+        </HStack>
+        <Text type="body" color="secondary">
+          {rest.join(": ")}
+        </Text>
+      </VStack>
+    </Card>
+  );
+}
+
 export default function RulesPage() {
-  const isMobile = useMediaQuery("(max-width: 767px)");
   const { lang, setLang } = useI18n();
   const t = arenaText(lang);
+  const vi = lang === "vi";
   return (
-    <Layout
-      height="fill"
-      content={
-        <LayoutContent padding={0}>
-          <Center axis="horizontal">
-            <Section variant="transparent" maxWidth={820} width="100%" padding={isMobile ? 4 : 6}>
-              <VStack gap={6}>
-                <Banner status="warning" title={t.testnet} />
-                <SiteHeader title={t.rulesTitle} lang={lang} setLang={setLang} current="rules" />
-                <Block title={t.scopeTitle}>
-                  <Text type="body">{t.scope}</Text>
-                </Block>
-                <Block title={t.freeTitle}>
-                  <Text type="body">{t.free}</Text>
-                </Block>
-                <Block title={t.breachTitle}>
-                  <Text type="body">{t.t0}</Text>
-                  <Text type="body">{t.t1}</Text>
-                  <Text type="body">{t.t2}</Text>
-                </Block>
-                <Block title={t.validatorsTitle}>
-                  <Text type="body">{t.validators}</Text>
-                  {ARENA.validators.map((v) => (
-                    <Text key={v} type="supporting" style={mono}>
-                      {v}
-                    </Text>
-                  ))}
-                  <Link href={ARENA.source}>{ARENA.source}</Link>
-                  <Link href={ARENA.deployments}>deployments/fuji.json</Link>
-                </Block>
-                <Block title={t.limitsTitle}>
-                  {t.limits.map((l, i) => (
-                    <Text key={l} type="body">
-                      {i + 1}. {l}
-                    </Text>
-                  ))}
-                </Block>
-                <Block title={t.reportTitle}>
-                  <Text type="body">{t.report}</Text>
-                </Block>
-              </VStack>
-            </Section>
-          </Center>
-        </LayoutContent>
-      }
-    />
+    <SiteShell lang={lang} setLang={setLang} current="rules" maxWidth={860}>
+      <VStack gap={6}>
+        <VStack gap={3}>
+          <Heading level={1} type="display-2">
+            {t.rulesTitle}
+          </Heading>
+          <HStack>
+            <Button label={t.navArena} variant="primary" href="/arena" />
+          </HStack>
+        </VStack>
+        <Grid columns={{ minWidth: 280, max: 2 }} gap={4}>
+          <Card>
+            <Block title={t.scopeTitle}>
+              <Text type="body" color="secondary">
+                {t.scope}
+              </Text>
+            </Block>
+          </Card>
+          <Card>
+            <Block title={t.freeTitle}>
+              <Text type="body" color="secondary">
+                {t.free}
+              </Text>
+            </Block>
+          </Card>
+        </Grid>
+        <Block title={t.breachTitle}>
+          <VStack gap={3}>
+            <Tier
+              text={t.t0}
+              variant="error"
+              badge={vi ? "Tính là vi phạm" : "Counts as a breach"}
+            />
+            <Tier text={t.t1} variant="neutral" badge={vi ? "Ngoài phạm vi" : "Out of scope"} />
+            <Tier text={t.t2} variant="warning" badge={vi ? "Được phép" : "Allowed"} />
+          </VStack>
+        </Block>
+        <Block title={t.validatorsTitle}>
+          <Text type="body" color="secondary">
+            {t.validators}
+          </Text>
+          {ARENA.validators.map((v) => (
+            <Code key={v}>{v}</Code>
+          ))}
+          <HStack gap={4} wrap="wrap">
+            <Link href={ARENA.source}>GitHub</Link>
+            <Link href={ARENA.deployments}>deployments/fuji.json</Link>
+          </HStack>
+        </Block>
+        <Block title={t.limitsTitle}>
+          <VStack gap={2}>
+            {t.limits.map((l, i) => (
+              <Text key={l} type="body" color="secondary">
+                {i + 1}. {l}
+              </Text>
+            ))}
+          </VStack>
+        </Block>
+        <Card variant="blue">
+          <Block title={t.reportTitle}>
+            <Text type="body">{t.report}</Text>
+          </Block>
+        </Card>
+      </VStack>
+    </SiteShell>
   );
 }

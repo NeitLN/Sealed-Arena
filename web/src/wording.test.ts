@@ -3,6 +3,7 @@ import { arenaText } from "./arenaText.js";
 import result from "./compare-result.json";
 import { compareText, type Result } from "./compareText.js";
 import { KEYS, useI18n } from "./i18n.js";
+import { landingText } from "./landingText.js";
 
 /** The project's "never say" list, in both languages (claims we must not make). */
 const FORBIDDEN = [
@@ -42,6 +43,23 @@ describe("page wording", () => {
   it.each(["en", "vi"] as const)("comparison page (%s) contains no forbidden claim", (lang) => {
     for (const s of allText(compareText(lang, result as unknown as Result)))
       for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
+  });
+
+  it.each(["en", "vi"] as const)("landing page (%s) contains no forbidden claim", (lang) => {
+    for (const s of allText(landingText(lang)))
+      for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
+  });
+
+  it("landing page says the plain-wallet loss is a hand-written transcript and the refusal count is off-chain", () => {
+    expect(landingText("en").plainResult).toMatch(/hand-written/);
+    expect(landingText("vi").plainResult).toMatch(/dựng tay/);
+    expect(landingText("en").refused).toMatch(/off-chain/);
+    expect(landingText("vi").refused).toMatch(/ngoài chain/);
+  });
+
+  it("landing page numbers come from the comparison results, not the text", () => {
+    for (const lang of ["en", "vi"] as const)
+      expect(landingText(lang).limitResult).toMatch(/\{passed\}.*\{attempts\}.*\{reverted\}/);
   });
 
   it("says the P column is a hand-written transcript, in both languages", () => {
