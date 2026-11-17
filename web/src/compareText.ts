@@ -50,7 +50,7 @@ export const compareText = (lang: Lang, x: Result) =>
           : "Node nhận giao dịch.",
         sBurst: `${x.S.settledOnChain} vào block; ${x.S.leftOutOfBlocks} chưa vào block (còn chờ trong pool); ${x.S.refusedByPool} bị pool từ chối. Đã chi ${x.S.spent} USDC.`,
         notes: [
-          "Cột P chạy lại một bản ghi dựng tay: trong 16 lượt chạy thật, model không lượt nào làm theo lệnh cài (services/agent/README.md).",
+          "Cột P chạy lại một bản ghi dựng tay (gửi hết số dư cho kẻ tấn công). Với model thật, agent không làm theo trang cài lệnh lượt nào (0/30), nhưng làm theo một ghi chú cài vào bộ nhớ 5/5 lượt khi chủ ví bảo đọc ghi chú; với S, node từ chối cả 15 khoản trả đó (docs/EVALUATION.md).",
           "Cả O và S đều không vượt hạn mức ngày. Khác biệt ở chỗ bị từ chối: với O, các khoản hỏng vẫn vào block sau khi đã qua bước kiểm của facilitator; với S, khoản bị từ chối không vào block nào.",
           "Giao dịch của S đang chờ trong pool có thể vào block ở ngày sau, trong hạn mức của ngày đó, cho tới khi uỷ quyền hết hạn.",
         ],
@@ -78,7 +78,7 @@ export const compareText = (lang: Lang, x: Result) =>
           : "Accepted by the node.",
         sBurst: `${x.S.settledOnChain} in blocks; ${x.S.leftOutOfBlocks} not in a block (still waiting in the pool); ${x.S.refusedByPool} refused by the pool. Spent ${x.S.spent} USDC.`,
         notes: [
-          "Column P replays a hand-written transcript: in 16 live runs the model never followed the injected instruction (services/agent/README.md).",
+          "Column P replays a hand-written transcript (the whole balance to the attacker). With a live model the agent never followed an injected page (0/30 runs), but it followed a note planted in its memory in 5/5 runs when its owner asked it to read its notes; on S the node refused all fifteen of those payments (docs/EVALUATION.md).",
           "Neither O nor S went over the daily cap. The difference is where refusals happen: O's failed payments still land in blocks after passing the facilitator's check; S's refused payments never enter a block.",
           "Payments S left waiting in the pool can go into a block on a later day, within that day's cap, until the mandate expires.",
         ],

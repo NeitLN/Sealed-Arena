@@ -6,7 +6,8 @@
 #   3. leaked-key attack suite (services/attacks)
 #   4. x402 signed-native-tx end to end (services/attacks/src/x402.ts)
 #   5. buying agent, replayed from recorded transcripts without an LLM: one live run that ignored the
-#      injected instruction, and the scripted run that obeys it (services/agent/transcripts)
+#      injected instruction, the scripted run that obeys it, and a live run that followed a planted
+#      memory note (services/agent/transcripts)
 #   6. ArenaRecorder: deploy, fund a fresh agent through it, leaked-key suite on it, checkpoint (services/attacks/src/arena.ts)
 #   7. owner console in Chromium with a virtual passkey (web/e2e/owner.e2e.ts)
 #   8. RPC gateway: forbidden payment recorded with its reason (services/rpc-gateway)
@@ -24,7 +25,7 @@ STEPS=(
   "seed|bash scripts/localnet.sh seed"
   "leaked-key|pnpm --filter attacks run --silent leaked-key"
   "x402|pnpm --filter attacks run --silent x402"
-  "agent-replay|pnpm --filter agent run --silent scenario --replay transcripts/injection-strong-2026-11-16T22-54-40-264Z.json && pnpm --filter agent run --silent scenario --replay transcripts/scripted-obeys-injection.json"
+  "agent-replay|pnpm --filter agent run --silent scenario --replay transcripts/injection-strong-2026-11-16T22-54-40-264Z.json && pnpm --filter agent run --silent scenario --replay transcripts/scripted-obeys-injection.json && pnpm --filter agent run --silent scenario --replay transcripts/poisoned-memory-2026-11-17T10-54-11-564Z.json"
   "arena|bash scripts/forge.sh build >/dev/null && pnpm --filter attacks run --silent arena"
   "owner-web|pnpm --filter web run --silent e2e"
   "gateway|pnpm --filter rpc-gateway run --silent localnet-check"
