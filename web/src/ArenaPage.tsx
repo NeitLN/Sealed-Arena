@@ -177,7 +177,7 @@ export default function ArenaPage() {
               variant={view.frozen ? "warning" : "success"}
               marks={[{ value: asNumber(view.mandate.perTxCap), label: t.perTx }]}
               hasValueLabel
-              formatValueLabel={(v, m) => `${t.spentToday}: ${v} / ${m} USDC`}
+              formatValueLabel={(v, m) => `${v} / ${m} USDC`}
             />
             <MetadataList>
               <MetadataListItem
@@ -296,15 +296,20 @@ export default function ArenaPage() {
                   />
                 ),
               },
-              {
-                key: "reason",
-                header: t.reason,
-                renderCell: (a) => (
-                  <Text type="supporting" color="secondary">
-                    {a.reason || "-"}
-                  </Text>
-                ),
-              },
+              // On a phone the reasons are already shown as tokens above the table.
+              ...(isMobile
+                ? []
+                : [
+                    {
+                      key: "reason",
+                      header: t.reason,
+                      renderCell: (a: Row) => (
+                        <Text type="supporting" color="secondary">
+                          {a.reason || "-"}
+                        </Text>
+                      ),
+                    },
+                  ]),
             ]}
           />
         )}

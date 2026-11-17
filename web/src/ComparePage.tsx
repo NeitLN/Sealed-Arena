@@ -163,7 +163,7 @@ export default function ComparePage() {
                 <TableCell>
                   <Verdict
                     variant="success"
-                    badge={`${r.S.attempts - r.S.settledOnChain}/${r.S.attempts} ${vi ? "không vào block" : "never in a block"}`}
+                    badge={`${r.S.attempts - r.S.settledOnChain}/${r.S.attempts} ${vi ? "chưa vào block" : "not in a block"}`}
                     line={t.sBurst}
                   />
                 </TableCell>
@@ -191,7 +191,7 @@ export default function ComparePage() {
           >
             <Dots
               txs={r.S.txs}
-              label={`${r.S.settledOnChain} ${vi ? "vào block" : "in blocks"} · ${r.S.attempts - r.S.settledOnChain} ${vi ? "không vào block" : "never in a block"}`}
+              label={`${r.S.settledOnChain} ${vi ? "vào block" : "in blocks"} · ${r.S.attempts - r.S.settledOnChain} ${vi ? "chưa vào block" : "not in a block"}`}
             />
             <TxList txs={r.S.txs} title={t.txs} />
           </Wallet>

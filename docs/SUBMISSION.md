@@ -17,7 +17,7 @@ Before pressing Submit (deadline 23:59, Saturday 21/11/2026, Vietnam time). Run 
 ## By hand, in a private browser window
 
 - [ ] Repository page opens: https://github.com/NeitLN/Sealed-Arena (public).
-- [ ] Owner console, challenge, rules and comparison pages open: https://sealed-arena.vercel.app, `/arena`, `/arena/rules`, `/compare`.
+- [ ] Overview, owner console, challenge, rules and comparison pages open: https://sealed-arena.vercel.app, `/console`, `/arena`, `/arena/rules`, `/compare`.
 - [ ] The Snowtrace links in `README.md` open (Snowtrace refuses scripted requests, so these are checked here).
 - [ ] The slide deck and the demo video links open without signing in.
 - [ ] The Fuji validator has balance left for the final (30/11): `platform l1` shows its remaining balance; top it up if it would run out before then.

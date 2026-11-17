@@ -112,7 +112,8 @@ With a live model, the buying agent ignored the injected pages (0/5 for each of 
 ## Try it on Fuji (testnet)
 
 - RPC: `https://sealed-arena.duckdns.org/rpc` (chain id `261126`, native coin: USDC bridged from Fuji with ICTT)
-- Owner console: https://sealed-arena.vercel.app
+- Overview with live numbers: https://sealed-arena.vercel.app
+- Owner console (passkey): https://sealed-arena.vercel.app/console
 - Open red-team challenge: https://sealed-arena.vercel.app/arena (rules: [/arena/rules](https://sealed-arena.vercel.app/arena/rules))
 - Comparison of P, O and S: https://sealed-arena.vercel.app/compare
 - Every address and transaction: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
