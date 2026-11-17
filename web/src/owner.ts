@@ -29,8 +29,9 @@ export async function relayerInfo(): Promise<RelayerInfo> {
 }
 
 /**
- * `live`: for pages that poll. Calls made together go in one batch request, and a failed request
- * is not retried (a rate-limited page waits for its next poll instead of sending more).
+ * `live`: for pages that poll. Calls made together go in one batch request (at most 20, the
+ * gateway's batch limit), and a failed request is not retried (a rate-limited page waits for its
+ * next poll instead of sending more).
  */
 export function chainClient(rpc: string, o: { live?: boolean } = {}): PublicClient {
   const chain = defineChain({
@@ -39,7 +40,7 @@ export function chainClient(rpc: string, o: { live?: boolean } = {}): PublicClie
     nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
     rpcUrls: { default: { http: [rpc] } },
   });
-  const transport = o.live ? http(rpc, { batch: true, retryCount: 0 }) : http(rpc);
+  const transport = o.live ? http(rpc, { batch: { batchSize: 20 }, retryCount: 0 }) : http(rpc);
   return createPublicClient({ chain, transport }) as PublicClient;
 }
 
