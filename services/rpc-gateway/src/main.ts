@@ -18,6 +18,7 @@ const app = createGatewayApp({
   store,
   ipSalt: salt,
   trustProxy: process.env.GATEWAY_TRUST_PROXY === "1",
+  ...(process.env.GATEWAY_PER_MINUTE ? { perMinute: Number(process.env.GATEWAY_PER_MINUTE) } : {}),
   ...(origins?.length ? { origins } : {}),
   upstream: async (req) => {
     const res = await fetch(rpc, {

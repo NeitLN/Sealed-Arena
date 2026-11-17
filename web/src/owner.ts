@@ -28,14 +28,19 @@ export async function relayerInfo(): Promise<RelayerInfo> {
   return (await res.json()) as RelayerInfo;
 }
 
-export function chainClient(rpc: string): PublicClient {
+/**
+ * `live`: for pages that poll. Calls made together go in one batch request, and a failed request
+ * is not retried (a rate-limited page waits for its next poll instead of sending more).
+ */
+export function chainClient(rpc: string, o: { live?: boolean } = {}): PublicClient {
   const chain = defineChain({
     id: CHAIN_ID,
     name: "Sealed",
     nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
     rpcUrls: { default: { http: [rpc] } },
   });
-  return createPublicClient({ chain, transport: http(rpc) }) as PublicClient;
+  const transport = o.live ? http(rpc, { batch: true, retryCount: 0 }) : http(rpc);
+  return createPublicClient({ chain, transport }) as PublicClient;
 }
 
 export const isLocalRpc = (rpc: string) =>

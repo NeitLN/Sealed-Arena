@@ -206,7 +206,7 @@ Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. R
 - Giới hạn tốc độ theo IP.
 - API đọc: `GET /attempts/summary` trả tổng lượt thử, số bị từ chối theo lý do, số người gửi phân biệt (theo hash của IP).
 
-Đã triển khai ở T11 (`services/rpc-gateway`): batch tối đa 20 yêu cầu, `eth_getLogs` tối đa 2048 block, 120 yêu cầu/phút và 20 `eth_sendRawTransaction`/phút cho mỗi khách; lượt thử lưu bằng `node:sqlite`; IP chỉ lưu dưới dạng HMAC-SHA256 có muối bí mật (`GATEWAY_IP_SALT`). `GET /attempts/recent` trả các lượt gần nhất (không có hash IP); cả hai API đọc nhận `?from=<địa chỉ>` để lọc theo agent.
+Đã triển khai ở T11 (`services/rpc-gateway`): batch tối đa 20 yêu cầu, `eth_getLogs` tối đa 2048 block, 600 lệnh/phút (mỗi lệnh trong batch tính một; đổi bằng `GATEWAY_PER_MINUTE`) và 20 `eth_sendRawTransaction`/phút cho mỗi khách. Trang web đọc chain mỗi 15 giây trong một batch, `/attempts` mỗi 5 giây, chờ lâu dần khi lỗi và ngừng khi tab bị ẩn (`web/src/poll.ts`): người cùng một sự kiện dùng chung IP; lượt thử lưu bằng `node:sqlite`; IP chỉ lưu dưới dạng HMAC-SHA256 có muối bí mật (`GATEWAY_IP_SALT`). `GET /attempts/recent` trả các lượt gần nhất (không có hash IP); cả hai API đọc nhận `?from=<địa chỉ>` để lọc theo agent.
 
 Trang `/arena` và `/arena/rules` (web). Người chơi không có trong TxAllowList, nên `checkpoint` và `reportBreach` của ArenaRecorder đi qua relayer (`POST /relayer/arena`, relayer tự dựng calldata); trên chain người gọi là relayer. Agent thử thách được đăng ký dưới một khoá chủ ví P-256 bí mật (không dùng khoá thử công khai), uỷ quyền tới hai người nhận do đội giữ khoá.
 
