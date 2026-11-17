@@ -24,15 +24,15 @@ The latest run is in `results/` and is shown on the `/compare` page (`web/src/co
 
 Run of 17/11/2026 (`results/fuji-2026-11-17T06-00-03-128Z.json`):
 
-|                   | P                | O                                                                | S                                                                               |
-| ----------------- | ---------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Injected transfer | lost 1 of 1 USDC | not measured                                                     | refused by the node (`agent: payee not allowed`)                                |
-| 20 × 0.4 at once  | not measured     | 20/20 passed verify; 2 settled, 18 reverted in blocks; spent 0.8 | 2 in blocks, 16 left out by the block builder, 2 refused by the pool; spent 0.8 |
+|                   | P                | O                                                                | S                                                                                            |
+| ----------------- | ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Injected transfer | lost 1 of 1 USDC | not measured                                                     | refused by the node (`agent: payee not allowed`)                                             |
+| 20 × 0.4 at once  | not measured     | 20/20 passed verify; 2 settled, 18 reverted in blocks; spent 0.8 | 2 in blocks, 16 not in a block (still waiting in the pool), 2 refused by the pool; spent 0.8 |
 
 **Neither O nor S went over the daily cap.** The expectation that O would overspend under concurrent payments did not hold: every `transferWithAuthorization` runs `isValidSignature` again when it executes, against the balance left by the ones before it. What differs is where a refusal happens:
 
 - O: all twenty passed the facilitator's check before any was settled, and eighteen failed only after they were in a block. A facilitator that hands over the resource after verify and before settle would give away eighteen resources, and someone pays gas for the reverted transactions.
-- S: refused payments never enter a block. The pool can hold more payments than the budget allows (it checks each against the current state); the block builder leaves out the ones the rule refuses. Payments left waiting can go into a block on a later day, within that day's cap, until the mandate expires.
+- S: refused payments never enter a block. The pool can hold more payments than the budget allows (it checks each against the current state); the block builder skips the ones the rule refuses, and they stay waiting in the pool. Payments left waiting can go into a block on a later day, within that day's cap, until the mandate expires.
 
 ## Running
 
