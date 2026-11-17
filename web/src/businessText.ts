@@ -20,7 +20,7 @@ const en = {
     ],
     [
       "Developers",
-      "A standard EVM RPC (chain id 261126) with USDC bridged from the Fuji C-Chain as the native coin. Register an agent, set its mandate with a passkey, pay with x402.",
+      "A standard EVM RPC (chain id 261126) with USDC bridged from the Fuji C-Chain as the native coin. The team adds the agent's address to the allow-list; then the owner registers it, sets its mandate with a passkey, and it pays with x402.",
     ],
   ],
   useTitle: "Use cases we expect (not tested with customers)",
@@ -58,7 +58,10 @@ const en = {
   ],
   checkTitle: "Check it yourself",
   check: [
-    ["The node change", "Two patch files: 1,912 lines of code and 1,295 lines of tests."],
+    [
+      "The node change",
+      "Two patch files: 1,912 non-blank lines of code and 1,295 non-blank lines of tests.",
+    ],
     ["Every address", "deployments/fuji.json lists every contract and account on Fuji."],
     ["The evaluation", "Generated from the raw result files, with every case and its limits."],
     ["The limits", "Written down in the README, next to the results."],
@@ -86,7 +89,7 @@ const vi: BusinessText = {
     ],
     [
       "Lập trình viên",
-      "RPC EVM chuẩn (chain id 261126), coin gốc là USDC chuyển từ Fuji C-Chain qua cầu nối. Đăng ký agent, đặt uỷ quyền bằng passkey, trả tiền bằng x402.",
+      "RPC EVM chuẩn (chain id 261126), coin gốc là USDC chuyển từ Fuji C-Chain qua cầu nối. Đội thêm địa chỉ agent vào danh sách được phép gửi; sau đó chủ đăng ký agent, đặt uỷ quyền bằng passkey, và agent trả tiền bằng x402.",
     ],
   ],
   useTitle: "Tình huống dùng dự kiến (chưa thử với khách hàng)",
@@ -124,7 +127,10 @@ const vi: BusinessText = {
   ],
   checkTitle: "Tự kiểm",
   check: [
-    ["Thay đổi trong node", "Hai file bản vá: 1.912 dòng code và 1.295 dòng test."],
+    [
+      "Thay đổi trong node",
+      "Hai file bản vá: 1.912 dòng code và 1.295 dòng test (không tính dòng trống).",
+    ],
     ["Mọi địa chỉ", "deployments/fuji.json ghi mọi contract và tài khoản trên Fuji."],
     ["Kết quả đánh giá", "Sinh từ các file kết quả gốc, có từng ca và giới hạn."],
     ["Giới hạn", "Ghi trong README, ngay cạnh kết quả."],
