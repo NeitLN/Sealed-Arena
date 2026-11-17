@@ -4,7 +4,7 @@
 import { CLASSES, MANDATE, type Outcome } from "./cases.js";
 import { wilson } from "./stats.js";
 
-export type Group = "P" | "O" | "S";
+export type Group = "P" | "O" | "O+" | "S";
 
 export type CaseRecord = {
   cls: number;
@@ -72,7 +72,7 @@ const usdc = (x: number) => x.toFixed(3);
 export function latest(files: RunFile[]): { wallet: WalletRun[]; agent: AgentRow[] } {
   const byAt = [...files].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   const wallet: WalletRun[] = [];
-  for (const g of ["P", "O", "S"] as Group[]) {
+  for (const g of ["P", "O", "O+", "S"] as Group[]) {
     const f = byAt.find((x): x is WalletRun => x.kind === "wallet" && x.group === g);
     if (f) wallet.push(f);
   }
@@ -92,7 +92,8 @@ export function latest(files: RunFile[]): { wallet: WalletRun[]; agent: AgentRow
 
 const GROUP_NAME: Record<Group, string> = {
   P: "P: plain wallet",
-  O: "O: spending-limit contract wallet (built by the team)",
+  O: "O: spending-limit contract wallet, caps only (built by the team)",
+  "O+": "O+: the same wallet with a payee list (built by the team)",
   S: "S: Sealed Arena",
 };
 

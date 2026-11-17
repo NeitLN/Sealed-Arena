@@ -95,9 +95,15 @@ contract CapWalletO {
         if (digest != hash) return INVALID;
         if (_recover(hash, sig) != agent) return INVALID;
         if (day != block.timestamp / 1 days) return INVALID;
+        if (!_payeeAllowed(to)) return INVALID;
         if (value > perTxCap) return INVALID;
         if (spentToday() + value > dailyCap) return INVALID;
         return MAGIC;
+    }
+
+    /// O has no payee list; O+ (CapWalletOPlus) overrides this with one.
+    function _payeeAllowed(address) internal view virtual returns (bool) {
+        return true;
     }
 
     function _recover(bytes32 h, bytes memory sig) internal pure returns (address) {

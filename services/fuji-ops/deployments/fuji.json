@@ -69,7 +69,8 @@
     "capWallet": "0x1ea8b7dba85254fbc387bc5abb90e7dca282642a",
     "oFunded": "3",
     "sink": "0x851b1924b0af889d7e4956ce5c9fa33ffda70ece",
-    "suiteO": "0xbb1fe13f1d5c93adfc1e1275f691afa3380f9e81"
+    "suiteO": "0xbb1fe13f1d5c93adfc1e1275f691afa3380f9e81",
+    "suiteOPlus": "0x7bf677ac0301bf65a2a4a30e59ea59b6387d7489"
   },
   "demoManager": {
     "address": "0x225e93A231eD527B6C898197d10B8922A0f46668",
