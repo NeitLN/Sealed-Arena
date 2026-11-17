@@ -37,6 +37,10 @@ export type RelayerOptions = {
   publicRpc?: string;
   /** ArenaRecorder address: enables POST /arena (checkpoint, reportBreach) for the open challenge. */
   arenaRecorder?: Address;
+  /** Minimum time between two sends of the same arena action for the same agent (default 60 s). */
+  arenaCooldownMs?: number;
+  /** Clock, for tests. */
+  now?: () => number;
   /** Allowed browser origins (CORS). Default: any. */
   origins?: string[];
 };
@@ -59,6 +63,10 @@ export function revertReason(e: unknown): string {
  */
 export function createRelayerApp(o: RelayerOptions) {
   const perMinute = o.perMinute ?? 10;
+  const cooldown = o.arenaCooldownMs ?? 60_000;
+  const clock = o.now ?? Date.now;
+  /** Last send per `${action}:${agent}`. */
+  const lastSent = new Map<string, number>();
   const hits = new Map<string, number[]>();
   const app = new Hono();
 
@@ -157,10 +165,24 @@ export function createRelayerApp(o: RelayerOptions) {
     ) {
       return c.json({ ok: false, error: "bad_request" }, 400);
     }
+    // Each send costs the relayer gas, and many clients could ask for the same agent: send one
+    // action per agent at most once per cooldown, whoever asks.
+    const key = `${action}:${agent.toLowerCase()}`;
+    const last = lastSent.get(key);
+    if (last !== undefined && clock() - last < cooldown)
+      return c.json(
+        { ok: false, error: "cooldown", retryAfterMs: cooldown - (clock() - last) },
+        429,
+      );
+    // Taken before any await, so two requests arriving together cannot both send.
+    const mark = clock();
+    lastSent.set(key, mark);
     const data = encodeFunctionData({ abi: arenaRecorderAbi, functionName: action, args: [agent] });
     try {
       await o.chain.simulate(data, o.arenaRecorder);
     } catch (e) {
+      // Nothing was sent: an action the chain refuses does not hold the next one back.
+      if (lastSent.get(key) === mark) lastSent.delete(key);
       return c.json({ ok: false, error: "reverted", reason: revertReason(e) }, 422);
     }
     try {

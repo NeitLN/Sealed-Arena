@@ -106,11 +106,12 @@ export function createGatewayApp(o: GatewayOptions) {
     }
     return createHmac("sha256", o.ipSalt).update(ip).digest("hex").slice(0, 16);
   };
-  const allow = (m: Map<string, number[]>, key: string, limit: number) => {
+  /** Sliding one-minute window; `cost` calls are taken at once (a batch counts every call). */
+  const allow = (m: Map<string, number[]>, key: string, limit: number, cost = 1) => {
     const now = Date.now();
     const recent = (m.get(key) ?? []).filter((t) => now - t < 60_000);
-    if (recent.length >= limit) return false;
-    recent.push(now);
+    if (recent.length + cost > limit) return false;
+    for (let i = 0; i < cost; i++) recent.push(now);
     m.set(key, recent);
     return true;
   };
@@ -166,11 +167,14 @@ export function createGatewayApp(o: GatewayOptions) {
 
   app.post("/", async (c) => {
     const ipHash = ipHashOf(c);
-    if (!allow(hits, ipHash, perMinute)) return c.json(rpcError(null, -32005, "rate limited"), 429);
     const body = (await c.req.json().catch(() => undefined)) as
       | RpcRequest
       | RpcRequest[]
       | undefined;
+    // Every call costs one, so a batch of 20 is not cheaper than 20 requests (body size is capped).
+    const cost = Array.isArray(body) ? Math.max(1, Math.min(body.length, MAX_BATCH)) : 1;
+    if (!allow(hits, ipHash, perMinute, cost))
+      return c.json(rpcError(null, -32005, "rate limited"), 429);
     if (!body) return c.json(rpcError(null, -32700, "parse error"), 400);
     if (Array.isArray(body)) {
       if (body.length === 0 || body.length > MAX_BATCH)

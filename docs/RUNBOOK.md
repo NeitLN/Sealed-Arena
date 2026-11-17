@@ -108,7 +108,7 @@ pnpm --filter rpc-gateway localnet-check        # trên mạng local: giao dịc
 ```
 - Trên Fuji: Caddy chuyển `POST /rpc` vào cổng, mở `GET /attempts/summary` và `/attempts/recent`.
 - Mở thử thách (chạy lại được): `pnpm --filter attacks arena-open` với `SEALED_*` của mạng đích, `SEALED_OWNER_P256_KEY` (bí mật), `ARENA_RECORDER`, `ARENA_PAYEES`, `ARENA_FUNDING`, `ARENA_EXPIRY`. Script từ chối chạy nếu thiếu khoá chủ ví bí mật.
-- Trang: `/arena`, `/arena/rules`. Relayer cần `RELAYER_ARENA_RECORDER` để bật `/arena`.
+- Trang: `/arena`, `/arena/rules`. Relayer cần `RELAYER_ARENA_RECORDER` để bật `/arena`. Mỗi hành động (`checkpoint`, `reportBreach`) cho một agent được gửi tối đa một lần mỗi 60 giây, bất kể ai gọi (429 `cooldown`). Cổng RPC tính mỗi lệnh trong một batch là một lượt khi giới hạn tần suất.
 - So sánh P, O, S trên Fuji (tiêu USDC thử): `pnpm --filter attacks compare setup` rồi `compare run`; kết quả ở `services/attacks/compare/results/` và trang `/compare` (`services/attacks/compare/README.md`).
 
 ## 9. Bản ghi sống sót sang ERC-8004
