@@ -25,8 +25,9 @@ export function classifySend(r: { hash?: string; error?: unknown }): SendOutcome
 }
 
 /**
- * Signs a plain transfer with the challenge agent's key and sends it as it is: no gas estimate
- * first (an estimate would already fail at the rule and nothing would be sent).
+ * Signs a plain transfer with the challenge agent's key and sends it as it is, with a fixed gas of
+ * 21,000 instead of an estimate: a plain transfer needs exactly that, and it saves a call. (The rule
+ * does not run in eth_estimateGas or eth_call, see decision D1; the answer comes from the send.)
  */
 export async function sendAsAgent(
   client: PublicClient,
