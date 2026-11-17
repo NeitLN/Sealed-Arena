@@ -271,3 +271,21 @@ describe("attempt summary cache", () => {
     expect(reads()).toBe(3);
   });
 });
+
+describe("attempt summary cache size", () => {
+  it("stays bounded when callers use many distinct sender filters", async () => {
+    const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+    const app = createGatewayApp({
+      upstream: node().upstream,
+      store: new MemoryStore(),
+      ipSalt: "s".repeat(16),
+      summaryCacheMax: 50,
+      summaryCache: cache,
+    });
+    for (let i = 0; i < 500; i++) {
+      const from = `0x${i.toString(16).padStart(40, "0")}`;
+      expect((await app.request(`/attempts/summary?from=${from}`)).status).toBe(200);
+    }
+    expect(cache.size).toBeLessThanOrEqual(50);
+  });
+});
