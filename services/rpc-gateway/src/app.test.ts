@@ -233,3 +233,59 @@ describe("normalizeReason", () => {
     expect(normalizeReason(raw)).toBe(want);
   });
 });
+
+describe("attempt summary cache", () => {
+  /** A store that counts summary reads. */
+  function counting() {
+    const store = new MemoryStore();
+    let reads = 0;
+    const summary = store.summary.bind(store);
+    store.summary = async (from?: string) => {
+      reads++;
+      return summary(from);
+    };
+    return { store, reads: () => reads };
+  }
+
+  it("serves repeated summary requests from a short cache, per sender filter", async () => {
+    const { store, reads } = counting();
+    let t = 1_000_000;
+    const app = createGatewayApp({
+      upstream: node().upstream,
+      store,
+      ipSalt: "s".repeat(16),
+      summaryTtlMs: 2000,
+      now: () => t,
+    });
+    const get = (q = "") => app.request(`/attempts/summary${q}`);
+    expect((await get()).status).toBe(200);
+    await get();
+    await get();
+    expect(reads()).toBe(1);
+    // Another filter is another entry.
+    await get(`?from=${payee}`);
+    expect(reads()).toBe(2);
+    // After the TTL the store is read again.
+    t += 2000;
+    await get();
+    expect(reads()).toBe(3);
+  });
+});
+
+describe("attempt summary cache size", () => {
+  it("stays bounded when callers use many distinct sender filters", async () => {
+    const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+    const app = createGatewayApp({
+      upstream: node().upstream,
+      store: new MemoryStore(),
+      ipSalt: "s".repeat(16),
+      summaryCacheMax: 50,
+      summaryCache: cache,
+    });
+    for (let i = 0; i < 500; i++) {
+      const from = `0x${i.toString(16).padStart(40, "0")}`;
+      expect((await app.request(`/attempts/summary?from=${from}`)).status).toBe(200);
+    }
+    expect(cache.size).toBeLessThanOrEqual(50);
+  });
+});
