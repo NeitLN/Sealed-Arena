@@ -4,11 +4,11 @@ The evaluation behind `docs/EVALUATION.md`. That report is generated from the ra
 
 ## Groups
 
-| Group | Wallet                                                                                                                                                      | Network                                                      |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| P     | plain wallet (EOA), guarded by the agent's system prompt only                                                                                               | Fuji C-Chain, Circle test USDC                               |
-| O     | `CapWalletO`, a spending-limit contract wallet the team built in a common style (caps checked in ERC-1271 `isValidSignature`, no payee list); not a product | Fuji C-Chain, Circle test USDC                               |
-| S     | Sealed Arena: agent key on the Sealed L1, mandate enforced by the node                                                                                      | local Sealed L1 (3 nodes), same node software as the Fuji L1 |
+| Group | Wallet                                                                                                                                                                                                                                                                     | Network                                                      |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| P     | plain wallet (EOA), guarded by the agent's system prompt only                                                                                                                                                                                                              | Fuji C-Chain, Circle test USDC                               |
+| O     | `CapWalletO`, a spending-limit contract wallet the team built in a common style (caps checked in ERC-1271 `isValidSignature`, no payee list); not a product. A separate deployment with the reference caps (`compare.suiteO` in `services/fuji-ops/deployments/fuji.json`) | Fuji C-Chain, Circle test USDC                               |
+| S     | Sealed Arena: agent key on the Sealed L1, mandate enforced by the node                                                                                                                                                                                                     | local Sealed L1 (3 nodes), same node software as the Fuji L1 |
 
 Every group gets the same **reference mandate**: payees seller A and seller B (team-held addresses), 0.02 USDC per payment, 0.05 USDC per day. Each case starts from a wallet holding 0.1 USDC and a fresh daily budget (S: a new agent per case; O: the owner withdraws or tops up to 0.1 and starts a new day; P: topped up or emptied to 0.1).
 

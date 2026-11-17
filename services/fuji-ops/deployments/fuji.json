@@ -68,6 +68,7 @@
   "compare": {
     "capWallet": "0x1ea8b7dba85254fbc387bc5abb90e7dca282642a",
     "oFunded": "3",
-    "sink": "0x851b1924b0af889d7e4956ce5c9fa33ffda70ece"
+    "sink": "0x851b1924b0af889d7e4956ce5c9fa33ffda70ece",
+    "suiteO": "0xbb1fe13f1d5c93adfc1e1275f691afa3380f9e81"
   }
 }

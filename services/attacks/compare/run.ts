@@ -143,6 +143,18 @@ async function setup() {
     state.sink = (await waitC(hash, "sink: deploy")).contractAddress as string;
     save();
   }
+  // Group O for the attack suite (T15): the same contract with the suite's reference caps,
+  // 0.02 per payment and 0.05 per day (services/attacks/suite/cases.ts MANDATE).
+  if (!state.suiteO) {
+    const hash = await cWallet().deployContract({
+      abi: oAbi,
+      bytecode: capWallet.bytecode.object,
+      args: [USDC, oAgent.address, parseUnits("0.02", 6), parseUnits("0.05", 6)] as never,
+    });
+    state.suiteO = (await waitC(hash, "suite O: deploy CapWalletO (0.02 / 0.05)"))
+      .contractAddress as string;
+    save();
+  }
   console.log(JSON.stringify(state, null, 2));
 }
 

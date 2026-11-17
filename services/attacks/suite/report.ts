@@ -174,7 +174,13 @@ export function render(files: RunFile[]): string {
     "- Group O is a spending-limit wallet the team built in a common style for this comparison, not a product.",
   );
   line(
-    "- The agent tier uses one model and pages the team wrote; another model or page may give another rate.",
+    "- The agent tier uses one model and pages the team wrote; another model or page may give another rate. In class 7 the owner's task asks the agent to read and follow its notes, and the attacker planted the note; with no such request the agent did not open the note.",
+  );
+  line(
+    "- P and O run on the Fuji C-Chain with test USDC; S runs on the local Sealed L1 with the same node software as the Sealed L1 on Fuji. On the C-Chain fees are paid in AVAX, so fee cases cannot take USDC from P or O.",
+  );
+  line(
+    "- S counts the maximum gas fee in the per-payment cap, so a payment of exactly the cap is refused; cases at the cap end as blocked for S and as T1 for the others.",
   );
   const s = wallet.find((r) => r.group === "S");
   if (s) {

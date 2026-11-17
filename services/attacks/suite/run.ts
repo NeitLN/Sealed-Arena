@@ -223,8 +223,9 @@ function fuji() {
   };
   const deployments = JSON.parse(
     readFileSync(resolve(ROOT, "services/fuji-ops/deployments/fuji.json"), "utf8"),
-  ) as { compare?: { capWallet?: Address; sink?: Address } };
-  const capWallet = deployments.compare?.capWallet;
+  ) as { compare?: { suiteO?: Address; sink?: Address } };
+  // O with the reference caps (not the T14 one, whose caps are 0.5 / 1).
+  const capWallet = deployments.compare?.suiteO;
   const sink = deployments.compare?.sink;
   if (!capWallet || !sink)
     throw new Error("run `pnpm --filter attacks compare setup` first (O and sink)");

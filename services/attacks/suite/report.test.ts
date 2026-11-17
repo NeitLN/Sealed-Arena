@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { latest, type RunFile, render, type WalletRun } from "./report.js";
 
@@ -85,5 +88,18 @@ describe("report", () => {
 
   it("gives the same text for the same files in any order", () => {
     expect(render([...files].reverse())).toBe(render(files));
+  });
+});
+
+describe("docs/EVALUATION.md", () => {
+  it("is exactly what the raw result files produce (no number typed by hand)", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const dir = resolve(here, "results");
+    const files = readdirSync(dir)
+      .filter((f) => /^(wallet|agent)-.*\.json$/.test(f))
+      .sort()
+      .map((f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as RunFile);
+    const committed = readFileSync(resolve(here, "../../../docs/EVALUATION.md"), "utf8");
+    expect(committed.replaceAll("\r\n", "\n")).toBe(render(files));
   });
 });
