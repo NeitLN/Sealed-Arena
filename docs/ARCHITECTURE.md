@@ -230,7 +230,7 @@ Không dùng lại khoá agent thử thách cho bất kỳ vai nào khác, trên
 - `web/` (Vite, React, thư viện giao diện Astryx): chủ ví tạo passkey (WebAuthn, ES256), gắn agent, đặt uỷ quyền, dừng và mở lại. Trang đọc chain trực tiếp qua RPC. Giao diện song ngữ Anh/Việt.
 - Passkey: `(x, y)` lấy từ `getPublicKey()` (SPKI P-256). Chữ ký DER của trình duyệt được đổi sang `(r, s)` với `s` ở nửa thấp, rồi thành `auth` theo mục 3.3 (`packages/shared/src/webauthn.ts`). RP ID là tên miền của trang, nên trang phải chạy trên tên miền (hoặc `localhost`), không chạy trên địa chỉ IP.
 - Gắn agent: khoá agent ký `registerDigest` (hash thô, không tiền tố). Trên mạng local được dán private key của agent để ký ngay trong trình duyệt; khoá không được gửi đi.
-- `services/relayer` (Hono): `POST /relay { data }` chỉ nhận `register`, `setMandate`, `freeze`, `unfreeze` tới `0x0300…01`; chạy thử bằng `eth_call` trước, nếu chain sẽ từ chối thì trả lý do và không gửi; giới hạn 10 yêu cầu/phút mỗi địa chỉ khách. `GET /info` trả địa chỉ relayer, chain id và URL RPC cho trang. Relayer không làm giả được thao tác (precompile kiểm passkey) nhưng có thể từ chối gửi; khi đó ai cũng có thể tự gửi cùng dữ liệu.
+- `services/relayer` (Hono): `POST /relay { data }` chỉ nhận `register`, `setMandate`, `freeze`, `unfreeze` tới `0x0300…01`; chạy thử bằng `eth_call` trước, nếu chain sẽ từ chối thì trả lý do và không gửi; giới hạn 10 yêu cầu/phút mỗi địa chỉ khách. `GET /info` trả địa chỉ relayer, chain id và URL RPC cho trang. Relayer không làm giả được thao tác (precompile kiểm passkey) nhưng có thể từ chối gửi. TxAllowList đang bật, nên chỉ địa chỉ có trong TxAllowList (mục 3) mới tự gửi được cùng dữ liệu; chủ ví không có địa chỉ như vậy thì relayer là đường duy nhất.
 
 ## 8. Quy ước
 
