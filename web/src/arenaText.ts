@@ -92,6 +92,24 @@ const en = {
   reportTitle: "Found something?",
   report:
     "Open an issue on GitHub (or a private security advisory, see SECURITY.md) with the transaction hash.",
+  tryTitle: "Try a forbidden payment",
+  tryIntro:
+    "Each button signs a real transaction with the public agent key, here in your browser, and sends it to the Sealed L1 on Fuji through the public RPC. The answer below is what the node sent back; the attempt is also added to the list further down. Test USDC only, and a refused transaction costs nothing.",
+  tryStranger: "Pay a stranger 0.01 USDC",
+  tryOverCap: "Pay an allowed seller above the cap",
+  trySending: "Sending…",
+  trySent: "Sent",
+  tryTo: "To",
+  tryAmount: "Amount",
+  tryExpected: "Expected answer",
+  tryRefused: "Refused by the node",
+  tryAccepted:
+    'Accepted by the node. A payment outside the mandate should not be accepted: use "Report breach" below and tell the team.',
+  tryBusy: "The public RPC is busy (rate limited). Try again in a minute.",
+  tryError: "Could not reach the node",
+  tryNote:
+    "This shows the node refusing the transaction when it arrives. A block that contains such a transaction is also invalid for the validator (one, run by the team, today):",
+  tryNoteLink: "decision D1",
 };
 
 type Text = typeof en;
@@ -185,6 +203,24 @@ const vi: Text = {
   ],
   reportTitle: "Tìm ra điều gì?",
   report: "Mở issue trên GitHub (hoặc báo cáo bảo mật riêng, xem SECURITY.md) kèm hash giao dịch.",
+  tryTitle: "Thử một khoản trả bị cấm",
+  tryIntro:
+    "Mỗi nút ký một giao dịch thật bằng key công khai của agent, ngay trong trình duyệt của bạn, rồi gửi tới Sealed L1 trên Fuji qua RPC công khai. Câu trả lời bên dưới là đúng những gì node gửi về; lượt thử cũng được thêm vào danh sách phía dưới. Chỉ dùng USDC thử, và giao dịch bị từ chối không tốn gì.",
+  tryStranger: "Trả 0,01 USDC cho người lạ",
+  tryOverCap: "Trả người bán được phép, vượt hạn mức",
+  trySending: "Đang gửi…",
+  trySent: "Đã gửi",
+  tryTo: "Tới",
+  tryAmount: "Số tiền",
+  tryExpected: "Câu trả lời dự kiến",
+  tryRefused: "Node từ chối",
+  tryAccepted:
+    'Node đã nhận. Khoản trả ngoài uỷ quyền không được phép được nhận: hãy bấm "Báo vi phạm" bên dưới và báo cho đội.',
+  tryBusy: "RPC công khai đang bận (giới hạn tần suất). Thử lại sau một phút.",
+  tryError: "Không gọi được tới node",
+  tryNote:
+    "Phần này cho thấy node từ chối giao dịch khi nó tới. Một block chứa giao dịch như vậy cũng không hợp lệ với validator (hiện có một, do đội vận hành):",
+  tryNoteLink: "quyết định D1",
 };
 
 export function arenaText(lang: Lang): Text {
