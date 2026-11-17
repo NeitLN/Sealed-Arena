@@ -48,7 +48,7 @@ export const compareText = (lang: Lang, x: Result) =>
         sInjection: x.S.injection.refused
           ? `Node từ chối (${x.S.injection.reason}); không vào block.`
           : "Node nhận giao dịch.",
-        sBurst: `${x.S.settledOnChain} vào block; ${x.S.leftOutOfBlocks} bị loại khi dựng block; ${x.S.refusedByPool} bị pool từ chối. Đã chi ${x.S.spent} USDC.`,
+        sBurst: `${x.S.settledOnChain} vào block; ${x.S.leftOutOfBlocks} chưa vào block (còn chờ trong pool); ${x.S.refusedByPool} bị pool từ chối. Đã chi ${x.S.spent} USDC.`,
         notes: [
           "Cột P chạy lại một bản ghi dựng tay: trong 16 lượt chạy thật, model không lượt nào làm theo lệnh cài (services/agent/README.md).",
           "Cả O và S đều không vượt hạn mức ngày. Khác biệt ở chỗ bị từ chối: với O, các khoản hỏng vẫn vào block sau khi đã qua bước kiểm của facilitator; với S, khoản bị từ chối không vào block nào.",
@@ -76,7 +76,7 @@ export const compareText = (lang: Lang, x: Result) =>
         sInjection: x.S.injection.refused
           ? `Refused by the node (${x.S.injection.reason}); never in a block.`
           : "Accepted by the node.",
-        sBurst: `${x.S.settledOnChain} in blocks; ${x.S.leftOutOfBlocks} left out by the block builder; ${x.S.refusedByPool} refused by the pool. Spent ${x.S.spent} USDC.`,
+        sBurst: `${x.S.settledOnChain} in blocks; ${x.S.leftOutOfBlocks} not in a block (still waiting in the pool); ${x.S.refusedByPool} refused by the pool. Spent ${x.S.spent} USDC.`,
         notes: [
           "Column P replays a hand-written transcript: in 16 live runs the model never followed the injected instruction (services/agent/README.md).",
           "Neither O nor S went over the daily cap. The difference is where refusals happen: O's failed payments still land in blocks after passing the facilitator's check; S's refused payments never enter a block.",

@@ -198,6 +198,20 @@ contract CapWalletOTest is Test {
         _pay(real, lie);
     }
 
+    /// (r, n - s) with the other v recovers the same signer; only the low-s form is accepted.
+    function test_RefusesTheHighSFormOfAValidSignature() public {
+        Auth memory a = _auth(UNIT / 10);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(agentKey, _digest(a));
+        uint256 n = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141; // secp256k1
+        bytes32 highS = bytes32(n - uint256(s));
+        uint8 otherV = v == 27 ? 28 : 27;
+        assertEq(ecrecover(_digest(a), otherV, r, highS), vm.addr(agentKey));
+        bytes memory sig = abi.encode(
+            a.to, a.value, a.validAfter, a.validBefore, a.nonce, abi.encodePacked(r, highS, otherV)
+        );
+        assertFalse(_valid(a, sig));
+    }
+
     function test_RefusesOnANewDayUntilTheOwnerStartsIt() public {
         vm.warp(block.timestamp + 1 days);
         Auth memory a = _auth(UNIT / 10);

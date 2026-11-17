@@ -358,7 +358,7 @@ async function runS() {
       refusals[k] = (refusals[k] ?? 0) + 1;
     }
   // The pool checks each payment against the current state, so it can hold more than the budget;
-  // the block builder drops the ones preCheck refuses. Wait until the agent's nonce stops moving.
+  // the block builder skips the ones preCheck refuses (they stay waiting in the pool). Wait until the agent's nonce stops moving.
   let mined = -1;
   for (let still = 0; still < 6; ) {
     await new Promise((r) => setTimeout(r, 3000));
