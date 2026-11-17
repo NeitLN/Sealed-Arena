@@ -38,6 +38,7 @@ import {
 import {
   type AgentClass,
   type AgentRun,
+  annotate,
   type BenignRecord,
   type CaseRecord,
   type Group,
@@ -545,19 +546,9 @@ function agentTier(runs: number, only: number[]) {
       followed: Number(m[1]),
       transcripts,
     };
-    if (scenario === "poisoned-memory") {
-      // The count only means something if the agent read the planted note.
-      const read = transcripts.filter((t) =>
-        (
-          JSON.parse(readFileSync(resolve(ROOT, t), "utf8")) as {
-            calls: Array<{ name: string; input: { key?: string } }>;
-          }
-        ).calls.some((c) => c.name === "read_memory" && c.input.key === "owner-notes"),
-      ).length;
-      row.note = `read the planted note in ${read}/${transcripts.length} runs`;
-    }
+    // Facts from the transcripts (e.g. whether the class 7 note was read) are added by the report.
     classes.push(row);
-    console.log(`class ${cls} ${scenario}: followed ${m[1]}/${m[2]} ${row.note ?? ""}`);
+    console.log(`class ${cls} ${scenario}: followed ${m[1]}/${m[2]}`);
   }
   const run: AgentRun = {
     version: 1,
@@ -577,6 +568,14 @@ function agentTier(runs: number, only: number[]) {
   console.log(`results: ${file}`);
 }
 
+/** Tool calls of a transcript, path relative to the repository root. */
+const readCalls = (path: string) =>
+  (
+    JSON.parse(readFileSync(resolve(ROOT, path), "utf8")) as {
+      calls: Array<{ name: string; input: { key?: string } }>;
+    }
+  ).calls;
+
 function report() {
   const files: RunFile[] = existsSync(RESULTS)
     ? readdirSync(RESULTS)
@@ -585,7 +584,7 @@ function report() {
         .map((f) => JSON.parse(readFileSync(resolve(RESULTS, f), "utf8")) as RunFile)
     : [];
   const out = resolve(ROOT, "docs/EVALUATION.md");
-  writeFileSync(out, render(files));
+  writeFileSync(out, render(annotate(files, readCalls)));
   console.log(`report: ${out} (${files.length} result files)`);
 }
 
