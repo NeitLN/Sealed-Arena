@@ -28,7 +28,7 @@ export function TryPayment(o: {
   onSent: () => void;
 }) {
   const { t, view } = o;
-  const [client] = useState(() => chainClient(RPC));
+  const [client] = useState(() => chainClient(RPC, { live: true }));
   const [busy, setBusy] = useState<string>();
   const [sent, setSent] = useState<Attempt>();
   const [result, setResult] = useState<SendOutcome>();
