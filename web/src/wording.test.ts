@@ -50,6 +50,13 @@ describe("page wording", () => {
       for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
   });
 
+  it("landing page says the plain-wallet loss is a hand-written transcript and the refusal count is off-chain", () => {
+    expect(landingText("en").plainResult).toMatch(/hand-written/);
+    expect(landingText("vi").plainResult).toMatch(/dựng tay/);
+    expect(landingText("en").refused).toMatch(/off-chain/);
+    expect(landingText("vi").refused).toMatch(/ngoài chain/);
+  });
+
   it("landing page numbers come from the comparison results, not the text", () => {
     for (const lang of ["en", "vi"] as const)
       expect(landingText(lang).limitResult).toMatch(/\{passed\}.*\{attempts\}.*\{reverted\}/);

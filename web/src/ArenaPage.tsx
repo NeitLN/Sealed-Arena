@@ -358,7 +358,16 @@ export default function ArenaPage() {
               </HStack>
             )}
           </Tile>
-          <Tile label={t.refused}>{big(summary?.rejected)}</Tile>
+          <Tile
+            label={
+              <HStack gap={1} vAlign="center">
+                <span>{t.refused}</span>
+                <InfoTip content={t.offChain} size="xsm" />
+              </HStack>
+            }
+          >
+            {big(summary?.rejected)}
+          </Tile>
           <Tile label={t.accepted}>{big(summary?.accepted)}</Tile>
           <Tile label={t.senders}>{big(summary?.distinctSenders)}</Tile>
         </Grid>
