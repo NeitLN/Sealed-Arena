@@ -2,3 +2,10 @@
 @import "@astryxdesign/core/astryx.css";
 @import "@astryxdesign/theme-neutral/fonts.css";
 @import "@astryxdesign/theme-neutral/theme.css";
+
+/* Brand: the seal of the mark (BrandMark.tsx, public/favicon.svg). Kept apart from the
+   green/red used for allowed/refused states. */
+:root {
+  --brand-seal: light-dark(#0f7f71, #6cc7b6);
+  --brand-on-seal: light-dark(#ffffff, #111111);
+}

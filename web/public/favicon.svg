@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>Sealed Arena</title>
+  <rect x="2" y="6" width="23" height="16" rx="3" stroke="#1b1b1b" stroke-width="2"/>
+  <rect x="2" y="10" width="23" height="3" fill="#1b1b1b"/>
+  <rect x="6" y="16.5" width="7" height="2" rx="1" fill="#1b1b1b" opacity=".45"/>
+  <circle cx="24" cy="23" r="7" fill="#ffffff"/>
+  <circle cx="24" cy="23" r="6" fill="#0f7f71"/>
+  <path d="M21.2 23.1l2 2 3.7-4" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
