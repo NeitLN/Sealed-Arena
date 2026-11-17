@@ -68,6 +68,15 @@ export function createRelayerApp(o: RelayerOptions) {
   /** Last send per `${action}:${agent}`. */
   const lastSent = new Map<string, number>();
   const hits = new Map<string, number[]>();
+  // One send at a time from the relayer's key: two sends in flight together would pick the same
+  // nonce (an owner's freeze and an arena checkpoint can arrive at once). A failed send does not
+  // stop the queue.
+  let queue: Promise<unknown> = Promise.resolve();
+  const send: RelayChain["send"] = (data, to) => {
+    const next = queue.then(() => o.chain.send(data, to));
+    queue = next.catch(() => undefined);
+    return next;
+  };
   const app = new Hono();
 
   app.use("*", cors({ origin: o.origins ?? "*" }));
@@ -126,7 +135,7 @@ export function createRelayerApp(o: RelayerOptions) {
       return c.json({ ok: false, error: "reverted", function: name, reason: revertReason(e) }, 422);
     }
     try {
-      const r = await o.chain.send(data);
+      const r = await send(data);
       if (r.status !== "success") {
         return c.json(
           { ok: false, error: "reverted", function: name, transaction: r.transaction },
@@ -186,12 +195,14 @@ export function createRelayerApp(o: RelayerOptions) {
       return c.json({ ok: false, error: "reverted", reason: revertReason(e) }, 422);
     }
     try {
-      const r = await o.chain.send(data, o.arenaRecorder);
+      const r = await send(data, o.arenaRecorder);
       return c.json(
         { ok: r.status === "success", function: action, ...r },
         r.status === "success" ? 200 : 422,
       );
     } catch (e) {
+      // Nothing was mined, so the next request for this agent may try again.
+      if (lastSent.get(key) === mark) lastSent.delete(key);
       return c.json({ ok: false, error: "send_failed", reason: revertReason(e) }, 502);
     }
   });

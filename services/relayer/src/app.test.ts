@@ -186,6 +186,50 @@ describe("relayer", () => {
       expect(sent).toEqual([]);
     });
 
+    it("does not start a cooldown when the send fails", async () => {
+      const { c, sent } = chain();
+      const ok = c.send;
+      let fail = true;
+      c.send = async (data, to) => {
+        if (fail) {
+          fail = false;
+          throw new Error("nonce too low");
+        }
+        return ok(data, to);
+      };
+      const app = createRelayerApp({ chain: c, trustProxy: true, arenaRecorder: recorder });
+      const first = await arena(app, { action: "checkpoint", agent }, "1.1.1.1");
+      expect(first.status).toBe(502);
+      expect(await first.json()).toMatchObject({ error: "send_failed" });
+      expect((await arena(app, { action: "checkpoint", agent }, "2.2.2.2")).status).toBe(200);
+      expect(sent).toHaveLength(1);
+    });
+
+    it("sends one transaction at a time, so concurrent sends do not race on the nonce", async () => {
+      const { c, sent } = chain();
+      const ok = c.send;
+      let inFlight = 0;
+      let most = 0;
+      c.send = async (data, to) => {
+        inFlight++;
+        most = Math.max(most, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight--;
+        // A failed send must not stall the ones queued behind it.
+        if (data === freezeData) throw new Error("boom");
+        return ok(data, to);
+      };
+      const app = createRelayerApp({ chain: c, trustProxy: true, arenaRecorder: recorder });
+      const res = await Promise.all([
+        post(app, { data: freezeData }, "1.1.1.1"),
+        arena(app, { action: "checkpoint", agent }, "2.2.2.2"),
+        arena(app, { action: "reportBreach", agent }, "3.3.3.3"),
+      ]);
+      expect(res.map((r) => r.status)).toEqual([502, 200, 200]);
+      expect(most).toBe(1);
+      expect(sent).toHaveLength(2);
+    });
+
     it.each(["checkpoint", "reportBreach"])(
       "sends %s to the ArenaRecorder, built by the relayer",
       async (action) => {
