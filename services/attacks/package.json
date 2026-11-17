@@ -14,7 +14,8 @@
     "x402": "tsx src/x402.ts",
     "arena": "tsx src/arena.ts",
     "arena-open": "tsx src/arena-open.ts",
-    "compare": "tsx compare/run.ts"
+    "compare": "tsx compare/run.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "2.1.8",

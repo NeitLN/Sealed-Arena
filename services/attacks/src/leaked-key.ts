@@ -7,6 +7,8 @@
 // succeed, so a broken network cannot make the suite look green. At the end the
 // suite checks the invariant balance drop <= totalCharged increase, that no stranger
 // received coins, and that the three nodes agree on the chain.
+// LEAKED_KEY_JSON=<file> also writes the results as JSON (used by the evaluation report).
+import { writeFileSync } from "node:fs";
 import {
   AGENT_POLICY_ADDRESS,
   agentPolicyAbi,
@@ -429,6 +431,24 @@ async function main(): Promise<void> {
 
   const mismatches = results.filter((r) => !matches(r));
   const ok = mismatches.length === 0 && invariant && strangerBalance === 0n && agree;
+  // Machine-readable copy for the evaluation report (services/attacks/suite).
+  if (process.env.LEAKED_KEY_JSON) {
+    writeFileSync(
+      process.env.LEAKED_KEY_JSON,
+      `${JSON.stringify(
+        {
+          results,
+          invariant,
+          strangerBalance: strangerBalance.toString(),
+          nodesAgree: agree,
+          ok,
+        },
+        null,
+        2,
+      )}
+`,
+    );
+  }
   console.log(
     `\nleaked-key: ${ok ? "PASS" : "FAIL"} (${results.length} cases, ${mismatches.length} unexpected)`,
   );
