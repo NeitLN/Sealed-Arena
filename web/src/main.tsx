@@ -4,14 +4,16 @@ import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import ArenaPage from "./ArenaPage.js";
+import ComparePage from "./ComparePage.js";
 import OwnerPage from "./OwnerPage.js";
 import RulesPage from "./RulesPage.js";
 
-/** Three pages, chosen by path (the host rewrites every path to index.html). */
+/** Pages chosen by path (the host rewrites every path to index.html). */
 function Page() {
   const path = location.pathname.replace(/\/+$/, "");
   if (path === "/arena/rules") return <RulesPage />;
   if (path === "/arena") return <ArenaPage />;
+  if (path === "/compare") return <ComparePage />;
   return <OwnerPage />;
 }
 

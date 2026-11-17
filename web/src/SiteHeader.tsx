@@ -6,9 +6,9 @@ import { Text } from "@astryxdesign/core/Text";
 import { arenaText } from "./arenaText.js";
 import type { Lang } from "./i18n.js";
 
-type Current = "owner" | "arena" | "rules";
+type Current = "owner" | "arena" | "rules" | "compare";
 
-/** Title, navigation between the three pages, and the language switch. */
+/** Title, navigation between the pages, and the language switch. */
 export function SiteHeader(o: {
   title: string;
   lang: Lang;
@@ -20,6 +20,7 @@ export function SiteHeader(o: {
     ["/", t.navOwner, "owner"],
     ["/arena", t.navArena, "arena"],
     ["/arena/rules", t.navRules, "rules"],
+    ["/compare", t.navCompare, "compare"],
   ];
   return (
     <VStack gap={4}>

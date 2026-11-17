@@ -64,5 +64,9 @@
       "tag2": "survival",
       "meaning": "coin-hours survived, read with ReputationRegistry.readFeedback(303, receiver, 1)"
     }
+  },
+  "compare": {
+    "capWallet": "0x1ea8b7dba85254fbc387bc5abb90e7dca282642a",
+    "oFunded": "3"
   }
 }

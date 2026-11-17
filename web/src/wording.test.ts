@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { arenaText } from "./arenaText.js";
+import result from "./compare-result.json";
+import { compareText, type Result } from "./compareText.js";
 import { KEYS, useI18n } from "./i18n.js";
 
 /** The project's "never say" list, in both languages (claims we must not make). */
@@ -35,6 +37,16 @@ describe("page wording", () => {
   it.each(["en", "vi"] as const)("challenge pages (%s) contain no forbidden claim", (lang) => {
     for (const s of allText(arenaText(lang)))
       for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
+  });
+
+  it.each(["en", "vi"] as const)("comparison page (%s) contains no forbidden claim", (lang) => {
+    for (const s of allText(compareText(lang, result as unknown as Result)))
+      for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
+  });
+
+  it("says the P column is a hand-written transcript, in both languages", () => {
+    expect(compareText("en", result as unknown as Result).notes[0]).toMatch(/hand-written/);
+    expect(compareText("vi", result as unknown as Result).notes[0]).toMatch(/dựng tay/);
   });
 
   it("states the six limits in both languages", () => {

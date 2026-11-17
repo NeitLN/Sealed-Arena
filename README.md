@@ -55,6 +55,7 @@ Transactions from other senders are not affected. Details and the exact contract
 | Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done   |
 | Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain              | Done   |
 | Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages    | Done   |
+| Comparison on Fuji with a plain wallet (P) and a spending-limit contract wallet built by the team (O)           | Done   |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
