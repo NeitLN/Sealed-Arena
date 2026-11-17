@@ -88,6 +88,8 @@ async function main() {
   );
   const site = new Hono();
   site.use("/*", serveStatic({ root: "./dist" }));
+  // Routes such as /console are client-side: serve index.html, as the host's rewrite does.
+  site.get("*", serveStatic({ path: "./dist/index.html" }));
   const web = await listen(site.fetch, 4173);
 
   // A fresh agent that may send transactions and holds a little; not linked to any owner yet.
