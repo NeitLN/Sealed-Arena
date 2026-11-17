@@ -46,6 +46,14 @@ Transactions from other senders are not affected. Details and the exact contract
 - **Why an Avalanche L1.** We need our own validity rule and still want to stay EVM-compatible and connected to existing assets. An Avalanche L1 runs our patched Subnet-EVM with its own validator set, keeps the C-Chain one message away (ICM), brings USDC across (ICTT), and costs a small continuous fee per validator rather than a network of our own to secure.
 - **Where the money comes from.** The L1's native coin is Circle test USDC from the Fuji C-Chain, bridged with ICTT: it is locked in the home contract on the C-Chain and minted one-for-one on the L1. The other coins on the L1 are the genesis supply, which the ICTT remote counts as its initial reserve imbalance. The bridge is the only minter the project uses; the operator's admin key still holds the NativeMinter admin role (see the limits below). Testnet only.
 
+## Business model (hypothesis)
+
+We have no customers yet; this is a hypothesis we have not tested.
+
+- **Who pays.** Agent platforms that hold wallets for their agents pay a fee per protected agent.
+- **Fees on the L1.** Transaction fees on the Sealed L1 are a second source. The current genesis does not enable fee recipients, so collecting them would need a network upgrade.
+- **How money moves.** Users deposit USDC from the C-Chain through ICTT (see [D6](docs/decisions/D6.md)); sellers withdraw to the C-Chain through the same bridge.
+
 ## Avalanche components used
 
 | Component                                                            | Role here                                                      |
@@ -84,17 +92,20 @@ Each design decision is recorded with its evidence (source lines, commands, resu
 [D3](docs/decisions/D3.md) how the local L1 is built ·
 [D4](docs/decisions/D4.md) precompile address and P-256 support ·
 [D5](docs/decisions/D5.md) x402 payment method `signed-native-tx` ·
+[D6](docs/decisions/D6.md) USDC bridged with ICTT as the native coin ·
 [D7](docs/decisions/D7.md) survival records in ERC-8004.
 
 ## Evaluation
 
-Nine attack classes on three groups with the same reference mandate (two sellers, 0.02 USDC per payment, 0.05 per day): **P** a plain wallet, **O** a spending-limit contract wallet the team built, **S** Sealed. Full report with 95% Wilson intervals, every case and its limits: [`docs/EVALUATION.md`](docs/EVALUATION.md), generated from the raw results.
+Nine attack classes on three groups with the same reference mandate (two sellers, 0.02 USDC per payment, 0.05 per day): **P** a plain wallet, **O** a spending-limit contract wallet the team built, with caps only and no payee list, **S** Sealed. Full report with 95% Wilson intervals, every case and its limits: [`docs/EVALUATION.md`](docs/EVALUATION.md), generated from the raw results.
 
-| Group                 | Coins left outside the mandate (T0) | Unwanted payments inside the mandate (T1) | Benign purchases completed |
-| --------------------- | ----------------------------------- | ----------------------------------------- | -------------------------- |
-| P plain wallet (Fuji) | 36/45 cases                         | 9/45                                      | 10/10                      |
-| O limit wallet (Fuji) | 16/45                               | 16/45                                     | 10/10                      |
-| S Sealed (local L1)   | 0/69                                | 9/69                                      | 10/10                      |
+| Group                                           | Coins left outside the mandate (T0) | Unwanted payments inside the mandate (T1) | Benign purchases completed |
+| ----------------------------------------------- | ----------------------------------- | ----------------------------------------- | -------------------------- |
+| P plain wallet (Fuji)                           | 36/45 cases                         | 9/45                                      | 10/10                      |
+| O limit wallet, caps only, no payee list (Fuji) | 16/45                               | 16/45                                     | 10/10                      |
+| S Sealed (local L1)                             | 0/69                                | 9/69                                      | 10/10                      |
+
+Cases that pay an unknown address succeed against O, because it has no payee list: only its caps limit them.
 
 With a live model, the buying agent ignored the injected pages (0/5 for each of three pages). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node refused all fifteen payments to the attacker. S does not stop T1: the rule limits where and how much, not what the owner wanted.
 
@@ -186,7 +197,7 @@ What the rule gives: on the Sealed L1, a transaction sent with an agent's key th
 What it does not give, stated plainly:
 
 1. **Testnet only.** Coins on the L1 have no monetary value. This is not a payment service.
-2. **The team runs all validators.** The claim is "the rule is enforced by the chain's consensus", not that control is spread across independent parties. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses. The operator's admin key also holds the NativeMinter admin role on the L1 and could mint native coin outside the bridge; the project uses the bridge as its only minter.
+2. **The team runs all validators.** The claim is "the rule is enforced by the chain's consensus", not that control is spread across independent parties. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses. Disabling and re-enabling the `AgentPolicy` precompile in a network upgrade would erase every registration and mandate; the same commitment covers this. The operator's admin key also holds the NativeMinter admin role on the L1 and could mint native coin outside the bridge; the project uses the bridge as its only minter.
 3. **Only assets on this L1 are protected.**
 4. **A leaked key can still spend inside the mandate**: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires.
 5. **Someone holding the key can grief**: use up the daily budget or occupy nonces.
@@ -194,6 +205,9 @@ What it does not give, stated plainly:
 7. **The open challenge measures how hard the system was tried, not that it is safe.**
 8. **The ERC-8004 record is only as trustworthy as its writer.** Anyone can give feedback in ERC-8004; read the survival record as feedback whose client is our ReputationReceiver (address in `services/fuji-ops/deployments/fuji.json`). ICM only carries this record; it plays no part in keeping funds safe, which is the L1 node's rule.
 9. **x402 here needs our payment method.** Sellers must add the network `eip155:261126` and point `/verify` and `/settle` at this facilitator; a standard x402 client (EIP-3009 tokens) cannot pay it. The facilitator holds no keys, but a seller still has to trust it or read the chain itself (the sample seller does both).
+10. **Owner passkey proofs are bound to the chain id and the agent, not to one deployment.** The challenge covers the chain id (`261126`), the agent and a nonce. The local network and the L1 on Fuji share that chain id, so each deployment must register its agents under its own owner key; the Fuji challenge agent does. Binding proofs to the blockchain ID is planned.
+11. **The precompile checks less of WebAuthn than a full relying party.** It verifies the P-256 signature, the challenge and the User Present flag. It does not check `rpIdHash` or the origin, and it does not require User Verification (the owner console asks for it as `preferred`). A page that tricks the owner into signing its challenge produces a valid proof.
+12. **Waiting payments are not re-checked.** Payments the pool accepted but the block builder left out (over the day's budget) stay in the pool and are not checked again while they wait. On a later day they can enter a block within that day's cap, until the owner freezes the agent or the mandate expires.
 
 Found a problem? See [SECURITY.md](SECURITY.md).
 
