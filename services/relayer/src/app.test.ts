@@ -133,12 +133,58 @@ describe("relayer", () => {
 
   describe("arena actions", () => {
     const recorder = "0x60d046fa32a101229f78d69b655a91193cdf4f77";
-    const arena = (app: ReturnType<typeof createRelayerApp>, body: unknown) =>
+    const arena = (app: ReturnType<typeof createRelayerApp>, body: unknown, ip = "9.9.9.9") =>
       app.request("/arena", {
         method: "POST",
-        headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.9" },
+        headers: { "content-type": "application/json", "x-forwarded-for": ip },
         body: JSON.stringify(body),
       });
+
+    it("sends each action for an agent at most once per cooldown, whoever asks", async () => {
+      const { c, sent } = chain();
+      let t = 1_000_000;
+      const app = createRelayerApp({
+        chain: c,
+        trustProxy: true,
+        arenaRecorder: recorder,
+        arenaCooldownMs: 60_000,
+        now: () => t,
+      });
+      expect((await arena(app, { action: "checkpoint", agent }, "1.1.1.1")).status).toBe(200);
+      // Another client, same agent and action: refused without sending (no gas spent).
+      const again = await arena(app, { action: "checkpoint", agent }, "2.2.2.2");
+      expect(again.status).toBe(429);
+      expect(await again.json()).toMatchObject({ error: "cooldown" });
+      // The other action, or another agent, is not held back.
+      expect((await arena(app, { action: "reportBreach", agent }, "3.3.3.3")).status).toBe(200);
+      const other = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+      expect((await arena(app, { action: "checkpoint", agent: other }, "4.4.4.4")).status).toBe(
+        200,
+      );
+      expect(sent).toHaveLength(3);
+      t += 60_000;
+      expect((await arena(app, { action: "checkpoint", agent }, "5.5.5.5")).status).toBe(200);
+      expect(sent).toHaveLength(4);
+    });
+
+    it("sends once when two requests for the same agent arrive together", async () => {
+      const { c, sent } = chain();
+      const app = createRelayerApp({ chain: c, trustProxy: true, arenaRecorder: recorder });
+      const [a, b] = await Promise.all([
+        arena(app, { action: "checkpoint", agent }, "1.1.1.1"),
+        arena(app, { action: "checkpoint", agent }, "2.2.2.2"),
+      ]);
+      expect([a.status, b.status].sort()).toEqual([200, 429]);
+      expect(sent).toHaveLength(1);
+    });
+
+    it("does not start a cooldown when the simulation refuses the action", async () => {
+      const { c, sent } = chain({ revert: "execution reverted: not enrolled" });
+      const app = createRelayerApp({ chain: c, trustProxy: true, arenaRecorder: recorder });
+      expect((await arena(app, { action: "checkpoint", agent })).status).toBe(422);
+      expect((await arena(app, { action: "checkpoint", agent }, "8.8.8.8")).status).toBe(422);
+      expect(sent).toEqual([]);
+    });
 
     it.each(["checkpoint", "reportBreach"])(
       "sends %s to the ArenaRecorder, built by the relayer",

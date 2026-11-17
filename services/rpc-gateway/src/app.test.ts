@@ -161,6 +161,16 @@ describe("rpc gateway", () => {
     expect(codes).toEqual([200, 200, 200, 429]);
   });
 
+  it("counts every call in a batch toward the rate limit", async () => {
+    const { app } = setup({ perMinute: 5 });
+    const call = (id: number) => ({ jsonrpc: "2.0", id, method: "eth_chainId", params: [] });
+    expect((await rpc(app, [call(1), call(2), call(3), call(4)])).status).toBe(200);
+    // 4 used: a batch of 2 would make 6 > 5, a single call still fits.
+    expect((await rpc(app, [call(5), call(6)])).status).toBe(429);
+    expect((await rpc(app, call(7))).status).toBe(200);
+    expect((await rpc(app, call(8))).status).toBe(429);
+  });
+
   it("handles a small batch and refuses a large one", async () => {
     const { app } = setup();
     const ok = (await (
