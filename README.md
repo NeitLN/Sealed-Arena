@@ -116,6 +116,7 @@ With a live model, the buying agent ignored the injected pages (0/5 for each of 
 - Owner console (passkey): https://sealed-arena.vercel.app/console
 - Open red-team challenge: https://sealed-arena.vercel.app/arena (rules: [/arena/rules](https://sealed-arena.vercel.app/arena/rules))
 - Comparison of P, O and S: https://sealed-arena.vercel.app/compare
+- Who it is for and the business model (hypothesis): https://sealed-arena.vercel.app/business
 - Every address and transaction: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
 
 | What                                    | Where                       | Address or ID                                                                                             |

@@ -12,9 +12,11 @@ import { TopNav, TopNavHeading, TopNavItem } from "@astryxdesign/core/TopNav";
 import type { ReactNode } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
+import { BrandMark } from "./BrandMark.js";
+import { businessText } from "./businessText.js";
 import type { Lang } from "./i18n.js";
 
-export type Current = "home" | "owner" | "arena" | "rules" | "compare";
+export type Current = "home" | "owner" | "arena" | "rules" | "compare" | "business";
 
 /**
  * Shared frame of every page: top navigation with the brand, a "Testnet" badge, the page links and
@@ -33,6 +35,7 @@ export function SiteShell(o: {
     ["/arena", t.navArena, "arena"],
     ["/compare", t.navCompare, "compare"],
     ["/arena/rules", t.navRules, "rules"],
+    ["/business", businessText(o.lang).nav, "business"],
     ["/console", t.navOwner, "owner"],
   ];
   return (
@@ -43,6 +46,7 @@ export function SiteShell(o: {
         <TopNav
           heading={
             <TopNavHeading
+              logo={<BrandMark size={24} />}
               heading="Sealed Arena"
               headingHref="/"
               headerEndContent={<Badge variant="warning" label="Testnet" />}
