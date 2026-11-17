@@ -6,7 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!contracts/lib", "!docs", "!chain/genesis/sealed-fuji.json"]
+    "includes": [
+      "**",
+      "!contracts/lib",
+      "!docs",
+      "!chain/genesis/sealed-fuji.json",
+      "!services/attacks/suite/results"
+    ]
   },
   "formatter": {
     "indentStyle": "space",
