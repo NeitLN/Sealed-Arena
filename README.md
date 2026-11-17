@@ -40,6 +40,27 @@ flowchart LR
 
 Transactions from other senders are not affected. Details and the exact contracts between components: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (Vietnamese).
 
+## Why on-chain, why Avalanche, where the money comes from
+
+- **Why a chain rule.** A limit kept by a server, or by a contract wallet the agent calls, binds only the paths that go through it; whoever holds the agent's key can sign other transactions. A validity rule in the node binds every transaction the key signs, whatever signed it and whoever sent it, because a block that contains a forbidden one is invalid for the validators.
+- **Why an Avalanche L1.** We need our own validity rule and still want to stay EVM-compatible and connected to existing assets. An Avalanche L1 runs our patched Subnet-EVM with its own validator set, keeps the C-Chain one message away (ICM), brings USDC across (ICTT), and costs a small continuous fee per validator rather than a network of our own to secure.
+- **Where the money comes from.** The L1's native coin is Circle test USDC from the Fuji C-Chain, bridged with ICTT: it is locked in the home contract on the C-Chain and minted one-for-one on the L1. The other coins on the L1 are the genesis supply, which the ICTT remote counts as its initial reserve imbalance. The bridge is the only minter the project uses; the operator's admin key still holds the NativeMinter admin role (see the limits below). Testnet only.
+
+## Avalanche components used
+
+| Component                                                            | Role here                                                      |
+| -------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Avalanche L1 on Fuji (ACP-77), one validator, P-Chain continuous fee | Runs the Sealed chain; created with the Avalanche Platform CLI |
+| Subnet-EVM, patched (`chain/patches/`)                               | The validity rule in `preCheck` and the transaction pool       |
+| Stateful precompile `AgentPolicy` (`0x0300…01`)                      | Mandates, passkey (P-256 WebAuthn) proofs, spend counters      |
+| Precompiles TxAllowList, ContractDeployerAllowList, NativeMinter     | Who may send and deploy; minting only for the ICTT remote      |
+| ValidatorManager on the Fuji C-Chain (proof of authority)            | The L1's validator set                                         |
+| ICTT: `ERC20TokenHome` (C-Chain), `NativeTokenRemote` (L1)           | USDC as the L1's native coin                                   |
+| ICM (Teleporter) and the ICM relayer                                 | Carries the open challenge's survival record to the C-Chain    |
+| ERC-8004 registries on the Fuji C-Chain                              | Public identity and reputation record of the challenge agent   |
+
+**Size of the node change.** Two patch files on avalanchego `v1.15.3`: 1,912 non-blank lines of code added and 4 removed, plus 1,295 non-blank lines of tests. The rule itself is about 170 lines (`core/agent_rule.go` and its hooks in `core/state_transition.go` and `core/txpool/`); the rest is the `AgentPolicy` precompile, including WebAuthn verification and its ABI.
+
 ## Status
 
 | Component                                                                                                       | Status |
@@ -59,22 +80,58 @@ Transactions from other senders are not affected. Details and the exact contract
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
+[D2](docs/decisions/D2.md) the rule stays in the node (tier 1) ·
 [D3](docs/decisions/D3.md) how the local L1 is built ·
 [D4](docs/decisions/D4.md) precompile address and P-256 support ·
-[D5](docs/decisions/D5.md) x402 payment method `signed-native-tx`.
+[D5](docs/decisions/D5.md) x402 payment method `signed-native-tx` ·
+[D7](docs/decisions/D7.md) survival records in ERC-8004.
+
+## Evaluation
+
+Nine attack classes on three groups with the same reference mandate (two sellers, 0.02 USDC per payment, 0.05 per day): **P** a plain wallet, **O** a spending-limit contract wallet the team built, **S** Sealed. Full report with 95% Wilson intervals, every case and its limits: [`docs/EVALUATION.md`](docs/EVALUATION.md), generated from the raw results.
+
+| Group                 | Coins left outside the mandate (T0) | Unwanted payments inside the mandate (T1) | Benign purchases completed |
+| --------------------- | ----------------------------------- | ----------------------------------------- | -------------------------- |
+| P plain wallet (Fuji) | 36/45 cases                         | 9/45                                      | 10/10                      |
+| O limit wallet (Fuji) | 16/45                               | 16/45                                     | 10/10                      |
+| S Sealed (local L1)   | 0/69                                | 9/69                                      | 10/10                      |
+
+With a live model, the buying agent ignored the injected pages (0/5 for each of three pages). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node refused all fifteen payments to the attacker. S does not stop T1: the rule limits where and how much, not what the owner wanted.
 
 ## Try it on Fuji (testnet)
 
 - RPC: `https://sealed-arena.duckdns.org/rpc` (chain id `261126`, native coin: USDC bridged from Fuji with ICTT)
 - Owner console: https://sealed-arena.vercel.app
 - Open red-team challenge: https://sealed-arena.vercel.app/arena (rules: [/arena/rules](https://sealed-arena.vercel.app/arena/rules))
-- Addresses and transactions: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
+- Comparison of P, O and S: https://sealed-arena.vercel.app/compare
+- Every address and transaction: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
 
-The operator runs the only validator. See "Security model and limitations" below.
+| What                                    | Where                       | Address or ID                                                                                             |
+| --------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Sealed L1                               | P-Chain subnet / blockchain | `xeBXaUqytA93ZuEKUm34LaYEy4UVqAGGrD6LCwNS8TWmCrJkG` / `UFo3xChM9b9efQkg93qPnswkJi7VR1XW7KQg9wE7gnCULfbYo` |
+| Validator                               | L1                          | `NodeID-6TgSfU7azciZHPtkWZ6qnc8wsqMHyTTGL`                                                                |
+| ValidatorManager                        | C-Chain                     | [`0x6911…6676`](https://testnet.snowtrace.io/address/0x69112c469092fed092d958d42a2c0f4fe16e6676)          |
+| ICTT home (USDC)                        | C-Chain                     | [`0x9806…6d2d`](https://testnet.snowtrace.io/address/0x980619791b89410b03ce02a479b032bddfe46d2d)          |
+| ICTT remote (native coin)               | L1                          | `0x0fb5053b11fefc69ac31e3e87f60ce8677f6483e`                                                              |
+| ArenaRecorder                           | L1                          | `0x60d046fa32a101229f78d69b655a91193cdf4f77`                                                              |
+| ReputationReceiver (ERC-8004 writer)    | C-Chain                     | [`0x3c99…6fda`](https://testnet.snowtrace.io/address/0x3c99b37bf7279220ae2f09f12bbdc0742b056fda)          |
+| ERC-8004 Reputation registry, agent 303 | C-Chain                     | [`0x8004…8713`](https://testnet.snowtrace.io/address/0x8004B663056A597Dffe9eCcC1965A193B7388713)          |
+
+The L1 has no public block explorer; read it through the RPC above. The operator runs the only validator. See "Security model and limitations" below.
 
 ## Quick start
 
 Requirements: Docker (running), Node.js 24, pnpm 11, Git, and bash (Git Bash on Windows). Go and Foundry are not needed on the host; they run in pinned containers.
+
+After `git clone --recursive` and `pnpm install`, three commands build the node, start a local L1 and run the leaked-key attack suite:
+
+```bash
+bash chain/scripts/fetch.sh && bash chain/scripts/build.sh
+bash scripts/localnet.sh up && bash scripts/localnet.sh seed
+pnpm --filter attacks leaked-key
+```
+
+Step by step, with the other suites:
 
 ```bash
 git clone --recursive https://github.com/NeitLN/Sealed-Arena.git
@@ -103,9 +160,9 @@ More, including logs and troubleshooting: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 | [`chain/`](chain)                     | Patches on avalanchego (`patches/`), pinned upstream, node Dockerfile, local network launcher, Go-side tests and network test scripts |
 | [`contracts/`](contracts)             | Solidity (Foundry, run in Docker)                                                                                                     |
 | [`packages/shared/`](packages/shared) | Chain id, addresses, ABI, and the encoders for passkey challenges and proofs, shared by every service                                 |
-| `services/`, `web/`, `infra/`         | x402 facilitator, demo seller, buying agent, RPC gateway, web app, deployment (in progress)                                           |
-| [`scripts/`](scripts)                 | `check.sh`, `localnet.sh`, `forge.sh`                                                                                                 |
-| [`docs/`](docs)                       | Architecture, runbook, decision records                                                                                               |
+| `services/`, `web/`                   | x402 facilitator, demo seller, buying agent, relayer, RPC gateway, Fuji operations, attack suites, web app                            |
+| [`scripts/`](scripts)                 | `check.sh`, `check-localnet.sh`, `localnet.sh`, `forge.sh`, `submission-check.sh`                                                     |
+| [`docs/`](docs)                       | Architecture, runbook, decision records, evaluation, submission checklist                                                             |
 
 Only our changes to avalanchego live in this repository, as patch files applied to a pinned tag, so reviewers can read exactly what we wrote.
 
@@ -129,7 +186,7 @@ What the rule gives: on the Sealed L1, a transaction sent with an agent's key th
 What it does not give, stated plainly:
 
 1. **Testnet only.** Coins on the L1 have no monetary value. This is not a payment service.
-2. **The team runs all validators.** The claim is "the rule is enforced by the chain's consensus", not decentralisation. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses.
+2. **The team runs all validators.** The claim is "the rule is enforced by the chain's consensus", not that control is spread across independent parties. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses. The operator's admin key also holds the NativeMinter admin role on the L1 and could mint native coin outside the bridge; the project uses the bridge as its only minter.
 3. **Only assets on this L1 are protected.**
 4. **A leaked key can still spend inside the mandate**: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires.
 5. **Someone holding the key can grief**: use up the daily budget or occupy nonces.
@@ -139,6 +196,10 @@ What it does not give, stated plainly:
 9. **x402 here needs our payment method.** Sellers must add the network `eip155:261126` and point `/verify` and `/settle` at this facilitator; a standard x402 client (EIP-3009 tokens) cannot pay it. The facilitator holds no keys, but a seller still has to trust it or read the chain itself (the sample seller does both).
 
 Found a problem? See [SECURITY.md](SECURITY.md).
+
+## Legal note
+
+Sealed Arena runs on Avalanche's Fuji testnet. Its coins and test USDC have no monetary value, and it is not a payment or custody service. The open red-team challenge is an authorised bug-hunting program within the scope set on its rules page (the Sealed L1 on Fuji and this project's contracts and services only); attacks on anything else, including Avalanche's networks, other teams and infrastructure providers, and denial of service, are not authorised.
 
 ## License
 
