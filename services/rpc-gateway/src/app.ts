@@ -59,6 +59,10 @@ export type GatewayOptions = {
   /** eth_sendRawTransaction per minute per client. */
   sendPerMinute?: number;
   origins?: string[];
+  /** How long a /attempts/summary answer is reused (default 2 s): every open page polls it. */
+  summaryTtlMs?: number;
+  /** Clock, for tests. */
+  now?: () => number;
 };
 
 /** "agent: payee not allowed: 0x…" → "agent: payee not allowed"; other node messages keep their first clause. */
@@ -191,9 +195,22 @@ export function createGatewayApp(o: GatewayOptions) {
   });
 
   const fromParam = (q: string | undefined) => (q && /^0x[0-9a-fA-F]{40}$/.test(q) ? q : undefined);
-  app.get("/attempts/summary", async (c) =>
-    c.json(await o.store.summary(fromParam(c.req.query("from")))),
-  );
+  // GETs are not rate limited and every open page polls the summary, so answers are reused for
+  // a short time; the store's aggregate query then runs at most once per TTL per filter.
+  const summaryTtl = o.summaryTtlMs ?? 2000;
+  const clock = o.now ?? Date.now;
+  const summaries = new Map<string, { at: number; value: Promise<unknown> }>();
+  app.get("/attempts/summary", async (c) => {
+    const from = fromParam(c.req.query("from"));
+    const key = from?.toLowerCase() ?? "";
+    const hit = summaries.get(key);
+    if (hit && clock() - hit.at < summaryTtl) return c.json(await hit.value);
+    const value = o.store.summary(from);
+    summaries.set(key, { at: clock(), value });
+    // A failed read is not cached.
+    value.catch(() => summaries.delete(key));
+    return c.json(await value);
+  });
   app.get("/attempts/recent", async (c) => {
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 200);
     return c.json(await o.store.recent(limit, fromParam(c.req.query("from"))));

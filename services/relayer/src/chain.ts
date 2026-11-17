@@ -60,7 +60,8 @@ export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
         // that is zero when simulated and non-zero a block later). Unused gas is refunded.
         gas: (gas * 3n) / 2n + 50_000n,
       });
-      const receipt = await pub.waitForTransactionReceipt({ hash });
+      // Sends go through one queue: a transaction that never lands must not hold the others back.
+      const receipt = await pub.waitForTransactionReceipt({ hash, timeout: 60_000 });
       return { transaction: hash, status: receipt.status };
     },
   };
