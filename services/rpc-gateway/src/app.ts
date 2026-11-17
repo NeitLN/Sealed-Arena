@@ -54,7 +54,10 @@ export type GatewayOptions = {
   /** Secret salt for hashing client IPs. */
   ipSalt: string;
   trustProxy?: boolean;
-  /** Requests per minute per client. */
+  /**
+   * Calls per minute per client (default 600). Every open page polls, and people at one event share
+   * an IP; sends have their own, lower limit.
+   */
   perMinute?: number;
   /** eth_sendRawTransaction per minute per client. */
   sendPerMinute?: number;
@@ -98,7 +101,7 @@ function logRangeOk(params: unknown): boolean {
 }
 
 export function createGatewayApp(o: GatewayOptions) {
-  const perMinute = o.perMinute ?? 120;
+  const perMinute = o.perMinute ?? 600;
   const sendPerMinute = o.sendPerMinute ?? 20;
   const hits = new Map<string, number[]>();
   const sends = new Map<string, number[]>();

@@ -2,6 +2,7 @@ import { arenaRecorderAbi } from "@sealed-arena/shared";
 import { useCallback, useEffect, useState } from "react";
 import { ARENA, GATEWAY_URL } from "./arena.config.js";
 import { type AgentView, chainClient, readAgent } from "./owner.js";
+import { poll } from "./poll.js";
 
 export const RPC = `${GATEWAY_URL}/rpc`;
 
@@ -17,11 +18,11 @@ export type Recorder = { funded: bigint; required: bigint; score: bigint; breach
 
 /**
  * Live state of the open challenge: the agent and its mandate (chain), the ArenaRecorder record
- * (chain), and the attempts the gateway logged. Polls the gateway every 3 s and the chain every
- * 10 s; `error` is set after two failed polls in a row and cleared by the next success.
+ * (chain), and the attempts the gateway logged. Polls the gateway every 5 s and the chain every
+ * 15 s (see poll.ts); `error` is set after two failed polls in a row and cleared by the next success.
  */
 export function useArenaLive(recentLimit = 15) {
-  const [client] = useState(() => chainClient(RPC));
+  const [client] = useState(() => chainClient(RPC, { live: true }));
   const [view, setView] = useState<AgentView>();
   const [rec, setRec] = useState<Recorder>();
   const [summary, setSummary] = useState<Summary>();
@@ -51,8 +52,10 @@ export function useArenaLive(recentLimit = 15) {
         breached: breached as boolean,
       });
       setFails(0);
+      return true;
     } catch {
       setFails((n) => n + 1);
+      return false;
     }
   }, [client]);
 
@@ -72,19 +75,22 @@ export function useArenaLive(recentLimit = 15) {
       setSummary(s);
       setRecent(r);
       setFails(0);
+      return true;
     } catch {
       setFails((n) => n + 1);
+      return false;
     }
   }, [recentLimit]);
 
   useEffect(() => {
-    void refreshChain();
-    void refreshAttempts();
-    const a = setInterval(() => void refreshAttempts(), 3000);
-    const b = setInterval(() => void refreshChain(), 10_000);
+    // Every open page polls the public gateway, which limits calls per client IP; people at one
+    // event share an IP. So: a chain read (10 calls in one batch) every 15 s, attempts every 5 s,
+    // longer waits after failures, nothing while the tab is hidden.
+    const a = poll(refreshAttempts, 5_000);
+    const b = poll(refreshChain, 15_000);
     return () => {
-      clearInterval(a);
-      clearInterval(b);
+      a();
+      b();
     };
   }, [refreshChain, refreshAttempts]);
 

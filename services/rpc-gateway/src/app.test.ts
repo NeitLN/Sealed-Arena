@@ -161,6 +161,19 @@ describe("rpc gateway", () => {
     expect(codes).toEqual([200, 200, 200, 429]);
   });
 
+  it("by default allows a few open pages from one address (600 calls a minute), then 429", async () => {
+    const { app } = setup();
+    const call = (id: number) => ({ jsonrpc: "2.0", id, method: "eth_chainId", params: [] });
+    // 60 batches of 10 calls: what several polling pages behind one shared IP send in a minute.
+    for (let i = 0; i < 60; i++) {
+      const batch = Array.from({ length: 10 }, (_, k) => call(i * 10 + k));
+      expect((await rpc(app, batch)).status).toBe(200);
+    }
+    expect((await rpc(app, call(999))).status).toBe(429);
+    // Another client is not affected.
+    expect((await rpc(app, call(1000), "198.51.100.9")).status).toBe(200);
+  });
+
   it("counts every call in a batch toward the rate limit", async () => {
     const { app } = setup({ perMinute: 5 });
     const call = (id: number) => ({ jsonrpc: "2.0", id, method: "eth_chainId", params: [] });
