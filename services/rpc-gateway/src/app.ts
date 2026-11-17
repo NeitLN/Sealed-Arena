@@ -76,11 +76,15 @@ const rpcError = (id: unknown, code: number, message: string): RpcResponse => ({
   error: { code, message },
 });
 
+/** A block number: "0x" and at least one hex digit (isHex alone accepts "0x", which BigInt refuses). */
+const isBlockNumber = (v: unknown): v is string =>
+  typeof v === "string" && /^0x[0-9a-fA-F]+$/.test(v);
+
 function logRangeOk(params: unknown): boolean {
   const f = (Array.isArray(params) ? params[0] : undefined) as Record<string, unknown> | undefined;
   if (!f) return false;
   if (typeof f.blockHash === "string") return true;
-  if (!isHex(f.fromBlock) || !isHex(f.toBlock)) return false;
+  if (!isBlockNumber(f.fromBlock) || !isBlockNumber(f.toBlock)) return false;
   const span = BigInt(f.toBlock) - BigInt(f.fromBlock);
   return span >= 0n && span <= MAX_LOG_BLOCKS;
 }
@@ -117,6 +121,8 @@ export function createGatewayApp(o: GatewayOptions) {
   };
 
   async function handle(req: RpcRequest, ipHash: string): Promise<RpcResponse> {
+    if (typeof req !== "object" || req === null || Array.isArray(req))
+      return rpcError(null, -32600, "invalid request");
     const method = typeof req.method === "string" ? req.method : "";
     if (!ALLOWED.has(method)) return rpcError(req.id, -32601, "method not allowed by the gateway");
     if (method === "eth_getLogs" && !logRangeOk(req.params)) {

@@ -189,6 +189,37 @@ describe("rpc gateway", () => {
     }));
     expect((await rpc(app, big)).status).toBe(400);
   });
+
+  it("answers a batch entry that is not an object with -32600, not a server error", async () => {
+    const { app, n } = setup();
+    const res = await rpc(app, [null, 5, { jsonrpc: "2.0", id: 3, method: "eth_chainId" }]);
+    expect(res.status).toBe(200);
+    const out = (await res.json()) as Array<{
+      id: unknown;
+      result?: string;
+      error?: { code: number };
+    }>;
+    expect(out[0]).toMatchObject({ id: null, error: { code: -32600 } });
+    expect(out[1]).toMatchObject({ id: null, error: { code: -32600 } });
+    expect(out[2]?.result).toBe("0x3fc06");
+    expect(n.calls).toEqual(["eth_chainId"]);
+  });
+
+  it.each([[{ fromBlock: "0x", toBlock: "0x10" }], [{ fromBlock: "0x1", toBlock: "0x" }]])(
+    "refuses eth_getLogs with an empty hex block number (%j) with -32602",
+    async (filter) => {
+      const { app, n } = setup();
+      const res = await rpc(app, {
+        jsonrpc: "2.0",
+        id: 9,
+        method: "eth_getLogs",
+        params: [filter],
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ id: 9, error: { code: -32602 } });
+      expect(n.calls).toEqual([]);
+    },
+  );
 });
 
 describe("normalizeReason", () => {
