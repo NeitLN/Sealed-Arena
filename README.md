@@ -44,7 +44,7 @@ Transactions from other senders are not affected. Details and the exact contract
 
 - **Why a chain rule.** A limit kept by a server, or by a contract wallet the agent calls, binds only the paths that go through it; whoever holds the agent's key can sign other transactions. A validity rule in the node binds every transaction the key signs, whatever signed it and whoever sent it, because a block that contains a forbidden one is invalid for the validators.
 - **Why an Avalanche L1.** We need our own validity rule and still want to stay EVM-compatible and connected to existing assets. An Avalanche L1 runs our patched Subnet-EVM with its own validator set, keeps the C-Chain one message away (ICM), brings USDC across (ICTT), and costs a small continuous fee per validator rather than a network of our own to secure.
-- **Where the money comes from.** The L1's native coin is Circle test USDC from the Fuji C-Chain, bridged with ICTT: it is locked in the home contract on the C-Chain and minted one-for-one on the L1. Nothing else mints it. Testnet only.
+- **Where the money comes from.** The L1's native coin is Circle test USDC from the Fuji C-Chain, bridged with ICTT: it is locked in the home contract on the C-Chain and minted one-for-one on the L1. The other coins on the L1 are the genesis supply, which the ICTT remote counts as its initial reserve imbalance. The bridge is the only minter the project uses; the operator's admin key still holds the NativeMinter admin role (see the limits below). Testnet only.
 
 ## Avalanche components used
 
@@ -59,7 +59,7 @@ Transactions from other senders are not affected. Details and the exact contract
 | ICM (Teleporter) and the ICM relayer                                 | Carries the open challenge's survival record to the C-Chain    |
 | ERC-8004 registries on the Fuji C-Chain                              | Public identity and reputation record of the challenge agent   |
 
-**Size of the node change.** Two patch files on avalanchego `v1.15.3`: 1,912 lines of code added and 4 removed, plus 1,295 lines of tests. The rule itself is about 170 lines (`core/agent_rule.go` and its hooks in `core/state_transition.go` and `core/txpool/`); the rest is the `AgentPolicy` precompile, including WebAuthn verification and its ABI.
+**Size of the node change.** Two patch files on avalanchego `v1.15.3`: 1,912 non-blank lines of code added and 4 removed, plus 1,295 non-blank lines of tests. The rule itself is about 170 lines (`core/agent_rule.go` and its hooks in `core/state_transition.go` and `core/txpool/`); the rest is the `AgentPolicy` precompile, including WebAuthn verification and its ABI.
 
 ## Status
 
@@ -186,7 +186,7 @@ What the rule gives: on the Sealed L1, a transaction sent with an agent's key th
 What it does not give, stated plainly:
 
 1. **Testnet only.** Coins on the L1 have no monetary value. This is not a payment service.
-2. **The team runs all validators.** The claim is "the rule is enforced by the chain's consensus", not that control is spread across independent parties. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses.
+2. **The team runs all validators.** The claim is "the rule is enforced by the chain's consensus", not that control is spread across independent parties. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses. The operator's admin key also holds the NativeMinter admin role on the L1 and could mint native coin outside the bridge; the project uses the bridge as its only minter.
 3. **Only assets on this L1 are protected.**
 4. **A leaked key can still spend inside the mandate**: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires.
 5. **Someone holding the key can grief**: use up the daily budget or occupy nonces.
