@@ -133,7 +133,7 @@
     ]
   },
   "S": {
-    "agent": "0x5edb9BA87d4842006ddB1C6dc589bF5ffBB0e8bD",
+    "agent": "0x07Dc337Bcbe000943B5DB108a0047EB78725e48A",
     "caps": {
       "perTx": "0.5",
       "daily": "1"
@@ -144,28 +144,29 @@
     },
     "attempts": 20,
     "payment": "0.4",
-    "acceptedByPool": 18,
-    "refusedByPool": 2,
-    "refusals": {
-      "Missing or invalid parameters.": 2
-    },
+    "acceptedByPool": 20,
+    "refusedByPool": 0,
+    "refusals": {},
     "settledOnChain": 2,
-    "leftOutOfBlocks": 16,
+    "leftOutOfBlocks": 18,
     "spent": "0.8",
     "gasPaidByRefused": "0 (a payment the rule refuses is never in a block)",
-    "balanceDrop": "0.800042000000042",
+    "funding": "8.1",
+    "balanceDrop": "0.800084",
+    "returnedAfterRun": "0.0991138",
     "overDailyCap": false,
     "txs": [
       {
-        "tx": "0x653939eef1678559122199c3acf0b9c8d75e551f3ca8e8f37fce52d902df986e",
+        "tx": "0x0231e083d64ad1627d828763216b9880002625fb7cabcc1af24280d37892ed59",
         "status": "success",
-        "block": 59
+        "block": 433
       },
       {
-        "tx": "0x40861c12114ab85468a52043f7b8529c36007377c97fe04997145999d193ed47",
+        "tx": "0x80d5ab6cff3937beca11770edc1267e8fb077b1816dc052cdf954e087c577a57",
         "status": "success",
-        "block": 60
+        "block": 434
       }
     ]
-  }
+  },
+  "atS": "2026-11-18T19:14:50.366Z"
 }

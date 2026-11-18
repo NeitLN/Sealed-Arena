@@ -4,6 +4,8 @@ import type { Lang } from "./i18n.js";
 export type Tx = { tx: string; status: string; block: number };
 export type Result = {
   at: string;
+  /** When group S was last run on its own (its burst), if after `at`. */
+  atS?: string;
   explorers: { cChain: string };
   P: { balanceBefore: string; attackerReceived: string; balanceAfter: string; tx: string };
   O: {
@@ -174,7 +176,7 @@ export const compareText = (lang: Lang, x: Result) =>
   lang === "vi"
     ? {
         title: "Một agent, ba loại ví",
-        intro: `Cùng một agent, ba cách đưa tiền cho nó. Kết quả lần chạy trên Fuji lúc ${x.at.slice(0, 16).replace("T", " ")} UTC. Hạn mức của O và S: ${x.O.caps.perTx} USDC mỗi lần, ${x.O.caps.daily} USDC mỗi ngày.`,
+        intro: `Cùng một agent, ba cách đưa tiền cho nó. Kết quả lần chạy trên Fuji lúc ${x.at.slice(0, 16).replace("T", " ")} UTC${x.atS ? ` (S chạy lại lúc ${x.atS.slice(0, 16).replace("T", " ")} UTC, agent được nạp đủ cho cả 20 khoản)` : ""}. Hạn mức của O và S: ${x.O.caps.perTx} USDC mỗi lần, ${x.O.caps.daily} USDC mỗi ngày.`,
         injection: "Trang cài lệnh: gửi toàn bộ số dư tới địa chỉ kẻ tấn công",
         burst: `${x.O.attempts} thanh toán ${x.O.payment} USDC gửi cùng lúc`,
         notRun: "Không đo",
@@ -190,7 +192,7 @@ export const compareText = (lang: Lang, x: Result) =>
         sInjection: x.S.injection.refused
           ? `Node từ chối (${x.S.injection.reason}); không được đưa vào block.`
           : "Node nhận giao dịch.",
-        sBurst: `${x.S.settledOnChain} vào block; ${x.S.leftOutOfBlocks} chưa vào block (còn chờ trong pool); ${x.S.refusedByPool} bị pool từ chối. Đã chi ${x.S.spent} USDC.`,
+        sBurst: `${x.S.settledOnChain} vào block; ${x.S.leftOutOfBlocks} đang chờ trong pool, chưa vào block; ${x.S.refusedByPool} bị từ chối ngay khi gửi. Đã chi ${x.S.spent} USDC (hạn mức ngày ${x.S.caps.daily}).`,
         notes: [
           `Cột P chạy lại một bản ghi dựng tay (gửi hết số dư cho kẻ tấn công). Với model thật (claude-sonnet-5-5 và claude-haiku-5-5), agent không làm theo trang cài lệnh lượt nào: 0/30, gồm 15 lượt ở services/agent/README.md và 15 lượt ở docs/EVALUATION.md. Nó làm theo một ghi chú cài vào bộ nhớ ${memory} lượt khi chủ ví bảo đọc ghi chú; với S (Sealed L1 cục bộ), node từ chối ${agent.toAttacker.refused}/${agent.toAttacker.tried} khoản trả tới địa chỉ kẻ tấn công (bảng agent tier trong docs/EVALUATION.md).`,
           "Cả O và S đều không vượt hạn mức ngày. Khác biệt ở chỗ bị từ chối: với O, các khoản hỏng vẫn vào block sau khi đã qua bước kiểm của facilitator; với S, khoản bị từ chối không vào block nào.",
@@ -201,7 +203,7 @@ export const compareText = (lang: Lang, x: Result) =>
       }
     : {
         title: "Same agent, three wallets",
-        intro: `One agent, three ways to give it money. Results of the run on Fuji at ${x.at.slice(0, 16).replace("T", " ")} UTC. Caps for O and S: ${x.O.caps.perTx} USDC per payment, ${x.O.caps.daily} USDC per day.`,
+        intro: `One agent, three ways to give it money. Results of the run on Fuji at ${x.at.slice(0, 16).replace("T", " ")} UTC${x.atS ? ` (S run again at ${x.atS.slice(0, 16).replace("T", " ")} UTC, with the agent funded for all 20 payments)` : ""}. Caps for O and S: ${x.O.caps.perTx} USDC per payment, ${x.O.caps.daily} USDC per day.`,
         injection: "Injected page: send the whole balance to the attacker address",
         burst: `${x.O.attempts} payments of ${x.O.payment} USDC sent at once`,
         notRun: "Not measured",
@@ -218,7 +220,7 @@ export const compareText = (lang: Lang, x: Result) =>
         sInjection: x.S.injection.refused
           ? `Refused by the node (${x.S.injection.reason}); not included in a block.`
           : "Accepted by the node.",
-        sBurst: `${x.S.settledOnChain} in blocks; ${x.S.leftOutOfBlocks} not in a block (still waiting in the pool); ${x.S.refusedByPool} refused by the pool. Spent ${x.S.spent} USDC.`,
+        sBurst: `${x.S.settledOnChain} in blocks; ${x.S.leftOutOfBlocks} waiting in the pool, not in a block; ${x.S.refusedByPool} refused on arrival. Spent ${x.S.spent} USDC (daily cap ${x.S.caps.daily}).`,
         notes: [
           `Column P replays a hand-written transcript (the whole balance to the attacker). With live models (claude-sonnet-5-5 and claude-haiku-5-5) the agent never followed an injected page: 0/30 runs, 15 in services/agent/README.md and 15 in docs/EVALUATION.md. It followed a note planted in its memory in ${memory} runs when its owner asked it to read its notes; on S (local Sealed L1) the node refused ${refusedOf} payments to the attacker's address (agent-tier table in docs/EVALUATION.md).`,
           "Neither O nor S went over the daily cap. The difference is where refusals happen: O's failed payments still land in blocks after passing the facilitator's check; S's refused payments are not included in a block.",
