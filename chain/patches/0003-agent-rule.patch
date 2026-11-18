@@ -910,10 +910,10 @@ index 0000000..0a4f168
 +}
 diff --git a/graft/subnet-evm/core/agent_rule_v2_test.go b/graft/subnet-evm/core/agent_rule_v2_test.go
 new file mode 100644
-index 0000000..aa329d9
+index 0000000..cf7680c
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule_v2_test.go
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,196 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -1075,6 +1075,40 @@ index 0000000..aa329d9
 +	st, err := fresh.State()
 +	require.NoError(t, err)
 +	require.Equal(t, uint64(2), agentpolicy.RuleVersion(st))
++}
++
++// The effective tip is min(tipCap, feeCap - baseFee): what the block producer gets per gas. A
++// payment whose declared tip is above the cap but whose fee cap leaves less than the cap above
++// the base fee is valid, legacy ones included (their tip is gasPrice - baseFee).
++func TestAgentRuleV2EffectiveTipUsesBaseFee(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
++	st, err := e.chain.State()
++	require.NoError(t, err)
++	baseFee := big.NewInt(25_000_000_000)
++	halfGwei := big.NewInt(500_000_000)
++	check := func(txType uint8, tipCap, feeCap *big.Int) error {
++		_, _, err := CheckAgentTx(st, e.head.Time(), AgentTx{
++			From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer,
++			GasFeeCap: feeCap, Plain: true, V2: true, TxType: txType, GasTipCap: tipCap, BaseFee: baseFee,
++		})
++		return err
++	}
++	justAbove := new(big.Int).Add(new(big.Int).Add(baseFee, AgentMaxTip), common.Big1)
++	atCap := new(big.Int).Add(baseFee, AgentMaxTip)
++	half := new(big.Int).Add(baseFee, halfGwei)
++	// Legacy: tip = gasPrice - baseFee.
++	require.NoError(t, check(0, half, half))
++	require.NoError(t, check(0, atCap, atCap))
++	require.ErrorIs(t, check(0, justAbove, justAbove), ErrAgentTipTooHigh)
++	// Type 2: a 2 gwei tip cap with only 0.5 gwei of room above the base fee pays 0.5 gwei.
++	require.NoError(t, check(2, big.NewInt(2_000_000_000), half))
++	require.ErrorIs(t, check(2, big.NewInt(2_000_000_000), justAbove), ErrAgentTipTooHigh)
++	// No base fee (before London): the declared tip counts.
++	_, _, err = CheckAgentTx(st, e.head.Time(), AgentTx{
++		From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap,
++		Plain: true, V2: true, TxType: 2, GasTipCap: big.NewInt(2_000_000_000),
++	})
++	require.ErrorIs(t, err, ErrAgentTipTooHigh)
 +}
 diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
 index 415a986..820c494 100644
