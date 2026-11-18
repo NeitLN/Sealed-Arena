@@ -2,6 +2,10 @@
 
 Sealed Arena runs on **testnets only**. The coins on its L1 have no monetary value, and the project is not a payment service.
 
+## Open challenge
+
+The open red-team challenge is live: https://sealed-arena.vercel.app/arena, rules at https://sealed-arena.vercel.app/arena/rules. A T0 breach of the challenge agent (coins leaving it beyond what the rule charged) is public by design: press "Report breach" on the page and open a public issue with the transaction hash. Everything else, including a way to forge an owner proof or to bypass the rule for other agents, should be reported privately as described below. Do not attack infrastructure outside the scope on the rules page.
+
 ## Reporting a vulnerability
 
 Please report privately through GitHub: **Security → Report a vulnerability** on this repository. Include:
@@ -21,6 +25,4 @@ Out of scope, by design (see the limitations in the README):
 - spending that stays inside an agent's mandate, including by someone holding a leaked agent key, until the owner freezes the agent or the mandate expires;
 - using up an agent's daily budget or nonces (griefing);
 - assets on any chain other than the Sealed L1;
-- actions that need the team's validator or admin keys, such as network upgrades.
-
-An open red-team challenge with its own rules will be announced separately. Until then, do not attack infrastructure you do not own.
+- actions that need the team's validator or admin keys, such as network upgrades, and anything that needs the relayer host's manager key (README limit 13).

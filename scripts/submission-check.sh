@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks before submitting (docs/SUBMISSION.md). Reads only tracked files.
 #   1. no forbidden claim in any tracked text file (same list as web/src/wording.test.ts)
-#   2. no statement about how the project itself was written (tool names, co-author trailers)
+#   2. the number of limits in README's "Security model and limitations" is EXPECTED_LIMITS
 #   3. no value of a secret from .env in any tracked file (the public challenge agent key excepted)
 #   4. no tracked file that .gitignore says should be ignored
 #   5. every https link in README.md answers (2xx or 3xx)
@@ -28,11 +28,11 @@ hits=$(files | grep -vE '^(web/src/wording.test.ts|scripts/submission-check.sh)$
   xargs -d '\n' grep -nIiE "$FORBIDDEN" 2>/dev/null || true)
 if [ -n "$hits" ]; then echo "$hits" | head -20; fail "forbidden wording"; else echo "PASS"; fi
 
-step "statements about how the project was written"
-AI='Co-Authored-By|AI-assisted|generated (with|by) (Claude|Codex|ChatGPT|AI)|\bChatGPT\b|\bCodex\b|noreply@anthropic'
-hits=$(files | grep -vE '^scripts/submission-check.sh$' | xargs -d '\n' grep -nIE "$AI" 2>/dev/null || true)
-commits=$(git log --format='%H %an %ae %cn %ce%n%B' | grep -nIE "$AI|anthropic" || true)
-if [ -n "$hits$commits" ]; then echo "$hits" | head -10; echo "$commits" | head -10; fail "trace found"; else echo "PASS"; fi
+step "numbered limits in README"
+# Every limit under "Security model and limitations" is numbered; bump this when one is added.
+EXPECTED_LIMITS=13
+n=$(awk '/^## Security model and limitations/{on=1; next} /^## /{on=0} on && /^[0-9]+\. /' README.md | wc -l | tr -d ' ')
+if [ "$n" = "$EXPECTED_LIMITS" ]; then echo "PASS ($n limits)"; else fail "README has $n numbered limits, expected $EXPECTED_LIMITS: update EXPECTED_LIMITS and docs together"; fi
 
 step "secrets from .env"
 if [ -f .env ]; then
