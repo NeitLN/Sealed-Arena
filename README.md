@@ -110,9 +110,11 @@ Nine attack classes, 45 cases, on four groups with the same reference mandate (t
 
 O+ and S both kept every coin inside the mandate in these 45 cases. S ends with fewer T1 cases than O+ (9 against 16) only because it adds the maximum fee to each payment: in the 7 cases that differ, a payment of exactly the cap was refused with "budget exceeded". It does not judge what the owner wanted. The local three-node L1 gives the same result for S.
 
-The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 26 cases ended inside the mandate, and on the Sealed L1 on Fuji all 22 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
+The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 26 cases ended inside the mandate, and on the Sealed L1 on Fuji all 22 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)). The Fuji run has four cases fewer: Fuji has one node, so "sent straight to node 2" and "node 3" do not apply, and the blob (type 3) and set-code (type 4) cases were added after that run.
 
-With a live model, the buying agent ignored the injected pages (0/5 for each of three pages). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node (local Sealed L1) refused 15 of 15 payments to the attacker's address (agent-tier table in [`docs/EVALUATION.md`](docs/EVALUATION.md)). S does not stop T1: the rule limits where and how much, not what the owner wanted.
+Three mandates are used, so the amounts differ between sections: the open challenge and the 20-payments-at-once run use 0.5 USDC per payment and 1 USDC per day; the 45-case evaluation uses 0.02 and 0.05; the leaked-key suite sets its own.
+
+With two live models (claude-sonnet-5-5 and claude-haiku-5-5), the buying agent followed none of the injected pages in 30 runs (15 in the evaluation below, 15 in [`services/agent`](services/agent/README.md)). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node (local Sealed L1) refused 15 of 15 payments to the attacker's address (agent-tier table in [`docs/EVALUATION.md`](docs/EVALUATION.md)). S does not stop T1: the rule limits where and how much, not what the owner wanted.
 
 ## Why not a contract wallet?
 

@@ -301,7 +301,7 @@ export default function LandingPage() {
                 <p className="comparison-detail">
                   {t.poolResult
                     .replace("{accepted}", String(r.S.acceptedByPool))
-                    .replace("{refused}", String(r.S.refusedByPool))}{" "}
+                    .replace("{attempts}", String(r.S.attempts))}{" "}
                   {t.sealedResult}
                 </p>
                 <p className="test-tag">{t.injectionLabel}</p>

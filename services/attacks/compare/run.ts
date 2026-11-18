@@ -7,7 +7,7 @@
 //                                         against caps of 0.5 per payment and 1 per day. Writes results/fuji-<time>.json
 //                                         and web/src/compare-result.json.
 // Needs: bash scripts/forge.sh build; the SSH tunnel to the Fuji node (127.0.0.1:19650); keys in Sealed-Arena/.env.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -29,7 +29,8 @@ import { avalancheFuji } from "viem/chains";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../../..");
-process.loadEnvFile(resolve(ROOT, ".env"));
+// A worktree has no .env: the variables can come from the environment instead.
+if (existsSync(resolve(ROOT, ".env"))) process.loadEnvFile(resolve(ROOT, ".env"));
 const DEPLOYMENTS = resolve(ROOT, "services/fuji-ops/deployments/fuji.json");
 const d = JSON.parse(readFileSync(DEPLOYMENTS, "utf8")) as Record<string, unknown> & {
   blockchainID: string;
@@ -348,12 +349,66 @@ async function runO() {
   };
 }
 
+/**
+ * After the measurement: the suite owner key widens the mandate, the payments still waiting in
+ * the pool are then included, and the rest of the balance is paid to the same team-held seller, so
+ * the test USDC is not stranded on a key nobody keeps. Recorded with hashes, so that anyone looking
+ * the agent up sees why all 20 payments are in blocks in the end.
+ */
+async function cleanUp(
+  n: ReturnType<typeof sealed.nodes>[number],
+  agent: Awaited<ReturnType<typeof sealed.freshAgent>>,
+  waiting: Hex[],
+) {
+  const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  await sealed.setMandate(n, agent.address, {
+    payees: [SELLER],
+    perTxCap: parseEther("100"),
+    dailyCap: parseEther("100"),
+    expiry,
+  });
+  const widenedAt = Number(await n.client.getBlockNumber());
+  const included = await Promise.all(
+    waiting.map((hash) => n.client.waitForTransactionReceipt({ hash, timeout: 120_000 })),
+  );
+  const fees = await n.client.estimateFeesPerGas();
+  const balance = await n.client.getBalance({ address: agent.address });
+  const gasCost = 21_000n * fees.maxFeePerGas;
+  let leftover: { block: number; tx: Hex; value: string } | null = null;
+  if (balance > gasCost) {
+    const value = balance - gasCost;
+    const hash = await sealed.wallet(n, agent).sendTransaction({
+      to: SELLER,
+      value,
+      gas: 21_000n,
+      maxFeePerGas: fees.maxFeePerGas,
+      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+    });
+    const r = await n.client.waitForTransactionReceipt({ hash });
+    leftover = { block: Number(r.blockNumber), tx: hash, value: formatEther(value) };
+  }
+  return {
+    note: "After the measurement the run cleaned up: the suite owner key widened the mandate, so the payments still waiting in the pool were included, and the rest of the balance went back to the same team-held seller. The numbers above are from before the mandate was widened.",
+    mandateWidened: { block: widenedAt, tx: null },
+    waitingIncluded: {
+      block: included[0] ? Number(included[0].blockNumber) : null,
+      count: included.length,
+      value: formatEther(parseEther(CAPS.payment) * BigInt(included.length)),
+      txs: waiting,
+    },
+    leftoverReturned: leftover,
+  };
+}
+
 /** S: a fresh agent on the Sealed L1 (not the challenge agent); same caps, same payment burst. */
 async function runS() {
   const [n] = sealed.nodes();
   if (!n) throw new Error("no Sealed node");
+  // Enough for all 20 payments and their gas, so only the rule limits what is spent (with less,
+  // the pool refuses the later payments for insufficient funds and the run measures the balance).
+  const funding = parseEther(CAPS.payment) * BigInt(CAPS.count) + parseEther("0.1");
   const agent = await sealed.freshAgent(n, [SELLER], {
-    funding: parseEther("3"),
+    funding,
     perTxCap: parseEther(CAPS.perTx),
     dailyCap: parseEther(CAPS.daily),
   });
@@ -410,6 +465,8 @@ async function runS() {
   );
   const toSeller = receipts.filter((r) => r.status === "success").length;
   const valueSent = parseEther(CAPS.payment) * BigInt(toSeller);
+  const balanceAfter = await n.client.getBalance({ address: agent.address });
+  const afterMeasurement = await cleanUp(n, agent, accepted.slice(mined) as Hex[]);
   return {
     agent: agent.address,
     caps: { perTx: CAPS.perTx, daily: CAPS.daily },
@@ -423,19 +480,29 @@ async function runS() {
     leftOutOfBlocks: accepted.length - mined,
     spent: formatEther(valueSent),
     gasPaidByRefused: "0 (a payment the rule refuses is never in a block)",
-    balanceDrop: formatEther(before - (await n.client.getBalance({ address: agent.address }))),
+    funding: formatEther(funding),
+    balanceDrop: formatEther(before - balanceAfter),
     overDailyCap: valueSent > parseEther(CAPS.daily),
     txs: receipts.map((r) => ({
       tx: r.transactionHash,
       status: r.status,
       block: Number(r.blockNumber),
     })),
+    afterMeasurement,
   };
 }
 
-const reason = (e: unknown) =>
-  /agent: [a-z ]+/.exec(e instanceof Error ? e.message : String(e))?.[0] ??
-  (e instanceof Error ? (e.message.split("\n")[0] ?? "rejected") : "rejected");
+/** The node's own message: viem wraps it (e.g. "Missing or invalid parameters." for -32602) and keeps it in `details`. */
+const reason = (e: unknown) => {
+  const all = [e, (e as { cause?: unknown })?.cause]
+    .map((x) => (x as { details?: string })?.details ?? (x instanceof Error ? x.message : ""))
+    .join("\n");
+  const agentErr = /agent: [a-z ]+/.exec(all)?.[0];
+  if (agentErr) return agentErr;
+  const details = (e as { details?: string })?.details;
+  if (details) return details.split("\n")[0] as string;
+  return e instanceof Error ? (e.message.split("\n")[0] ?? "rejected") : "rejected";
+};
 
 async function run() {
   const at = new Date().toISOString();
@@ -471,7 +538,23 @@ async function run() {
 }
 
 const cmd = process.argv[2];
-const fns: Record<string, () => Promise<void>> = { setup, run };
+/** Group S only, merged into the last full result (P and O keep their run time in `at`). */
+async function runSOnly() {
+  const file = resolve(ROOT, "web/src/compare-result.json");
+  const last = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+  const atS = new Date().toISOString();
+  console.log("S ...");
+  const S = await runS();
+  console.log(JSON.stringify({ ...S, txs: S.txs.length }));
+  const result = { ...last, atS, S };
+  const out = resolve(HERE, `results/fuji-S-${atS.replace(/[:.]/g, "-")}.json`);
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
+  writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`);
+  console.log(`results: ${out}`);
+}
+
+const fns: Record<string, () => Promise<void>> = { setup, run, "run-s": runSOnly };
 const fn = cmd ? fns[cmd] : undefined;
 if (!fn) {
   console.error(`usage: compare <${Object.keys(fns).join("|")}>`);

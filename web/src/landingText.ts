@@ -13,7 +13,7 @@ const en = {
   injectedTag: "Injected page · hand-written transcript",
   burstTag: "{attempts} simultaneous payments",
   inBlocks: "In blocks",
-  keptOut: "Kept out of blocks",
+  keptOut: "Waiting in the pool",
   reverted: "Reverted",
   injectionLabel: "Payment to the attacker refused by the node",
   challengeEyebrow: "SEALED ARENA / OPEN CHALLENGE",
@@ -27,7 +27,7 @@ const en = {
   ownerConsole: "Owner console",
   liveTitle: "Live on Fuji, right now",
   liveNote: "The challenge agent's private key is public. These numbers update every few seconds.",
-  senders: "Distinct senders",
+  senders: "Distinct visitors (salted IP hash)",
   survival: "Survival",
   survivalUnit: "USDC·hours",
   survivalHelp:
@@ -52,7 +52,8 @@ const en = {
   limit: "Limit contract wallet",
   limitResult: "{passed} of {attempts} passed the check, then {reverted} reverted inside blocks",
   sealed: "Sealed L1",
-  poolResult: "The pool accepted {accepted}. It rejected {refused} for invalid parameters.",
+  poolResult:
+    "The pool accepted {accepted} of {attempts}: each payment alone is inside the caps. The rule lets into blocks only what fits the daily cap.",
   sealedResult:
     "Over-limit payments stayed out of blocks. A waiting payment can enter a later day's block within that day's cap.",
   fullResults: "Full results",
@@ -129,7 +130,7 @@ const vi: Text = {
   injectedTag: "Trang cài lệnh · bản ghi dựng tay",
   burstTag: "{attempts} khoản trả đồng thời",
   inBlocks: "Vào block",
-  keptOut: "Chưa vào block",
+  keptOut: "Đang chờ trong pool",
   reverted: "Revert",
   injectionLabel: "Node từ chối khoản trả cho kẻ tấn công",
   challengeEyebrow: "SEALED ARENA / THỬ THÁCH MỞ",
@@ -144,7 +145,7 @@ const vi: Text = {
   liveTitle: "Đang chạy trên Fuji",
   liveNote:
     "Private key của agent thử thách được công khai. Các số dưới đây cập nhật vài giây một lần.",
-  senders: "Số người gửi",
+  senders: "Số khách (theo hash IP có muối)",
   survival: "Sống sót",
   survivalUnit: "USDC·giờ",
   survivalHelp:
@@ -169,7 +170,7 @@ const vi: Text = {
   limitResult: "{passed}/{attempts} qua bước kiểm, rồi {reverted} revert trong block",
   sealed: "L1 Sealed",
   poolResult:
-    "Pool nhận {accepted} giao dịch và từ chối {refused} giao dịch do tham số không hợp lệ.",
+    "Pool nhận {accepted}/{attempts} khoản: từng khoản riêng lẻ đều trong hạn mức. Quy tắc chỉ cho vào block phần vừa hạn mức ngày.",
   sealedResult:
     "Khoản vượt hạn mức chưa vào block. Giao dịch chờ có thể vào block ngày sau nếu còn hạn mức của ngày đó.",
   fullResults: "Xem đầy đủ",

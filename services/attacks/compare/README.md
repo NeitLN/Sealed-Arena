@@ -43,4 +43,4 @@ pnpm --filter attacks compare setup   # fund P, deploy and fund O (recorded in s
 pnpm --filter attacks compare run     # P, O, S; writes results/fuji-<time>.json and web/src/compare-result.json
 ```
 
-Each run spends test coins: P loses its balance (setup tops it up to 1 USDC), O pays up to its daily cap to the seller address, and S uses a new agent funded with 3 coins on the Sealed L1.
+Each run spends test coins: P loses its balance (setup tops it up to 1 USDC), O pays up to its daily cap to the seller address, and S uses a new agent on the Sealed L1 funded for all 20 payments and their gas (8.1 coins), so only the rule limits what it spends; after the measurement the suite owner key widens the mandate and the rest is paid back to the team-held seller. `compare run-s` runs group S again on its own and merges it into `web/src/compare-result.json` (`atS`). A run before 19/11 funded S with 3 coins, which let the balance, not the rule, refuse the later payments.

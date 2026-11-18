@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { arenaText } from "./arenaText.js";
 import { businessText } from "./businessText.js";
@@ -5,6 +8,8 @@ import result from "./compare-result.json";
 import { compareText, type Result } from "./compareText.js";
 import { KEYS, useI18n } from "./i18n.js";
 import { landingText } from "./landingText.js";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 /** The project's "never say" list, in both languages (claims we must not make). */
 const FORBIDDEN = [
@@ -105,6 +110,17 @@ describe("page wording", () => {
       expect(landingText(lang).limitResult).toMatch(/\{passed\}.*\{attempts\}.*\{reverted\}/);
   });
 
+  it("explains the clean-up after the S measurement, with its blocks, in both languages", () => {
+    const r = result as unknown as Result;
+    const a = r.S.afterMeasurement;
+    if (!a) throw new Error("compare-result.json has no afterMeasurement for S");
+    for (const lang of ["en", "vi"] as const) {
+      const note = compareText(lang, r).notes.at(-1) ?? "";
+      expect(note).toContain(`block ${a.waitingIncluded.block}`);
+      expect(note).toContain(String(a.waitingIncluded.count));
+    }
+  });
+
   it("says the P column is a hand-written transcript, in both languages", () => {
     expect(compareText("en", result as unknown as Result).notes[0]).toMatch(/hand-written/);
     expect(compareText("vi", result as unknown as Result).notes[0]).toMatch(/dựng tay/);
@@ -113,6 +129,34 @@ describe("page wording", () => {
   it("states the six limits in both languages", () => {
     expect(arenaText("en").limits).toHaveLength(6);
     expect(arenaText("vi").limits).toHaveLength(6);
+  });
+
+  it.each([
+    ["arenaText", (l: "en" | "vi") => arenaText(l)],
+    ["landingText", (l: "en" | "vi") => landingText(l)],
+    ["businessText", (l: "en" | "vi") => businessText(l)],
+    ["compareText", (l: "en" | "vi") => compareText(l, result as unknown as Result)],
+  ])("%s has the same keys and list lengths in English and Vietnamese", (_, text) => {
+    const shape = (v: unknown): unknown =>
+      Array.isArray(v)
+        ? v.map(shape)
+        : v && typeof v === "object"
+          ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shape(x)]))
+          : typeof v;
+    expect(shape(text("vi"))).toEqual(shape(text("en")));
+    for (const s of allText(text("vi"))) expect(s.trim(), "empty Vietnamese string").not.toBe("");
+  });
+
+  it.each([
+    "README.md",
+    "SECURITY.md",
+    "docs/SUBMISSION.md",
+    "docs/EVALUATION.md",
+    "docs/ARCHITECTURE.md",
+    "services/agent/README.md",
+  ])("%s contains no forbidden claim", (file) => {
+    const text = readFileSync(resolve(ROOT, file), "utf8");
+    for (const re of FORBIDDEN) expect(text, `${re} in ${file}`).not.toMatch(re);
   });
 
   it("owner console keys exist", () => {
