@@ -16,7 +16,7 @@ source "$CHAIN_DIR/UPSTREAM"
 SRC="$CHAIN_DIR/.work/avalanchego"
 
 # Packages and test name pattern covered by the Sealed Arena patches.
-PACKAGES=(./core/ ./core/txpool/legacypool/ ./precompile/contracts/agentpolicy/ ./plugin/evm/)
+PACKAGES=(./core/ ./core/txpool/legacypool/ ./precompile/contracts/agentpolicy/ ./plugin/evm/ ./params/extras/)
 RUN_PATTERN="${SEALED_TEST_RUN:-AgentRule|AgentPolicy}"
 # Shared WebAuthn vectors, read by the AgentPolicy tests.
 VECTORS="$CHAIN_DIR/testvectors"
