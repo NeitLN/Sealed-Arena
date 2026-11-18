@@ -74,6 +74,28 @@ const en = {
   agent_not_allowed:
     "This agent is not allowed to send on this chain yet. Ask the operator to add it, then link it.",
   rate_limited: "Too many requests. Wait a minute and try again.",
+  demoTitle: "Try it with a demo agent",
+  demoIntro:
+    "We give you a new agent on the Sealed L1 on Fuji, already linked to your passkey, with 0.05 test USDC. Its key stays in this browser.",
+  demoStep1: "Create a passkey (step 1 below).",
+  demoStep2: "Get a demo agent: it is linked to your passkey before it may send anything.",
+  demoStep3: "Set a mandate: payees, a cap per payment and per day (step 3).",
+  demoStep4:
+    "Try a payment to a stranger (refused), pay an allowed payee (goes through), then freeze the agent and pay the payee again (refused).",
+  demoGet: "Get a demo agent",
+  demoNeedPasskey: "Create a passkey first.",
+  demoFailed: "Could not get a demo agent. Try again later.",
+  demo_cap: "No more demo agents today. Try again tomorrow.",
+  demoTry: "Pay a stranger 0.01 USDC",
+  demoTryPayee: "Pay your first allowed payee 0.01 USDC",
+  demoTryHint:
+    "Each button signs a real payment with the demo agent's key and sends it to the node; the answer below is what the node sent back. A payment to an allowed payee goes through while the agent is not frozen.",
+  demoPaid: "Accepted by the node: inside the mandate",
+  demoRefused: "Refused by the node",
+  demoAccepted:
+    "Accepted by the node. A payment to a stranger should not be accepted: please tell the team.",
+  demoBusy: "The public RPC is busy (rate limited). Try again in a minute.",
+  demoError: "Could not reach the node",
 };
 
 type Key = keyof typeof en;
@@ -148,6 +170,28 @@ const vi: Record<Key, string> = {
   agent_not_allowed:
     "Agent này chưa được phép gửi giao dịch trên chain. Nhờ người vận hành thêm agent rồi gắn lại.",
   rate_limited: "Quá nhiều yêu cầu. Đợi một phút rồi thử lại.",
+  demoTitle: "Thử với một agent demo",
+  demoIntro:
+    "Chúng tôi cấp cho bạn một agent mới trên Sealed L1 ở Fuji, đã gắn sẵn với passkey của bạn, kèm 0,05 USDC thử. Key của agent chỉ nằm trong trình duyệt này.",
+  demoStep1: "Tạo passkey (bước 1 bên dưới).",
+  demoStep2:
+    "Nhận agent demo: agent được gắn với passkey của bạn trước khi được phép gửi bất cứ gì.",
+  demoStep3: "Đặt uỷ quyền: người nhận, hạn mức mỗi lần và mỗi ngày (bước 3).",
+  demoStep4:
+    "Thử trả cho người lạ (bị từ chối), trả cho người nhận được phép (đi qua), rồi dừng agent và trả lại người nhận đó (bị từ chối).",
+  demoGet: "Nhận agent demo",
+  demoNeedPasskey: "Hãy tạo passkey trước.",
+  demoFailed: "Không nhận được agent demo. Thử lại sau.",
+  demo_cap: "Hôm nay đã hết agent demo. Hãy thử lại vào ngày mai.",
+  demoTry: "Trả 0,01 USDC cho người lạ",
+  demoTryPayee: "Trả 0,01 USDC cho người nhận được phép đầu tiên",
+  demoTryHint:
+    "Mỗi nút ký một khoản trả thật bằng key của agent demo rồi gửi tới node; câu trả lời bên dưới là đúng những gì node gửi về. Khoản trả cho người nhận được phép sẽ đi qua khi agent chưa bị dừng.",
+  demoPaid: "Node đã nhận: nằm trong uỷ quyền",
+  demoRefused: "Node từ chối",
+  demoAccepted: "Node đã nhận. Khoản trả cho người lạ không được phép được nhận: hãy báo cho đội.",
+  demoBusy: "RPC công khai đang bận (giới hạn tần suất). Thử lại sau một phút.",
+  demoError: "Không gọi được tới node",
 };
 
 const dict: Record<Lang, Record<Key, string>> = { en, vi };

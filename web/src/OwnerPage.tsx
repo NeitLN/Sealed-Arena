@@ -33,6 +33,7 @@ import {
   type PublicClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { DemoAgents } from "./DemoAgents.js";
 import { useI18n } from "./i18n.js";
 import {
   type AgentView,
@@ -380,6 +381,20 @@ export default function OwnerPage() {
           />
         ) : null}
         {busy ? <Banner status="info" title={t("working")} /> : null}
+
+        <DemoAgents
+          t={t}
+          client={client}
+          passkey={saved.passkey}
+          current={agent}
+          ownedByMe={ownedByMe}
+          payee={ownedByMe ? (view?.mandate.payees[0] as Address | undefined) : undefined}
+          onClaimed={(a) => {
+            setAgentInput(a);
+            remember({ ...saved, agent: a });
+          }}
+          onTried={() => void refresh()}
+        />
 
         <Stack direction={isMobile ? "vertical" : "horizontal"} gap={8} vAlign="start">
           <StackItem size="fill" style={isMobile ? undefined : formColBasis}>

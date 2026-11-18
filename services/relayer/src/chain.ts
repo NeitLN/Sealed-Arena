@@ -7,7 +7,7 @@ import {
 } from "@sealed-arena/shared";
 import { createPublicClient, createWalletClient, defineChain, type Hex, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import type { RelayChain } from "./app.js";
+import type { DemoIssuer, RelayChain } from "./app.js";
 
 const isLocal = (url: string) => /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(url);
 
@@ -64,5 +64,47 @@ export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
       const receipt = await pub.waitForTransactionReceipt({ hash, timeout: 60_000 });
       return { transaction: hash, status: receipt.status };
     },
+  };
+}
+
+/**
+ * The demo issuer: a separate key with the TxAllowList manager role (it can allow and remove
+ * senders, not change admins). One transaction at a time, each waited for in a block.
+ */
+export function demoIssuer(rpc: string, key: Hex): DemoIssuer {
+  const chain = defineChain({
+    id: CHAIN_ID,
+    name: "Sealed",
+    nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+    rpcUrls: { default: { http: [rpc] } },
+  });
+  const account = privateKeyToAccount(key);
+  const pub = createPublicClient({ chain, transport: http(rpc) });
+  const wallet = createWalletClient({ account, chain, transport: http(rpc) });
+  let queue: Promise<unknown> = Promise.resolve();
+  const one = <T>(f: () => Promise<T>): Promise<T> => {
+    const next = queue.then(f);
+    queue = next.catch(() => undefined);
+    return next;
+  };
+  const landed = async (hash: Hex) => {
+    const r = await pub.waitForTransactionReceipt({ hash, timeout: 60_000 });
+    if (r.status !== "success") throw new Error(`reverted: ${hash}`);
+    return hash;
+  };
+  return {
+    enable: (agent) =>
+      one(async () =>
+        landed(
+          await wallet.writeContract({
+            address: PRECOMPILES.txAllowList,
+            abi: allowListAbi,
+            functionName: "setEnabled",
+            args: [agent],
+          }),
+        ),
+      ),
+    fund: (agent, wei) =>
+      one(async () => landed(await wallet.sendTransaction({ to: agent, value: wei }))),
   };
 }
