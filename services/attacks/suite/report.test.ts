@@ -44,6 +44,19 @@ describe("report", () => {
     ]);
   });
 
+  it("keeps the newest run of a group on each network", () => {
+    const fuji = { ...run("S", "2026-11-19T00:00:00Z", ["blocked"]), network: "fuji" };
+    const older = { ...run("S", "2026-11-17T00:00:00Z", ["blocked"]), network: "fuji" };
+    const { wallet } = latest([...files, older, fuji]);
+    expect(wallet.map((w) => [w.group, w.network, w.at])).toEqual([
+      ["P", "test", "2026-11-18T00:00:00Z"],
+      ["S", "fuji", "2026-11-19T00:00:00Z"],
+      ["S", "test", "2026-11-18T00:00:00Z"],
+    ]);
+    const md = render([...files, { ...fuji, leakedKeyAt: "2026-11-19T01:00:00Z" }]);
+    expect(md).toContain("Cases 9.L*: leaked-key run 2026-11-19T01:00:00Z.");
+  });
+
   it("computes rates, Wilson intervals and losses from the records", () => {
     const md = render(files);
     expect(md).toContain(

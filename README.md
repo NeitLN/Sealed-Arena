@@ -220,6 +220,8 @@ Found a problem? See [SECURITY.md](SECURITY.md).
 
 Sealed Arena runs on Avalanche's Fuji testnet. Its coins and test USDC have no monetary value, and it is not a payment or custody service. The open red-team challenge is an authorised bug-hunting program within the scope set on its rules page (the Sealed L1 on Fuji and this project's contracts and services only); attacks on anything else, including Avalanche's networks, other teams and infrastructure providers, and denial of service, are not authorised.
 
+**Vietnam.** Vietnam's Law on Digital Technology Industry No. 71/2025/QH15 (in force from 1 January 2026) defines digital assets and crypto assets in Articles 46–47. Government Resolution No. 05/2025/NQ-CP (in force from 9 September 2025, a five-year pilot) allows crypto-asset services only from organisations licensed by the Ministry of Finance. Decree No. 52/2024/NĐ-CP on non-cash payments prohibits issuing, providing or using unlawful means of payment (Article 3(11), Article 8(6)), and the State Bank of Vietnam has stated that bitcoin and similar virtual currencies are not a lawful means of payment in Vietnam. This project does not issue, offer or trade crypto assets, provides no payment or crypto-asset service, and holds no one's funds; every token in it is a testnet token that cannot be redeemed for money. This note is not legal advice.
+
 ## License
 
 [MIT](LICENSE) for this project's code. The patches in [`chain/patches/`](chain/patches) modify [avalanchego](https://github.com/ava-labs/avalanchego) and follow its BSD 3-Clause license.

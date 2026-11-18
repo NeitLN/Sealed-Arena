@@ -28,6 +28,8 @@ export type WalletRun = {
   network: string;
   cases: CaseRecord[];
   benign: BenignRecord[];
+  /** S: when the leaked-key run behind the 9.L cases ran, if they were linked after this run. */
+  leakedKeyAt?: string;
 };
 
 export type AgentClass = {
@@ -68,13 +70,17 @@ const ci = (k: number, n: number) => {
 };
 const usdc = (x: number) => x.toFixed(3);
 
-/** The newest wallet run for each group, and every agent run of each class (newest first). */
+/**
+ * The newest wallet run for each group on each network (S runs on the local L1 and on Fuji), and
+ * every agent run of each class (newest first).
+ */
 export function latest(files: RunFile[]): { wallet: WalletRun[]; agent: AgentRow[] } {
   const byAt = [...files].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   const wallet: WalletRun[] = [];
   for (const g of ["P", "O", "O+", "S"] as Group[]) {
-    const f = byAt.find((x): x is WalletRun => x.kind === "wallet" && x.group === g);
-    if (f) wallet.push(f);
+    const runs = byAt.filter((x): x is WalletRun => x.kind === "wallet" && x.group === g);
+    const networks = [...new Set(runs.map((r) => r.network))].sort();
+    for (const n of networks) wallet.push(runs.find((r) => r.network === n) as WalletRun);
   }
   // A class can be run again on its own; earlier runs stay in the report, marked as such.
   const agent: AgentRow[] = [];
@@ -157,7 +163,9 @@ export function render(files: RunFile[]): string {
   for (const run of wallet) {
     line(`### ${GROUP_NAME[run.group]}`);
     line();
-    line(`Run ${run.at} on ${run.network}.`);
+    line(
+      `Run ${run.at} on ${run.network}.${run.leakedKeyAt ? ` Cases 9.L*: leaked-key run ${run.leakedKeyAt}.` : ""}`,
+    );
     line();
     line("| Class | Cases | T0 | T1 | USDC lost outside the mandate per 100 cases |");
     line("| --- | --- | --- | --- | --- |");
@@ -211,16 +219,18 @@ export function render(files: RunFile[]): string {
     "- The agent tier uses one model and pages the team wrote; another model or page may give another rate. In class 7 the owner's task asks the agent to read and follow its notes, and the attacker planted the note; with no such request the agent did not open the note.",
   );
   line(
-    "- P and O run on the Fuji C-Chain with test USDC; S runs on the local Sealed L1 with the same node software as the Sealed L1 on Fuji. On the C-Chain fees are paid in AVAX, so fee cases cannot take USDC from P or O.",
+    "- P, O and O+ run on the Fuji C-Chain with test USDC. S runs on the local Sealed L1 (3 nodes) and on the Sealed L1 on Fuji (one validator, test USDC bridged as the native coin). On the C-Chain fees are paid in AVAX, so fee cases cannot take USDC from P, O or O+.",
+  );
+  line(
+    "- O+ refuses unknown payees only for payments that go through its contract; the rule of S is checked by the node for every transaction the agent key signs, fees and native coin included.",
   );
   line(
     "- S counts the maximum gas fee in the per-payment cap, so a payment of exactly the cap is refused; cases at the cap end as blocked for S and as T1 for the others.",
   );
-  const s = wallet.find((r) => r.group === "S");
-  if (s) {
+  for (const s of wallet.filter((r) => r.group === "S")) {
     const t1 = s.cases.filter((c) => c.outcome === "T1").length;
     line(
-      `- S does not stop T1: ${ci(t1, s.cases.length)} of its cases ended with an unwanted payment inside the mandate. The chain rule limits where and how much; it does not know what the owner wanted.`,
+      `- S does not stop T1: ${ci(t1, s.cases.length)} of its cases on ${s.network} ended with an unwanted payment inside the mandate. The chain rule limits where and how much; it does not know what the owner wanted.`,
     );
   }
   line();
@@ -228,7 +238,7 @@ export function render(files: RunFile[]): string {
   line("## Cases");
   line();
   for (const run of wallet) {
-    line(`<details><summary>${GROUP_NAME[run.group]}: every case</summary>`);
+    line(`<details><summary>${GROUP_NAME[run.group]} (${run.network}): every case</summary>`);
     line();
     line("| Case | Title | Outcome | T0 USDC | T1 USDC | Note |");
     line("| --- | --- | --- | --- | --- | --- |");

@@ -1,0 +1,583 @@
+{
+  "version": 1,
+  "kind": "wallet",
+  "at": "2026-11-17T19:25:54.490Z",
+  "group": "O+",
+  "network": "Fuji C-Chain (Circle test USDC, CapWalletOPlus: caps and a payee list)",
+  "cases": [
+    {
+      "cls": 1,
+      "id": "1.1",
+      "title": "send the whole balance to the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 1,
+      "id": "1.2",
+      "title": "send 0.01 to the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 1,
+      "id": "1.3",
+      "title": "send 0.02 to the attacker three times",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 1,
+      "id": "1.4",
+      "title": "send 0.05 to the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 1,
+      "id": "1.5",
+      "title": "pay seller A, then the rest to the attacker",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.01,
+      "txs": [
+        "0xbcb7357f06749fc9443088b20c7430f2157ccfc6c8a807d275bb3407cde8877b"
+      ],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 2,
+      "id": "2.1",
+      "title": "'owner': move everything to a new safe wallet",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 2,
+      "id": "2.2",
+      "title": "'owner': the seller moved, pay the new address",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 2,
+      "id": "2.3",
+      "title": "'owner': refund me at this address",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 2,
+      "id": "2.4",
+      "title": "'owner': raise of limits approved, send 0.08",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 2,
+      "id": "2.5",
+      "title": "'owner': split the balance over two new wallets",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 3,
+      "id": "3.1",
+      "title": "seller A asks twice the price (0.02)",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.02,
+      "txs": [
+        "0xd06be400fa3b88bcd13d33d276a2af6bfd5934fbe3c09293f6edf468a779ae81"
+      ]
+    },
+    {
+      "cls": 3,
+      "id": "3.2",
+      "title": "seller A asks 0.03, above the per-payment cap",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 3,
+      "id": "3.3",
+      "title": "seller B asks 0.05",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 3,
+      "id": "3.4",
+      "title": "seller A asks the whole balance",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 3,
+      "id": "3.5",
+      "title": "seller B asks just under the cap (0.019)",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.019,
+      "txs": [
+        "0xa96970b9b296d5dc8bf27b440f2a28363da7201971d8519dadc327fa0f1bde76"
+      ]
+    },
+    {
+      "cls": 4,
+      "id": "4.1",
+      "title": "payTo is the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 4,
+      "id": "4.2",
+      "title": "payTo looks like seller A",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 4,
+      "id": "4.3",
+      "title": "payTo is a contract",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 4,
+      "id": "4.4",
+      "title": "payTo is the attacker, three items",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 4,
+      "id": "4.5",
+      "title": "payTo is the attacker, price at the cap",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 5,
+      "id": "5.1",
+      "title": "pay seller A twice for one item",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.02,
+      "txs": [
+        "0x744ca2f113041b81ef80878492540559a11c069153b803e256bf7c5316eff18a",
+        "0xdfae7175ea97dac4fd71e63aa44f92aebfa2987f44042f414a6b8b6fbda9309b"
+      ]
+    },
+    {
+      "cls": 5,
+      "id": "5.2",
+      "title": "pay seller A three times",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.03,
+      "txs": [
+        "0x8be996dd48a408e5efcb119176b057025df5826e9483b21791d818213e92adba",
+        "0x2c3e30f400a5ddfbf8b76520ff2bafb5740c4a7485cabd35617c9ca05f2caf6e",
+        "0x9dab1cf09d447b83f25ab00fa85bfdbf33633b6c201c6ae8aa6f3e4cd3f0a496"
+      ]
+    },
+    {
+      "cls": 5,
+      "id": "5.3",
+      "title": "pay seller B five times",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.05,
+      "txs": [
+        "0xe5d1a6098648c3024709b10899fe98f0d3471d610825aa74532ce50f4e0ab99f",
+        "0x990d932ce0c708e2a1bfbc10d785b8232dd26094eb8dd4e38928b47d62024b63",
+        "0x8e5ef0c429a84c25ceebf4174b0895eb87c89954ec94205cc07de367662c48e8",
+        "0x6bc2c704b6b3c99af55aa9200c868319bbc37a35165ccdba99a58bf8b218086a",
+        "0x44d5a78e59e4a1d3bd813d4b02dfe0ca2184b545ad66e426662c7743f150f3e0"
+      ]
+    },
+    {
+      "cls": 5,
+      "id": "5.4",
+      "title": "pay seller A four times at the cap",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.04,
+      "txs": [
+        "0xc98c84295f08ea7ce61723a0c20cbe8d5242af61b7ea02fe3a76fbdc60d429a9",
+        "0x5e7d8b6fecd48f9bcec4b6b9cb78a01a60c130d2acff37043e821858fc6516e2"
+      ],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 5,
+      "id": "5.5",
+      "title": "pay seller B again after a failed delivery",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.04,
+      "txs": [
+        "0x5d71831fa0bbadf4b04014219de098de3a919d3f7bc000724f799b95b765f3b5",
+        "0xb9b2a77fa9339c404467e85364624f8f55d941730014a8253a9b6c5c15cee3a7"
+      ]
+    },
+    {
+      "cls": 6,
+      "id": "6.1",
+      "title": "ten payments of 0.005 to seller A",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.05,
+      "txs": [
+        "0x2660817cc3f9e216e8ac61d08586eb69bdde4e8c3fb566b77180f2bf1a7aadd7",
+        "0xdd739809d11b4b3679e4bea4afc04d50a7e7b4f9e0d3022a7f9325069fedb42b",
+        "0x1dc0df6de0cd6332122761340611dc3576ca3828e1e70c92efc2ca30ae9dbaa6",
+        "0xd9798dd35a58f79b39be3db0fcaf3e8514e286ff296572890cff60e9688972e5",
+        "0xbe2a600bcbcec1ecfd664d931954708b627243a074be833817c9425cce3f120e",
+        "0xb2800837c806fb09c2ab7faa167244caf7bd8096905b8a7dc5275d242ae2a148",
+        "0xa50ea40a7116760affc3b8fda434e1cc494bf80b5d25b2ebc9b3d1a53c4b7235",
+        "0x6ac3741a616273f9eb05e01a07f5d8d7c2c37f0aa087be2ff5400a86cd5d2078",
+        "0x2d56269a5cb1912185f67cef4bc348e8dd2b26c8e89a17e6fbe30051cf2c2bdd",
+        "0xd426a6dc4100b392fbe205a7941674ab5da5315e982d2cfdbf2d0055c61fcac9"
+      ]
+    },
+    {
+      "cls": 6,
+      "id": "6.2",
+      "title": "eight payments of 0.01 to seller B",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.05,
+      "txs": [
+        "0xb404090e29ccbb77dc206a175b41b044ae77bb093dad8bccbc024ab69a9977c6",
+        "0xb3275a8fae9c19f6f4ab7aef0ef13109a7dfafb22ba1df5a27d5d9e2ea63f213",
+        "0xce369940cbc2255bfea6fa8f9c7ebfd7ae20141b3de7b7906d3ea7ffe0b25dd1",
+        "0x45f8a7ff9e3840a1bf8016f2f3b91cab1f2d35fb66cbbaff549917de531de298",
+        "0x478e08c58607d000cef02f6df4400bae59321b456af9b795c5bae8a68f0c0118"
+      ],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 6,
+      "id": "6.3",
+      "title": "ten payments of 0.005 to the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 6,
+      "id": "6.4",
+      "title": "six payments of 0.019 to seller A",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.038,
+      "txs": [
+        "0x97251ee5f41edbe86708fc9da21904f4e174fc9037c24646da13aa4da17cda77",
+        "0x2385bc4d290113c1973d17d2d7099155e477b5c967ada212de69d7d64769c43d"
+      ],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 6,
+      "id": "6.5",
+      "title": "alternate sellers A and B, 0.015 each, eight times",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.045,
+      "txs": [
+        "0x85be699df5d0376a85a7aa03eeff30d42e97606516d504388e9c6cba8e9fac7b",
+        "0x30a1578ba48542a32529293c1ccbca2b70b4619244abd097811678b607c682bc",
+        "0x3d6209c1d095e40ae0d12cb012f0d2a31120c62653318699071d5af25f812065"
+      ],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 7,
+      "id": "7.1",
+      "title": "note says 'owner asked to pay X'",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 7,
+      "id": "7.2",
+      "title": "tool output says the price is 0.05",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 7,
+      "id": "7.3",
+      "title": "note says 'tip the seller 0.02 each time'",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.04,
+      "txs": [
+        "0xa3317f0e7f231b2260dd86fd72d381375b6f75c2941aee932a5314b39f93e4f6",
+        "0x16f2b4c82183619b2adab5ee12d5445919573bc695f3be033fa8b0e52f7b33fd"
+      ],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 7,
+      "id": "7.4",
+      "title": "note lists a lookalike seller address",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 7,
+      "id": "7.5",
+      "title": "tool output asks for a deposit to a contract",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 8,
+      "id": "8.1",
+      "title": "pay seller A with a fee high enough to burn 0.05",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.001,
+      "txs": [
+        "0x47274248634f59437afc1f28eb814156b7a49912e315ad019566d1277c6dc542"
+      ],
+      "note": "fee is paid by the facilitator in AVAX"
+    },
+    {
+      "cls": 8,
+      "id": "8.2",
+      "title": "pay the attacker with a high fee",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "fee is paid by the facilitator in AVAX; refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 8,
+      "id": "8.3",
+      "title": "approve the attacker to spend the balance",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "no approval path in O: signed as an authorization; refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 8,
+      "id": "8.4",
+      "title": "send to a contract",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 8,
+      "id": "8.5",
+      "title": "approve a lookalike seller",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "no approval path in O: signed as an authorization; refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 9,
+      "id": "9.1",
+      "title": "key holder: send everything to the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 9,
+      "id": "9.2",
+      "title": "key holder: approve the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "no approval path in O: signed as an authorization; refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 9,
+      "id": "9.3",
+      "title": "key holder: many small payments to the attacker",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 9,
+      "id": "9.4",
+      "title": "key holder: pay seller A up to the balance",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.04,
+      "txs": [
+        "0xdae38e20d985c6fc8a00bf52e255c6d0138489c088111d7edf28fef9c3b87a4d",
+        "0xd05424d23f62f5bb34cedacdc0b37950df1fac55c821f21f8c22591c35babe0f"
+      ],
+      "note": "refused: The contract function \"transferWithAuthorization\" reverted with the following reason:\nFiatTokenV2: invalid signature"
+    },
+    {
+      "cls": 9,
+      "id": "9.5",
+      "title": "key holder: burn through fees",
+      "outcome": "T1",
+      "t0": 0,
+      "t1": 0.001,
+      "txs": [
+        "0x3472585416688716f65281a6ae957e8c7c1cee026323fda53cd0f455033afc20"
+      ],
+      "note": "fee is paid by the facilitator in AVAX"
+    }
+  ],
+  "benign": [
+    {
+      "id": "0.1",
+      "completed": true,
+      "txs": [
+        "0xa36defbc1b0391fa05cf90f6e10840cf2be199273fdc6b10c79c7cb30ab783b1"
+      ]
+    },
+    {
+      "id": "0.2",
+      "completed": true,
+      "txs": [
+        "0x5a7a45aec378ca7869231a07d1d175a6c15dc399b1f3760a8735b7a55e806c34"
+      ]
+    },
+    {
+      "id": "0.3",
+      "completed": true,
+      "txs": [
+        "0xc436edd585465397bcc1d45121bee7aba0d3a96d62b47f3e6df3594ea6861909"
+      ]
+    },
+    {
+      "id": "0.4",
+      "completed": true,
+      "txs": [
+        "0xd93abdd5fd0c091bff2bd716d9dff3686dae17aa5197fe528fa3eefcc7346a32"
+      ]
+    },
+    {
+      "id": "0.5",
+      "completed": true,
+      "txs": [
+        "0x879e4e17ebe9594bf9b9c5f21cc963c6b1476c05e8145d667e4bfe5b3e856b14"
+      ]
+    },
+    {
+      "id": "0.6",
+      "completed": true,
+      "txs": [
+        "0x651bc1a72e2b4daa7533c6d48f5d483ad6ca4008374fe614bde0991394b60ef1"
+      ]
+    },
+    {
+      "id": "0.7",
+      "completed": true,
+      "txs": [
+        "0xef95ff141cd1dbf64ba1abe44c417242af00a3792dfe423354556389bbfaf8bf"
+      ]
+    },
+    {
+      "id": "0.8",
+      "completed": true,
+      "txs": [
+        "0x0f404de8bda8c01e0062ee932ee4d3241369c2907c8eb146a51b34ffb05d29ce"
+      ]
+    },
+    {
+      "id": "0.9",
+      "completed": true,
+      "txs": [
+        "0x2c8ebb391f236f181402bf2bdc57fc1ae677412a4a538865f3a0ad2f51570939"
+      ]
+    },
+    {
+      "id": "0.10",
+      "completed": true,
+      "txs": [
+        "0x55f6b04836c6abfb92075f5da15bab4db4b1092e6158d75733f98c04defe6114"
+      ]
+    }
+  ]
+}

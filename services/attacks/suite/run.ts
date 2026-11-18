@@ -139,8 +139,11 @@ async function sealedWallet(fuji = false): Promise<Wallet> {
   const [n] = sealed.nodes();
   if (!n) throw new Error(fuji ? "no Fuji L1 node (is the SSH tunnel up?)" : "no local node");
   const recorder = fuji
-    ? (JSON.parse(readFileSync(FUJI_DEPLOYMENTS, "utf8")) as { arenaRecorder: { address: Address } })
-        .arenaRecorder.address
+    ? (
+        JSON.parse(readFileSync(FUJI_DEPLOYMENTS, "utf8")) as {
+          arenaRecorder: { address: Address };
+        }
+      ).arenaRecorder.address
     : undefined;
   const to: Record<Target, Address> = fuji
     ? {
@@ -478,6 +481,7 @@ async function capWallet(plus = false): Promise<Wallet> {
 // ---- class 9 for S: the leaked-key suite of T06 ------------------------------------------------
 
 type LeakedKeyFile = {
+  at?: string;
   results: Array<{
     name: string;
     expected: "blocked" | "succeeded";
@@ -492,6 +496,12 @@ function leakedKeyRecords(fuji: boolean): CaseRecord[] {
   const file = resolve(RESULTS, fuji ? "leaked-key-fuji.json" : "leaked-key.json");
   if (!existsSync(file)) return [];
   const lk = JSON.parse(readFileSync(file, "utf8")) as LeakedKeyFile;
+  // A run whose positive control was refused did not test the rule (e.g. the agent had spent its
+  // day already); its cases are not evidence either way. A run with a working control is kept as
+  // it is, breaches included.
+  const control = lk.results.find((r) => r.expected === "succeeded");
+  if (control?.result !== "succeeded")
+    throw new Error(`${file}: the positive control was refused; run leaked-key again`);
   return lk.results
     .filter((r) => r.expected === "blocked")
     .map((r, i) => ({
@@ -541,13 +551,34 @@ async function wallet(group: string) {
   console.log(`results: ${file}`);
 }
 
+/**
+ * Replaces the 9.L cases of an S result file with those of the current leaked-key run on the same
+ * network, for when the leaked-key run was redone after the wallet run. Nothing else changes.
+ */
+function relinkLeaked(name: string) {
+  const file = resolve(RESULTS, name);
+  const run = JSON.parse(readFileSync(file, "utf8")) as WalletRun;
+  if (run.group !== "S") throw new Error("relink-leaked: not an S result file");
+  const fuji = run.network.includes("Fuji");
+  const lkFile = resolve(RESULTS, fuji ? "leaked-key-fuji.json" : "leaked-key.json");
+  const lk = JSON.parse(readFileSync(lkFile, "utf8")) as LeakedKeyFile;
+  if (!lk.at) throw new Error(`${lkFile}: no run time; run leaked-key again`);
+  run.cases = [...run.cases.filter((c) => !c.id.startsWith("9.L")), ...leakedKeyRecords(fuji)];
+  run.leakedKeyAt = lk.at;
+  writeFileSync(file, `${JSON.stringify(run, null, 2)}\n`);
+  console.log(`relinked: ${file} (leaked-key run ${lk.at})`);
+}
+
 function leakedKey(fuji: boolean) {
   mkdirSync(RESULTS, { recursive: true });
-  // On Fuji: the project's test agent, seeded with the sample mandate and 4 coins first.
+  // On Fuji: a new agent for every run, seeded with the sample mandate and 4 coins first. A
+  // reused agent carries the day's spending and payments still waiting in the pool from an
+  // earlier run (they can enter a block the next day, README limit 12), and the daily cases
+  // assume a fresh day. Its owner is the suite's secret P-256 key.
   const extra: Record<string, string> = fuji
     ? {
         ...fujiL1Env(),
-        SEALED_AGENT_KEY: env("FUJI_TEST_AGENT_PRIVATE_KEY"),
+        SEALED_AGENT_KEY: generatePrivateKey(),
         SEALED_SEED_FUNDING: "4",
       }
     : {};
@@ -648,9 +679,12 @@ const FUJI = process.argv.includes("--fuji");
 const main = async () => {
   if (cmd === "wallet") return wallet(arg ?? "");
   if (cmd === "leaked-key") return leakedKey(FUJI);
+  if (cmd === "relink-leaked") return relinkLeaked(arg ?? "");
   if (cmd === "report") return report();
   if (cmd === "agent") return agentTier(Number(arg ?? "5"), process.argv.slice(4).map(Number));
-  console.error("usage: suite <wallet P|O|S | leaked-key | agent [runs] | report>");
+  console.error(
+    "usage: suite <wallet P|O|O+|S | leaked-key | relink-leaked <S file> | agent [runs] | report>",
+  );
   process.exit(2);
 };
 main().catch((e) => {
