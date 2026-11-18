@@ -110,6 +110,24 @@ const en = {
   tryNote:
     "This shows the node refusing the transaction when it arrives. A block that contains such a transaction is also invalid for the validator (one, run by the team, today):",
   tryNoteLink: "decision D1",
+  verifyTitle: "Verify it yourself",
+  verifyIntro:
+    "The page read the agent's account from the public RPC before sending, and again 8 seconds after the answer. Every read can be repeated with the command below.",
+  verifyHash: "Transaction hash (computed in your browser from the signed bytes)",
+  verifyNull: "null: the chain has no transaction with this hash",
+  verifyNonce: "Agent nonce (latest block)",
+  verifyBalance: "Agent balance (latest block)",
+  verifyBlock: "Block number",
+  verifyUnchanged: "unchanged",
+  verifyChangedOther:
+    "Changed, but not by this transaction: the key is public, and someone else's payment inside the mandate was included meanwhile. The hash lookup above is the check that counts.",
+  verifyFound:
+    'The chain has this transaction. A payment outside the mandate should not be there: use "Report breach" below.',
+  verifyCurl: "Run it yourself",
+  verifyAgain: "Check again",
+  verifyWaiting: "Reading the chain again in a few seconds…",
+  verifyLimit:
+    "What this does not show: these reads go through one RPC endpoint, run by the team, in front of the chain's only validator. The repository's Go tests show the same refusal for a hand-built block (decision D1).",
 };
 
 type Text = typeof en;
@@ -221,6 +239,24 @@ const vi: Text = {
   tryNote:
     "Phần này cho thấy node từ chối giao dịch khi nó tới. Một block chứa giao dịch như vậy cũng không hợp lệ với validator (hiện có một, do đội vận hành):",
   tryNoteLink: "quyết định D1",
+  verifyTitle: "Tự kiểm",
+  verifyIntro:
+    "Trang đã đọc tài khoản agent qua RPC công khai trước khi gửi và đọc lại 8 giây sau câu trả lời. Mọi phép đọc đều chạy lại được bằng lệnh bên dưới.",
+  verifyHash: "Hash giao dịch (tính trong trình duyệt từ các byte đã ký)",
+  verifyNull: "null: chain không có giao dịch nào mang hash này",
+  verifyNonce: "Nonce của agent (block mới nhất)",
+  verifyBalance: "Số dư agent (block mới nhất)",
+  verifyBlock: "Số block",
+  verifyUnchanged: "không đổi",
+  verifyChangedOther:
+    "Có đổi, nhưng không phải do giao dịch này: khoá công khai, và một khoản trả trong uỷ quyền của người khác vừa vào block. Phép tra hash ở trên mới là phép kiểm quyết định.",
+  verifyFound:
+    'Chain có giao dịch này. Khoản trả ngoài uỷ quyền không được phép có mặt: bấm "Báo vi phạm" bên dưới.',
+  verifyCurl: "Tự chạy lệnh",
+  verifyAgain: "Kiểm lại",
+  verifyWaiting: "Đang đọc lại chain sau vài giây…",
+  verifyLimit:
+    "Điều phần này không cho thấy: các phép đọc đi qua một RPC do đội vận hành, đứng trước validator duy nhất của chain. Go test trong repo cho thấy cùng kết quả từ chối với block dựng tay (quyết định D1).",
 };
 
 export function arenaText(lang: Lang): Text {

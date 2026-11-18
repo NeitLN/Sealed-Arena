@@ -2,24 +2,37 @@ import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
+import { CodeBlock } from "@astryxdesign/core/CodeBlock";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { formatUsdc } from "@sealed-arena/shared";
 import { useState } from "react";
-import { type Address, parseEther } from "viem";
+import { type Address, formatEther, type Hex, parseEther } from "viem";
 import { ARENA } from "./arena.config.js";
 import type { arenaText } from "./arenaText.js";
 import { type SendOutcome, sendAsAgent } from "./forbiddenSend.js";
 import { type AgentView, chainClient } from "./owner.js";
 import { RPC } from "./useArenaLive.js";
+import { type Account, curlFor, lookUp, readAccount, type Verdict, verdict } from "./verify.js";
 
 /** An address nobody holds a key for; never on any mandate. */
 const STRANGER: Address = "0x000000000000000000000000000000000000dEaD";
 const D1 = `${ARENA.source}/blob/main/docs/decisions/D1.md`;
 
 type Attempt = { to: Address; value: bigint; expected: string };
+type Check =
+  | { state: "waiting" }
+  | { state: "busy" }
+  | { state: "done"; before: Account; after: Account; found: boolean; verdict: Verdict };
+
+/** Seconds to wait after the node's answer before reading the chain again. */
+const RECHECK_MS = 8_000;
+
+/** "before → after", or the word for unchanged. */
+const change = (a: string | number, b: string | number, same: string) =>
+  a === b ? `${a} (${same})` : `${a} → ${b}`;
 
 /** Two buttons that send a real forbidden payment with the public agent key and show the answer. */
 export function TryPayment(o: {
@@ -32,6 +45,30 @@ export function TryPayment(o: {
   const [busy, setBusy] = useState<string>();
   const [sent, setSent] = useState<Attempt>();
   const [result, setResult] = useState<SendOutcome>();
+  const [hash, setHash] = useState<Hex>();
+  const [before, setBefore] = useState<Account>();
+  const [check, setCheck] = useState<Check>();
+
+  /** The second read: the account again and the hash lookup. */
+  const recheck = async (h: Hex, b: Account | undefined) => {
+    setCheck({ state: "waiting" });
+    try {
+      const [after, look] = await Promise.all([
+        readAccount(client, ARENA.agent),
+        lookUp(client, h),
+      ]);
+      if (!b) return setCheck({ state: "busy" });
+      setCheck({
+        state: "done",
+        before: b,
+        after,
+        found: look.found,
+        verdict: verdict(b, after, look.found),
+      });
+    } catch {
+      setCheck({ state: "busy" });
+    }
+  };
 
   const payee = view?.mandate.payees[0] as Address | undefined;
   const attempts: Record<"stranger" | "overCap", Attempt | undefined> = {
@@ -52,9 +89,21 @@ export function TryPayment(o: {
     setBusy(key);
     setSent(a);
     setResult(undefined);
-    setResult(await sendAsAgent(client, ARENA.agentPrivateKey, a.to, a.value));
+    setHash(undefined);
+    setCheck(undefined);
+    const b = await readAccount(client, ARENA.agent).catch(() => undefined);
+    setBefore(b);
+    const r = await sendAsAgent(client, ARENA.agentPrivateKey, a.to, a.value);
+    setResult(r);
     setBusy(undefined);
     o.onSent();
+    // Verify only an answer that came from the node (refused or accepted), not a busy RPC.
+    if (r.signed && (r.kind === "refused" || r.kind === "accepted")) {
+      setHash(r.signed);
+      setCheck({ state: "waiting" });
+      const h = r.signed;
+      setTimeout(() => void recheck(h, b), RECHECK_MS);
+    }
   };
 
   return (
@@ -107,6 +156,64 @@ export function TryPayment(o: {
           <Banner status="warning" title={t.tryBusy} />
         ) : result?.kind === "error" ? (
           <Banner status="warning" title={t.tryError} description={result.message} />
+        ) : null}
+
+        {hash && check ? (
+          <VStack gap={3}>
+            <Heading level={3}>{t.verifyTitle}</Heading>
+            <Text type="supporting" color="secondary">
+              {t.verifyIntro}
+            </Text>
+            <MetadataList>
+              <MetadataListItem label={t.verifyHash}>
+                <Code>{hash}</Code>
+              </MetadataListItem>
+              {check.state === "done" ? (
+                <>
+                  <MetadataListItem label="eth_getTransactionByHash">
+                    {check.found ? <Code>found</Code> : t.verifyNull}
+                  </MetadataListItem>
+                  <MetadataListItem label={t.verifyNonce}>
+                    {change(check.before.nonce, check.after.nonce, t.verifyUnchanged)}
+                  </MetadataListItem>
+                  <MetadataListItem label={t.verifyBalance}>
+                    {change(
+                      `${formatEther(check.before.balance)} USDC`,
+                      `${formatEther(check.after.balance)} USDC`,
+                      t.verifyUnchanged,
+                    )}
+                  </MetadataListItem>
+                  <MetadataListItem label={t.verifyBlock}>
+                    {`${check.before.block} → ${check.after.block}`}
+                  </MetadataListItem>
+                </>
+              ) : null}
+            </MetadataList>
+            {check.state === "waiting" ? (
+              <Text type="supporting" color="secondary">
+                {t.verifyWaiting}
+              </Text>
+            ) : check.state === "busy" ? (
+              <Banner status="warning" title={t.tryBusy} />
+            ) : check.verdict === "found" ? (
+              <Banner status="error" title={t.verifyFound} />
+            ) : check.verdict === "changedOther" ? (
+              <Banner status="info" title={t.verifyChangedOther} />
+            ) : null}
+            <CodeBlock title={t.verifyCurl} code={curlFor(RPC, hash)} isWrapped size="sm" />
+            <HStack>
+              <Button
+                label={t.verifyAgain}
+                variant="secondary"
+                size="sm"
+                isDisabled={check.state === "waiting"}
+                onClick={() => void recheck(hash, before)}
+              />
+            </HStack>
+            <Text type="supporting" color="secondary">
+              {t.verifyLimit}
+            </Text>
+          </VStack>
         ) : null}
 
         <Text type="supporting" color="secondary">

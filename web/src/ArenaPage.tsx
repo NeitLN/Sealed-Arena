@@ -339,6 +339,8 @@ export default function ArenaPage() {
           </Text>
         </VStack>
 
+        <TryPayment t={t} view={view} onSent={() => void live.refreshChain()} />
+
         <Grid columns={{ minWidth: 160, max: 4 }} gap={4}>
           <Tile
             label={
@@ -372,8 +374,6 @@ export default function ArenaPage() {
           <Tile label={t.accepted}>{big(summary?.accepted)}</Tile>
           <Tile label={t.senders}>{big(summary?.distinctSenders)}</Tile>
         </Grid>
-
-        <TryPayment t={t} view={view} onSent={() => void live.refreshChain()} />
 
         <Stack direction={isMobile ? "vertical" : "horizontal"} gap={4} vAlign="start">
           <StackItem size="fill" style={isMobile ? undefined : colBasis}>
