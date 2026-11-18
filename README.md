@@ -211,7 +211,8 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 
 `bash scripts/check.sh` is the single quick check and runs in CI on every pull request. Highlights:
 
-- Go tests run against hand-built blocks: a block that contains a forbidden agent transaction must be rejected at import, for transaction types 0, 1 and 2.
+- Go tests run against hand-built blocks: a block that contains a forbidden agent transaction must be rejected at import, for transaction types 0, 1 and 2; a blob transaction (type 3) from an agent is refused too, and no other type can be decoded at the pinned version (limit 14).
+- A Go test pins the daily window to the UTC day: a payment in the last second of a day and one in the first second of the next are both valid, and a third on that day is refused.
 - A VM-level test drives the real transaction pool and block builder: 20 payments that are each valid alone are queued at once, and only what fits the daily budget reaches a block.
 - WebAuthn test vectors in [`chain/testvectors/`](chain/testvectors) are shared by the Go precompile tests and the TypeScript encoder tests, so both sides agree byte for byte.
 - `chain/tests/rule/run.sh` checks the same behaviour over RPC on a running local L1 with one and three nodes.
@@ -239,6 +240,7 @@ What it does not give, stated plainly:
 11. **The precompile checks less of WebAuthn than a full relying party.** It verifies the P-256 signature, the challenge and the User Present flag. It does not check `rpIdHash` or the origin, and it does not require User Verification (the owner console asks for it as `preferred`). The proof also does not show the owner what is being signed: the passkey prompt names the site, not the mandate. If the console's origin is compromised (its hosting, its domain, or a script it loads), the owner can be made to sign a different mandate.
 12. **Waiting payments are not re-checked.** Payments the pool accepted but the block builder left out (over the day's budget) stay in the pool and are not checked again while they wait. On a later day they can enter a block within that day's cap, until the owner freezes the agent or the mandate expires.
 13. **The relayer host can allow senders.** For demo agents the relayer holds a second key with the TxAllowList manager role. It registers each demo agent to the visitor's passkey before allowing it, but whoever takes over the host could allow any address to send, outside any mandate. The admin can remove the role (`setNone`).
+14. **The block-level check filters transaction types more loosely than the pool.** The pool accepts only types 0, 1 and 2 from an agent. The block-validity check (`preCheck`) refuses a transaction that carries blob hashes and does not otherwise look at the type. At the pinned node version no type above 3 can be decoded, and tests cover a blob transaction in a hand-built block and types 3 and 4 over RPC. Before a network upgrade enables a new transaction type (for example set-code), the block-level check must be tightened.
 
 Found a problem? See [SECURITY.md](SECURITY.md).
 

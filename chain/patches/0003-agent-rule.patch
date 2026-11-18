@@ -115,10 +115,10 @@ index 0000000..0625333
 +}
 diff --git a/graft/subnet-evm/core/agent_rule_test.go b/graft/subnet-evm/core/agent_rule_test.go
 new file mode 100644
-index 0000000..f280f75
+index 0000000..efdf9ef
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule_test.go
-@@ -0,0 +1,443 @@
+@@ -0,0 +1,608 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -140,9 +140,11 @@ index 0000000..f280f75
 +	"github.com/ava-labs/libevm/core/vm"
 +	"github.com/ava-labs/libevm/crypto"
 +	"github.com/ava-labs/libevm/ethdb"
++	"github.com/holiman/uint256"
 +	"github.com/stretchr/testify/require"
 +
 +	"github.com/ava-labs/avalanchego/graft/evm/utils"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -217,7 +219,12 @@ index 0000000..f280f75
 +
 +func newArEnv(t *testing.T, m *agentpolicy.IAgentPolicyMandate) *arEnv {
 +	t.Helper()
-+	config := arConfig()
++	return newArEnvWith(t, m, arConfig(), dummy.NewCoinbaseFaker())
++}
++
++// newArEnvWith is newArEnv on another chain config, with `engine` verifying inserted blocks.
++func newArEnvWith(t *testing.T, m *agentpolicy.IAgentPolicyMandate, config *params.ChainConfig, engine consensus.Engine) *arEnv {
++	t.Helper()
 +	gspec := &Genesis{
 +		Config: config,
 +		Alloc: types.GenesisAlloc{
@@ -227,7 +234,7 @@ index 0000000..f280f75
 +		},
 +		GasLimit: params.GetExtra(config).FeeConfig.GasLimit.Uint64(),
 +	}
-+	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
++	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 +	require.NoError(t, err)
 +	t.Cleanup(chain.Stop)
 +
@@ -561,6 +568,164 @@ index 0000000..f280f75
 +	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
 +	require.Equal(t, types.ReceiptStatusSuccessful, r[1].Status)
 +	require.Equal(t, big.NewInt(7), e.balance(arStranger))
++}
++
++// ---- transaction types and the UTC day (README limit 14) ----------------------------
++
++// arCancunConfig is arConfig with Cancun active, so blob transactions (type 3) can be
++// signed and decoded, as on the Fuji L1 where Etna enables Cancun.
++func arCancunConfig() *params.ChainConfig {
++	c := arConfig()
++	c.ShanghaiTime = utils.PointerTo[uint64](0)
++	c.CancunTime = utils.PointerTo[uint64](0)
++	return c
++}
++
++// arBlobTx signs a type 3 transaction from the agent to a listed payee, inside the caps.
++func (e *arEnv) arBlobTx(hashes []common.Hash) *types.Transaction {
++	tx, err := types.SignNewTx(arAgentKey, types.NewCancunSigner(e.chainID()), &types.BlobTx{
++		ChainID: uint256.MustFromBig(e.chainID()), Nonce: e.nonces[arAgent],
++		GasTipCap: uint256.MustFromBig(arTip), GasFeeCap: uint256.MustFromBig(arFeeCap),
++		Gas: arTransfer, To: arPayee, Value: uint256.NewInt(1),
++		BlobFeeCap: uint256.NewInt(1), BlobHashes: hashes,
++	})
++	require.NoError(e.t, err)
++	e.nonces[arAgent]++
++	return tx
++}
++
++// applyMessage runs ApplyMessage for `msg` on the head state in a block at head + 10 s.
++func (e *arEnv) applyMessage(msg *Message) (agentpolicy.Spend, agentpolicy.Spend, error) {
++	e.t.Helper()
++	st, err := e.chain.State()
++	require.NoError(e.t, err)
++	header := types.CopyHeader(e.head.Header())
++	header.Number = new(big.Int).Add(header.Number, common.Big1)
++	header.Time += 10
++	header.ParentHash = e.head.Hash()
++	before := agentpolicy.SpendForDay(st, arAgent, header.Time)
++	evm := vm.NewEVM(NewEVMBlockContext(header, e.chain, nil), vm.TxContext{Origin: msg.From, GasPrice: msg.GasPrice}, st, e.gspec.Config, vm.Config{})
++	_, err = ApplyMessage(evm, msg, new(GasPool).AddGas(header.GasLimit))
++	return before, agentpolicy.SpendForDay(st, arAgent, header.Time), err
++}
++
++// The rule's own gate, below the pool: a message that carries blob hashes (type 3) is
++// invalid for an agent even when payee, caps and budget would allow it, and nothing is charged.
++func TestAgentRuleBlobMessageRefused(t *testing.T) {
++	e := newArEnv(t, arBigMandate())
++	st, err := e.chain.State()
++	require.NoError(t, err)
++	for name, hashes := range map[string][]common.Hash{
++		"one blob hash":         {{0x01}},
++		"empty, non-nil hashes": {},
++	} {
++		t.Run(name, func(t *testing.T) {
++			msg := &Message{
++				From: arAgent, To: &arPayee, Nonce: st.GetNonce(arAgent), Value: big.NewInt(1),
++				GasLimit: arTransfer, GasPrice: arFeeCap, GasFeeCap: arFeeCap, GasTipCap: arTip,
++				BlobHashes: hashes, BlobGasFeeCap: common.Big1,
++			}
++			before, after, err := e.applyMessage(msg)
++			require.ErrorIs(t, err, ErrAgentTxTypeNotAllowed)
++			require.Equal(t, 0, before.SpentToday.Cmp(after.SpentToday))
++			require.Equal(t, 0, before.TotalCharged.Cmp(after.TotalCharged))
++		})
++	}
++	// Control: the same message without blob hashes is a valid payment.
++	msg := &Message{
++		From: arAgent, To: &arPayee, Nonce: st.GetNonce(arAgent), Value: big.NewInt(1),
++		GasLimit: arTransfer, GasPrice: arFeeCap, GasFeeCap: arFeeCap, GasTipCap: arTip,
++	}
++	_, after, err := e.applyMessage(msg)
++	require.NoError(t, err)
++	require.Equal(t, 0, arCharge(big.NewInt(1), arTransfer).Cmp(after.SpentToday))
++}
++
++// A hand-built block holding a type 3 transaction from the agent (payee, caps and budget
++// all allowed) is rejected by the agent rule, with the node's header checks on (as on the
++// network) and with them skipped. Nothing is charged and the agent can still pay normally.
++func TestAgentRuleBlobTxBlockRejected(t *testing.T) {
++	for name, engine := range map[string]*dummy.DummyEngine{
++		"header checks on":      dummy.NewCoinbaseFaker(),
++		"header checks skipped": dummy.NewFullFaker(),
++	} {
++		t.Run(name+": agent transaction type not allowed", func(t *testing.T) {
++			e := newArEnvWith(t, arBigMandate(), arCancunConfig(), engine)
++			require.ErrorIs(t, e.bad(e.arBlobTx([]common.Hash{{0x01}})), ErrAgentTxTypeNotAllowed)
++			require.Equal(t, 0, e.spend().TotalCharged.Sign())
++			e.good(10, e.pay(1))
++		})
++	}
++}
++
++// At the pinned libevm no transaction type above 3 can be decoded, so a block cannot
++// carry one. If an upgrade adds a type (for example set-code, 0x04), this test fails and
++// the block-level gate (Plain = no blob hashes) must be reviewed.
++func TestAgentRuleOnlyTypes0To3Decodable(t *testing.T) {
++	for typ := 0x04; typ <= 0x7f; typ++ {
++		err := new(types.Transaction).UnmarshalBinary([]byte{byte(typ), 0xc0})
++		require.ErrorIs(t, err, types.ErrTxTypeNotSupported, "type 0x%02x", typ)
++	}
++}
++
++// Types 0, 1 and 2 reach preCheck with no blob hashes (Plain at block level, as in the pool);
++// a type 3 transaction keeps non-nil blob hashes after a decode, even with none listed.
++func TestAgentRulePlainMatchesPool(t *testing.T) {
++	config := arCancunConfig()
++	signer := types.LatestSigner(config)
++	to := arPayee
++	for name, inner := range map[string]types.TxData{
++		"type 0": &types.LegacyTx{Nonce: 0, GasPrice: arFeeCap, Gas: arTransfer, To: &to, Value: common.Big1},
++		"type 1": &types.AccessListTx{ChainID: config.ChainID, GasPrice: arFeeCap, Gas: arTransfer, To: &to, Value: common.Big1},
++		"type 2": &types.DynamicFeeTx{ChainID: config.ChainID, GasTipCap: arTip, GasFeeCap: arFeeCap, Gas: arTransfer, To: &to, Value: common.Big1},
++	} {
++		t.Run(name, func(t *testing.T) {
++			tx, err := types.SignNewTx(arAgentKey, signer, inner)
++			require.NoError(t, err)
++			msg, err := TransactionToMessage(tx, signer, nil)
++			require.NoError(t, err)
++			require.Nil(t, msg.BlobHashes)
++		})
++	}
++	t.Run("type 3 with no hashes, after a decode", func(t *testing.T) {
++		tx, err := types.SignNewTx(arAgentKey, signer, &types.BlobTx{
++			ChainID: uint256.MustFromBig(config.ChainID), GasTipCap: uint256.MustFromBig(arTip),
++			GasFeeCap: uint256.MustFromBig(arFeeCap), Gas: arTransfer, To: arPayee, BlobFeeCap: uint256.NewInt(1),
++		})
++		require.NoError(t, err)
++		raw, err := tx.MarshalBinary()
++		require.NoError(t, err)
++		var decoded types.Transaction
++		require.NoError(t, decoded.UnmarshalBinary(raw))
++		msg, err := TransactionToMessage(&decoded, signer, nil)
++		require.NoError(t, err)
++		require.NotNil(t, msg.BlobHashes)
++	})
++}
++
++// The daily budget follows the UTC day (timestamp / 86400): a payment in the last second of a
++// day and one in the first second of the next are both valid; a third on that day is not.
++func TestAgentRuleDailyWindowIsUTCDay(t *testing.T) {
++	value := big.NewInt(1000)
++	charge := arCharge(value, arTransfer)
++	e := newArEnv(t, arMandate([]common.Address{arPayee}, charge, charge, arFarFuture))
++	e.good(86_399-e.head.Time(), e.pay(1000))
++	require.Equal(t, uint64(86_399), e.head.Time())
++	// One second after its parent the block gas cost is high; a tip at the fee cap pays it.
++	// The charge is the same (value + gas * fee cap).
++	tx, err := types.SignNewTx(arAgentKey, e.signer, &types.DynamicFeeTx{
++		ChainID: e.chainID(), Nonce: e.nonces[arAgent], GasTipCap: arFeeCap, GasFeeCap: arFeeCap,
++		Gas: arTransfer, To: &arPayee, Value: value,
++	})
++	require.NoError(t, err)
++	e.nonces[arAgent]++
++	e.good(1, tx)
++	require.Equal(t, uint64(86_400), e.head.Time())
++	sp := e.spend()
++	require.Equal(t, 0, charge.Cmp(sp.SpentToday))
++	require.Equal(t, 0, new(big.Int).Mul(charge, big.NewInt(2)).Cmp(sp.TotalCharged))
++	require.ErrorIs(t, e.bad(e.pay(1000)), ErrAgentBudgetExceeded) // hand-built block at 86 410, same UTC day
++	e.checkInvariant()
 +}
 diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
 index 415a986..789b90b 100644

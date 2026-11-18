@@ -74,7 +74,7 @@ Khi qua (chỉ ở `preCheck`): `spentToday += charge`, `totalCharged += charge`
 `from` không phải agent đã đăng ký: quy tắc không áp, chỉ còn TxAllowList.
 
 Lỗi trả về dùng các biến lỗi riêng (`ErrAgentPayeeNotAllowed`, `ErrAgentBudgetExceeded`, `ErrAgentFrozen`, `ErrAgentMandateExpired`, `ErrAgentContractCreation`, `ErrAgentPayeeHasCode`, `ErrAgentTxTypeNotAllowed`) để cổng RPC và giao diện hiển thị đúng lý do.
-Chuỗi lỗi qua RPC có tiền tố `agent:` (ví dụ `agent: payee not allowed: 0x…`, `agent: budget exceeded: …`, `agent: frozen`). Agent chỉ được gửi giao dịch loại 0, 1, 2; loại khác trả `ErrAgentTxTypeNotAllowed` (T05).
+Chuỗi lỗi qua RPC có tiền tố `agent:` (ví dụ `agent: payee not allowed: 0x…`, `agent: budget exceeded: …`, `agent: frozen`). Txpool chỉ nhận giao dịch loại 0, 1, 2 từ agent. Ở `preCheck`, giao dịch có blob hash trả `ErrAgentTxTypeNotAllowed`; `preCheck` không xét loại theo cách nào khác. Ở phiên bản node đã ghim, không loại nào trên 3 decode được (README, giới hạn 14).
 
 Đã triển khai ở T05 (`chain/patches/0003-agent-rule.patch`): hàm chung `core.CheckAgentTx`. `preCheck` kiểm ngay sau TxAllowList và ghi bộ đếm ở bước cuối, sau `buyGas`. Txpool kiểm chỉ đọc theo `max(thời gian block đầu chain, đồng hồ máy)` (trường `Time` mới của `ValidationOptionsWithState`, hàm `txpool.PoolTime`), để sang ngày mới thì pool nhận lại thanh toán kể cả khi chain đứng yên; `preCheck` luôn dùng thời gian block.
 
