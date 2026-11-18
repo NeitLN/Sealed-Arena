@@ -1,9 +1,9 @@
 diff --git a/graft/subnet-evm/core/agent_rule.go b/graft/subnet-evm/core/agent_rule.go
 new file mode 100644
-index 0000000..8e802c8
+index 0000000..8c77f41
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule.go
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,149 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -16,8 +16,10 @@ index 0000000..8e802c8
 +
 +	"github.com/ava-labs/libevm/common"
 +
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentrulev2"
 +)
 +
 +// Sealed Arena validity rule (docs/ARCHITECTURE.md 3.1). A transaction whose sender is
@@ -128,12 +130,35 @@ index 0000000..8e802c8
 +	}
 +	return charge, true, nil
 +}
++
++// AgentRuleVersion is the version of the agent rule that applies at a time.
++type AgentRuleVersion int
++
++const (
++	AgentRuleOff AgentRuleVersion = iota // AgentPolicy not enabled
++	AgentRuleV1
++	AgentRuleV2
++)
++
++// AgentRuleVersionAt returns the rule version at `time` from the chain config: off before
++// AgentPolicy is enabled, v2 once agentRuleV2Config is active, v1 otherwise.
++func AgentRuleVersionAt(c *params.ChainConfig, time uint64) AgentRuleVersion {
++	x := params.GetExtra(c)
++	switch {
++	case !x.IsPrecompileEnabled(agentpolicy.ContractAddress, time):
++		return AgentRuleOff
++	case x.IsPrecompileEnabled(agentrulev2.ContractAddress, time):
++		return AgentRuleV2
++	default:
++		return AgentRuleV1
++	}
++}
 diff --git a/graft/subnet-evm/core/agent_rule_test.go b/graft/subnet-evm/core/agent_rule_test.go
 new file mode 100644
-index 0000000..0e6f32c
+index 0000000..0a4f168
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule_test.go
-@@ -0,0 +1,617 @@
+@@ -0,0 +1,655 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -164,6 +189,7 @@ index 0000000..0e6f32c
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentrulev2"
 +)
 +
 +// ---- fixtures ------------------------------------------------------------------
@@ -749,6 +775,43 @@ index 0000000..0e6f32c
 +	require.Equal(t, 0, charge.Cmp(sp.SpentToday))
 +	require.Equal(t, 0, new(big.Int).Mul(charge, big.NewInt(2)).Cmp(sp.TotalCharged))
 +	require.ErrorIs(t, e.bad(e.pay(1000)), ErrAgentBudgetExceeded) // hand-built block at 86 410, same UTC day
++	e.checkInvariant()
++}
++
++// ---- rule v2 activation (agentRuleV2Config) -----------------------------------------
++
++func arConfigV2At(t uint64) *params.ChainConfig {
++	c := arConfig()
++	params.GetExtra(c).GenesisPrecompiles[agentrulev2.ConfigKey] = agentrulev2.NewConfig(utils.PointerTo(t))
++	return c
++}
++
++func TestAgentRuleVersionAt(t *testing.T) {
++	require.Equal(t, AgentRuleV1, AgentRuleVersionAt(arConfig(), 1_000))
++	c := arConfigV2At(40)
++	require.Equal(t, AgentRuleV1, AgentRuleVersionAt(c, 39))
++	require.Equal(t, AgentRuleV2, AgentRuleVersionAt(c, 40))
++	off := arConfig()
++	delete(params.GetExtra(off).GenesisPrecompiles, agentpolicy.ConfigKey)
++	require.Equal(t, AgentRuleOff, AgentRuleVersionAt(off, 1_000))
++}
++
++// Activating rule v2 writes the version into the AgentPolicy storage in the activating block.
++// (The v2 checks come in a later change; until then the rule behaves as v1 on both sides of T.)
++func TestAgentRuleV2ActivationMarker(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(40), dummy.NewCoinbaseFaker())
++	version := func() uint64 {
++		st, err := e.chain.State()
++		require.NoError(t, err)
++		return agentpolicy.RuleVersion(st)
++	}
++	require.Equal(t, uint64(10), e.head.Time())
++	require.Equal(t, uint64(1), version())
++	e.good(10, e.pay(1)) // t = 20
++	e.good(10, e.pay(1)) // t = 30
++	require.Equal(t, uint64(1), version())
++	e.good(10, e.pay(1)) // t = 40: activation
++	require.Equal(t, uint64(2), version())
 +	e.checkInvariant()
 +}
 diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
@@ -1606,10 +1669,10 @@ index 225e4fa..6b9a4fc 100644
 +	require.ErrorIs(t, ChargeSpend(e.db, agent, big.NewInt(-1), 100), ErrCounterOverflow)
 +}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
-index 8ac7ba6..9ae38e8 100644
+index 8ac7ba6..d0a2acb 100644
 --- a/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
-@@ -180,9 +180,17 @@ func SpendForDay(s contract.StateReader, agent common.Address, timestamp uint64)
+@@ -180,9 +180,35 @@ func SpendForDay(s contract.StateReader, agent common.Address, timestamp uint64)
  // ChargeSpend adds `charge` to the agent's spend counters at `timestamp`
  // (spentToday resets when the UTC day changes; totalCharged never resets).
  // Callers must check the mandate first; this function only records.
@@ -1629,6 +1692,24 @@ index 8ac7ba6..9ae38e8 100644
 -	setBig(s, agent, fieldTotalCharged, new(big.Int).Add(sp.TotalCharged, charge))
 +	setBig(s, agent, fieldTotalCharged, total)
 +	return nil
++}
++
++// ruleVersionKey holds the agent-rule version in AgentPolicy's storage: 0 until rule v2 is
++// activated (agentrulev2.Configure writes 2). It cannot collide with per-agent slots, which are
++// keccak hashes of (agent, field, ...).
++var ruleVersionKey = common.BytesToHash([]byte("sealed-arena.agent-rule-version"))
++
++// RuleVersion returns 2 once rule v2 is active, 1 before.
++func RuleVersion(s contract.StateReader) uint64 {
++	if v := s.GetState(ContractAddress, ruleVersionKey).Big().Uint64(); v >= 2 {
++		return v
++	}
++	return 1
++}
++
++// SetRuleVersion writes the rule version (called at rule v2 activation only).
++func SetRuleVersion(s contract.StateDB, v uint64) {
++	s.SetState(ContractAddress, ruleVersionKey, common.BigToHash(new(big.Int).SetUint64(v)))
  }
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go b/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
 index 95a5767..a939043 100644
@@ -1642,3 +1723,164 @@ index 95a5767..a939043 100644
  )
  
  var (
+diff --git a/graft/subnet-evm/precompile/contracts/agentrulev2/config.go b/graft/subnet-evm/precompile/contracts/agentrulev2/config.go
+new file mode 100644
+index 0000000..6bfde08
+--- /dev/null
++++ b/graft/subnet-evm/precompile/contracts/agentrulev2/config.go
+@@ -0,0 +1,39 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package agentrulev2
++
++import (
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
++)
++
++var _ precompileconfig.Config = (*Config)(nil)
++
++// Config schedules rule v2. Its parameters are constants of the rule version; changing them
++// would be a new version with its own key.
++type Config struct {
++	precompileconfig.Upgrade
++}
++
++// NewConfig schedules rule v2 at blockTimestamp.
++func NewConfig(blockTimestamp *uint64) *Config {
++	return &Config{Upgrade: precompileconfig.Upgrade{BlockTimestamp: blockTimestamp}}
++}
++
++func (*Config) Key() string { return ConfigKey }
++
++// Verify refuses disable: v2 changes what owners sign and cannot be undone.
++func (c *Config) Verify(precompileconfig.ChainConfig) error {
++	if c.Disable {
++		return ErrDisableNotAllowed
++	}
++	return nil
++}
++
++// Equal returns true if s is a *Config scheduled identically.
++func (c *Config) Equal(s precompileconfig.Config) bool {
++	other, ok := s.(*Config)
++	if !ok {
++		return false
++	}
++	return c.Upgrade.Equal(&other.Upgrade)
++}
+diff --git a/graft/subnet-evm/precompile/contracts/agentrulev2/config_test.go b/graft/subnet-evm/precompile/contracts/agentrulev2/config_test.go
+new file mode 100644
+index 0000000..9e6a102
+--- /dev/null
++++ b/graft/subnet-evm/precompile/contracts/agentrulev2/config_test.go
+@@ -0,0 +1,25 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package agentrulev2
++
++import (
++	"testing"
++
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/graft/evm/utils"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
++)
++
++func TestAgentRuleV2ConfigVerifyRejectsDisable(t *testing.T) {
++	require.NoError(t, NewConfig(utils.PointerTo[uint64](100)).Verify(nil))
++	disable := &Config{Upgrade: precompileconfig.Upgrade{BlockTimestamp: utils.PointerTo[uint64](200), Disable: true}}
++	require.ErrorIs(t, disable.Verify(nil), ErrDisableNotAllowed)
++}
++
++func TestAgentRuleV2ConfigEqual(t *testing.T) {
++	a := NewConfig(utils.PointerTo[uint64](100))
++	require.True(t, a.Equal(NewConfig(utils.PointerTo[uint64](100))))
++	require.False(t, a.Equal(NewConfig(utils.PointerTo[uint64](101))))
++	require.Equal(t, ConfigKey, a.Key())
++}
+diff --git a/graft/subnet-evm/precompile/contracts/agentrulev2/module.go b/graft/subnet-evm/precompile/contracts/agentrulev2/module.go
+new file mode 100644
+index 0000000..ab33f06
+--- /dev/null
++++ b/graft/subnet-evm/precompile/contracts/agentrulev2/module.go
+@@ -0,0 +1,67 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++// Package agentrulev2 activates version 2 of the Sealed Arena agent rule. It is a config-only
++// precompile: scheduling "agentRuleV2Config" in precompileUpgrades at a timestamp T makes the rule
++// v2 from T on, so blocks before T keep their v1 meaning when a node re-executes history. The
++// contract has no functions. Activation is one-way (Verify refuses disable).
++package agentrulev2
++
++import (
++	"errors"
++	"fmt"
++
++	"github.com/ava-labs/libevm/common"
++
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
++)
++
++var _ contract.Configurator = (*configurator)(nil)
++
++// ConfigKey is the key used in json config files to schedule rule v2.
++const ConfigKey = "agentRuleV2Config"
++
++// ContractAddress is the address of the marker precompile, next to AgentPolicy.
++var ContractAddress = common.HexToAddress("0x0300000000000000000000000000000000000002")
++
++// ErrDisableNotAllowed is returned by Verify for an upgrade that disables rule v2.
++var ErrDisableNotAllowed = errors.New("agentrulev2: rule v2 cannot be disabled once scheduled")
++
++// Contract has no functions; any call to it fails.
++var Contract = func() contract.StatefulPrecompiledContract {
++	c, err := contract.NewStatefulPrecompileContract(nil, nil)
++	if err != nil {
++		panic(err)
++	}
++	return c
++}()
++
++// Module registers the precompile.
++var Module = modules.Module{
++	ConfigKey:    ConfigKey,
++	Address:      ContractAddress,
++	Contract:     Contract,
++	Configurator: &configurator{},
++}
++
++type configurator struct{}
++
++func init() {
++	if err := modules.RegisterModule(Module); err != nil {
++		panic(err)
++	}
++}
++
++func (*configurator) MakeConfig() precompileconfig.Config { return new(Config) }
++
++// Configure writes the rule version into AgentPolicy's storage at activation, before any
++// transaction of the activating block, so the precompile can read it (agentpolicy.RuleVersion).
++func (*configurator) Configure(_ precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, _ contract.ConfigurationBlockContext) error {
++	if _, ok := cfg.(*Config); !ok {
++		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
++	}
++	agentpolicy.SetRuleVersion(state, 2)
++	return nil
++}
+diff --git a/graft/subnet-evm/precompile/registry/registry.go b/graft/subnet-evm/precompile/registry/registry.go
+index 42bc394..9e2561c 100644
+--- a/graft/subnet-evm/precompile/registry/registry.go
++++ b/graft/subnet-evm/precompile/registry/registry.go
+@@ -18,6 +18,7 @@ import (
+ 
+ 	// Sealed Arena
+ 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentrulev2"
+ )
+ 
+ // This list is kept just for reference. The actual addresses defined in respective packages of precompiles.
