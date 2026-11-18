@@ -155,6 +155,8 @@ export function TryPayment(o: {
           <Banner status="error" title={t.tryAccepted} description={<Code>{result.hash}</Code>} />
         ) : result?.kind === "busy" ? (
           <Banner status="warning" title={t.tryBusy} />
+        ) : result?.kind === "node" ? (
+          <Banner status="warning" title={t.tryNode} description={<Code>{result.message}</Code>} />
         ) : result?.kind === "error" ? (
           <Banner status="warning" title={t.tryError} description={result.message} />
         ) : null}

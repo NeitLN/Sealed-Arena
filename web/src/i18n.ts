@@ -15,6 +15,8 @@ const en = {
   passkeyMissing: "No passkey on this browser yet.",
   publicKey: "Public key",
   forgetPasskey: "Forget on this browser",
+  forgetConfirm:
+    "Forget this passkey on this browser? This page can then no longer change, freeze or unfreeze the agents it owns from here.",
   agentSection: "2. Your agent",
   agentAddress: "Agent address",
   agentHelp: "The address your agent pays from.",
@@ -32,6 +34,7 @@ const en = {
   payees: "Allowed payees",
   payeesHelp: "One address per line, up to 16.",
   perTxCap: "Per payment (USDC)",
+  perTxCapFee: "Per payment, maximum fee included (USDC)",
   dailyCap: "Per day (USDC)",
   validDays: "Valid (days)",
   signMandate: "Sign and set mandate",
@@ -70,7 +73,13 @@ const en = {
   key_invalid: "Not a valid private key.",
   no_passkey: "Create a passkey first.",
   passkey_unsupported: "This browser cannot create passkeys here (needs HTTPS or localhost).",
-  relayer_down: "The relayer is not reachable.",
+  relayer_down:
+    "The relayer is not reachable: the chain is still shown, but changes (register, mandate, freeze) cannot be sent now.",
+  chain_mismatch: "The relayer is on another chain than this page. Changes are disabled.",
+  passkey_cancelled: "Passkey prompt closed. Nothing was signed or sent.",
+  staleView: "Could not read the chain since {time}. Showing the last values read.",
+  code_unchecked:
+    "could not be checked for code (the read failed). Sign only if you know it is a plain address.",
   agent_not_allowed:
     "This agent is not allowed to send on this chain yet. Ask the operator to add it, then link it.",
   rate_limited: "Too many requests. Wait a minute and try again.",
@@ -97,6 +106,7 @@ const en = {
     "Accepted by the node. A payment to a stranger should not be accepted: please tell the team.",
   demoBusy: "The public RPC is busy (rate limited). Try again in a minute.",
   demoError: "Could not reach the node",
+  demoNode: "The node answered with an error that is not the mandate rule",
 };
 
 type Key = keyof typeof en;
@@ -114,6 +124,8 @@ const vi: Record<Key, string> = {
   passkeyMissing: "Trình duyệt này chưa có passkey.",
   publicKey: "Khoá công khai",
   forgetPasskey: "Quên trên trình duyệt này",
+  forgetConfirm:
+    "Quên passkey này trên trình duyệt? Sau đó trang này không đổi uỷ quyền, đóng băng hay mở lại các agent của bạn từ đây được nữa.",
   agentSection: "2. Agent của bạn",
   agentAddress: "Địa chỉ agent",
   agentHelp: "Địa chỉ mà agent dùng để trả tiền.",
@@ -131,6 +143,7 @@ const vi: Record<Key, string> = {
   payees: "Người nhận được phép",
   payeesHelp: "Mỗi dòng một địa chỉ, tối đa 16.",
   perTxCap: "Mỗi lần (USDC)",
+  perTxCapFee: "Mỗi lần, đã gồm phí tối đa (USDC)",
   dailyCap: "Mỗi ngày (USDC)",
   validDays: "Hiệu lực (ngày)",
   signMandate: "Ký và đặt uỷ quyền",
@@ -167,7 +180,13 @@ const vi: Record<Key, string> = {
   key_invalid: "Private key không hợp lệ.",
   no_passkey: "Hãy tạo passkey trước.",
   passkey_unsupported: "Trình duyệt này không tạo được passkey ở đây (cần HTTPS hoặc localhost).",
-  relayer_down: "Không kết nối được relayer.",
+  relayer_down:
+    "Không kết nối được relayer: vẫn xem được chain, nhưng chưa gửi được thay đổi (đăng ký, uỷ quyền, đóng băng).",
+  chain_mismatch: "Relayer đang ở chain khác với trang này. Đã tắt các thao tác thay đổi.",
+  passkey_cancelled: "Đã đóng hộp passkey. Không có gì được ký hay gửi đi.",
+  staleView: "Không đọc được chain từ {time}. Đang hiện số liệu đọc được lần gần nhất.",
+  code_unchecked:
+    "chưa kiểm được có code hay không (đọc lỗi). Chỉ ký nếu bạn biết đây là địa chỉ thường.",
   agent_not_allowed:
     "Agent này chưa được phép gửi giao dịch trên chain. Nhờ người vận hành thêm agent rồi gắn lại.",
   rate_limited: "Quá nhiều yêu cầu. Đợi một phút rồi thử lại.",
@@ -195,6 +214,7 @@ const vi: Record<Key, string> = {
   demoAccepted: "Node đã nhận. Khoản trả cho người lạ không được phép được nhận: hãy báo cho đội.",
   demoBusy: "RPC công khai đang bận (giới hạn tần suất). Thử lại sau một phút.",
   demoError: "Không gọi được tới node",
+  demoNode: "Node trả lỗi, nhưng không phải lỗi của quy tắc uỷ quyền",
 };
 
 const dict: Record<Lang, Record<Key, string>> = { en, vi };

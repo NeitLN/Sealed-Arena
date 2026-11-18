@@ -8,12 +8,23 @@ export type SendOutcome =
   | { kind: "refused"; reason: string }
   | { kind: "accepted"; hash: string }
   | { kind: "busy" }
+  /** The node answered with an error that is not the rule's (e.g. insufficient funds). */
+  | { kind: "node"; message: string }
+  /** No answer from the node (network, timeout). */
   | { kind: "error"; message: string };
 
 /** What the node's answer means. A refusal is only a message the rule itself wrote ("agent: …"). */
 export function classifySend(r: { hash?: string; error?: unknown }): SendOutcome {
   if (r.hash) return { kind: "accepted", hash: r.hash };
-  const e = r.error as { details?: unknown; message?: unknown; status?: unknown } | undefined;
+  const e = r.error as
+    | {
+        details?: unknown;
+        message?: unknown;
+        status?: unknown;
+        code?: unknown;
+        cause?: { code?: unknown };
+      }
+    | undefined;
   const text = [e?.details, e?.message].filter((x) => typeof x === "string").join("\n");
   const rule = text.match(/agent: [a-z][a-z ]*[a-z]/);
   if (rule) return { kind: "refused", reason: rule[0] };
@@ -21,7 +32,9 @@ export function classifySend(r: { hash?: string; error?: unknown }): SendOutcome
   const first = (typeof e?.details === "string" ? e.details : String(e?.message ?? r.error))
     .split("\n")[0]
     ?.trim();
-  return { kind: "error", message: first || "unknown error" };
+  // A JSON-RPC error code means the node answered; without one, the request did not get through.
+  const answered = typeof e?.code === "number" || typeof e?.cause?.code === "number";
+  return { kind: answered ? "node" : "error", message: first || "unknown error" };
 }
 
 /**

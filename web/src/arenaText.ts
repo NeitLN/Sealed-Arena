@@ -108,6 +108,7 @@ const en = {
     'Accepted by the node. A payment outside the mandate should not be accepted: use "Report breach" below and tell the team.',
   tryBusy: "The public RPC is busy (rate limited). Try again in a minute.",
   tryError: "Could not reach the node",
+  tryNode: "The node answered with an error that is not the mandate rule",
   tryNote:
     "This shows the node refusing the transaction when it arrives. A block that contains such a transaction is also invalid for the validator (one, run by the team, today):",
   tryNoteLink: "decision D1",
@@ -243,6 +244,7 @@ const vi: Text = {
     'Node đã nhận. Khoản trả ngoài uỷ quyền không được phép được nhận: hãy bấm "Báo vi phạm" bên dưới và báo cho đội.',
   tryBusy: "RPC công khai đang bận (giới hạn tần suất). Thử lại sau một phút.",
   tryError: "Không gọi được tới node",
+  tryNode: "Node trả lỗi, nhưng không phải lỗi của quy tắc uỷ quyền",
   tryNote:
     "Phần này cho thấy node từ chối giao dịch khi nó tới. Một block chứa giao dịch như vậy cũng không hợp lệ với validator (hiện có một, do đội vận hành):",
   tryNoteLink: "quyết định D1",

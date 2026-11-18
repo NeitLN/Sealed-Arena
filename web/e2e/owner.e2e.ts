@@ -140,7 +140,7 @@ async function main() {
     );
 
     await page.getByLabel("Allowed payees").fill(`${LOCAL_PAYEES[0]}\n${LOCAL_PAYEES[1]}`);
-    await page.getByLabel("Per payment (USDC)").fill("1");
+    await page.getByLabel("Per payment, maximum fee included (USDC)").fill("1");
     await page.getByLabel("Per day (USDC)").fill("3");
     await page.getByLabel("Valid (days)").fill("7");
     await page.getByRole("button", { name: "Sign and set mandate" }).click();
@@ -177,6 +177,37 @@ async function main() {
     await page.getByRole("button", { name: "Unfreeze agent" }).click();
     await until(page, "unfrozen", async () => !(await readPolicy.mandate(n, agent.address))[1]);
     check("E2 unfreeze lets the agent pay again", (await pay()) === "success");
+
+    // ---- E4: typing does not hammer the RPC; a reload starts from the mandate on chain ----
+    let rpcCalls = 0;
+    const countRpc = (r: { method(): string; url(): string }) => {
+      if (r.method() === "POST" && /\/rpc|\/ext\/bc\//.test(r.url())) rpcCalls++;
+    };
+    page.on("request", countRpc);
+    const box = page.getByLabel("Allowed payees");
+    await box.click();
+    await box.press("End");
+    await box.pressSequentially(`\n${LOCAL_PAYEES[0]}`, { delay: 15 });
+    page.off("request", countRpc);
+    check(
+      "E4 typing a payee address sends at most a poll or two, not a read per key",
+      rpcCalls <= 2,
+      `${rpcCalls} RPC requests while typing 43 characters`,
+    );
+    await page.reload();
+    await page.getByText("Linked to this passkey").waitFor({ timeout: 30_000 });
+    await page.waitForTimeout(500);
+    const payeesAfter = await page.getByLabel("Allowed payees").inputValue();
+    const perTxAfter = await page
+      .getByLabel("Per payment, maximum fee included (USDC)")
+      .inputValue();
+    check(
+      "E4 after a reload the form shows the mandate on chain",
+      payeesAfter.includes(LOCAL_PAYEES[0]) &&
+        payeesAfter.includes(LOCAL_PAYEES[1]) &&
+        perTxAfter === "1",
+      `payees ${payeesAfter.split("\n").length}, per payment ${perTxAfter}`,
+    );
 
     // ---- E3 -----------------------------------------------------------------------
     const other = await ownerContext(browser);
