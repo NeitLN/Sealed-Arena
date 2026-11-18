@@ -133,7 +133,7 @@
     ]
   },
   "S": {
-    "agent": "0x07Dc337Bcbe000943B5DB108a0047EB78725e48A",
+    "agent": "0x6d6D8De714F1c12b05608615BE1d63144499F285",
     "caps": {
       "perTx": "0.5",
       "daily": "1"
@@ -144,65 +144,49 @@
     },
     "attempts": 20,
     "payment": "0.4",
-    "acceptedByPool": 20,
-    "refusedByPool": 0,
-    "refusals": {},
+    "acceptedByPool": 2,
+    "refusedByPool": 18,
+    "refusals": {
+      "agent: budget exceeded": 18
+    },
     "settledOnChain": 2,
-    "leftOutOfBlocks": 18,
+    "leftOutOfBlocks": 0,
+    "droppedByPool": 0,
     "spent": "0.8",
     "gasPaidByRefused": "0 (a payment the rule refuses is never in a block)",
-    "funding": "8.1",
-    "balanceDrop": "0.800084",
+    "funding": "2",
+    "balanceDrop": "0.800042000000042",
     "overDailyCap": false,
     "txs": [
       {
-        "tx": "0x0231e083d64ad1627d828763216b9880002625fb7cabcc1af24280d37892ed59",
+        "tx": "0x6641a92cb75607bd8a18de8fe9cbb8051fbd80231651bb3276b1ea3cd7b1466c",
         "status": "success",
-        "block": 433
+        "block": 474
       },
       {
-        "tx": "0x80d5ab6cff3937beca11770edc1267e8fb077b1816dc052cdf954e087c577a57",
+        "tx": "0x84a7d5465a0e958b268d7bb95360aa27aa386510662bfa5dd735f3552fd9ce99",
         "status": "success",
-        "block": 434
+        "block": 475
       }
     ],
     "afterMeasurement": {
       "note": "After the measurement the run cleaned up: the suite owner key widened the mandate, so the payments still waiting in the pool were included, and the rest of the balance went back to the same team-held seller. The numbers above are from before the mandate was widened.",
       "mandateWidened": {
-        "block": 435,
-        "tx": "0xb34a9fbbad15acea594cd4f945158066fe5bd0c4255a28fbc7c1e40b9b423437"
+        "block": 476,
+        "tx": null
       },
       "waitingIncluded": {
-        "block": 436,
-        "count": 18,
-        "value": "7.2",
-        "txs": [
-          "0x68f0c4f135c7ad8e259d979465177bf7f1a0acf14bec4a9a63bea6256a8e4bec",
-          "0x0c31df0e6ed83958bf25415f8d53f568f2fa320d3068d5d5fd5ebd5008c86967",
-          "0x7e1b19fc73b8a0ff8b1564202208c516895400a623673ee6b7e375b05e7917d8",
-          "0x0921f4e4c68094fb88234b15cfd330a18e3c6c6233f20107b962562e5b063399",
-          "0x5a05520ee6d53f1646db0f6486b7cdfaa0368dbf16d07633190ab3d5bb0b0f42",
-          "0xc2509db5959c806bc7387e11ecff2b14eaad25a9ef491a978af123296cc82a6a",
-          "0x6f1a4102a99b88626a6f1b5c4782eac4078fbbde05315d2afdc66fdd5c770060",
-          "0x00ea4620cdcd78cdd56add3fb38c91f554cd060e45df16908f56c70ca9726388",
-          "0x0da831a263a20fa7091a54ea4af8ba5a40d144a6bc28c46db9f881f0d66896ad",
-          "0x0d84af499d533e8bd6957b7eafde19fb41c4851e92ca0ec7163fb7ffa9f8ae74",
-          "0x32f6d4eab08274eb2e367861efd3ae5a26297b5af062b29f87c8b2b0ae6aa102",
-          "0xf888b4740ececd81118dda026f6d1249680ea959c10cb1811b6f6a4b07b5f7ca",
-          "0xebecfb408acf535ffb1895229930bcda600b19e3af12ee84bbeac29dda81f582",
-          "0x62b9f0dda44c2e7055cca013f76e3b96ffb302811156bf76df3c2824bf5d3201",
-          "0x83e1f1466e5dc5c71816d256decc83951833ad3bd8331cc11eb216c312d08877",
-          "0xb983648f6994435c83c8e230392913bc107b18d5b15e5e4b963b831bfd27e5cd",
-          "0xe80c4f732d829a17979acb4f742049ed47a7d9ecc02f46f0e99c7a9c1eaa4818",
-          "0xade0e0cb6742429aa3be8dd4ae90afbeaab3af742d01427e3c20afcc939199af"
-        ]
+        "block": null,
+        "count": 0,
+        "value": "0",
+        "txs": []
       },
       "leftoverReturned": {
-        "block": 437,
-        "tx": "0xe0271e86343b2581f45a65bdebfed54e815dfe38611232199e0ad90fba6f3d41",
-        "value": "0.0991138"
+        "block": 477,
+        "tx": "0xfcd386dbfcc83ff688778587629f1b6d2f1ed74661dc63facabfd9c66934a904",
+        "value": "1.199932799999937"
       }
     }
   },
-  "atS": "2026-11-18T19:14:50.366Z"
+  "atS": "2026-11-18T21:45:56.302Z"
 }

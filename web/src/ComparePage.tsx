@@ -165,7 +165,11 @@ export default function ComparePage() {
                 <TableCell>
                   <Verdict
                     variant="success"
-                    badge={`${r.S.leftOutOfBlocks}/${r.S.attempts} ${vi ? "đang chờ, chưa vào block" : "waiting, not in a block"}`}
+                    badge={
+                      r.S.refusedByPool > 0
+                        ? `${r.S.refusedByPool}/${r.S.attempts} ${vi ? "bị từ chối khi gửi" : "refused on arrival"}`
+                        : `${r.S.leftOutOfBlocks}/${r.S.attempts} ${vi ? "đang chờ, chưa vào block" : "waiting, not in a block"}`
+                    }
                     line={t.sBurst}
                   />
                 </TableCell>

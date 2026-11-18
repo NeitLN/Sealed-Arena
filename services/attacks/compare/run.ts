@@ -7,7 +7,7 @@
 //                                         against caps of 0.5 per payment and 1 per day. Writes results/fuji-<time>.json
 //                                         and web/src/compare-result.json.
 // Needs: bash scripts/forge.sh build; the SSH tunnel to the Fuji node (127.0.0.1:19650); keys in Sealed-Arena/.env.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -404,10 +404,23 @@ async function cleanUp(
 async function runS() {
   const [n] = sealed.nodes();
   if (!n) throw new Error("no Sealed node");
-  // Enough for all 20 payments and their gas, so only the rule limits what is spent (with less,
-  // the pool refuses the later payments for insufficient funds and the run measures the balance).
-  const funding = parseEther(CAPS.payment) * BigInt(CAPS.count) + parseEther("0.1");
+  // Twice the daily cap. The pool counts an agent's pooled payments toward the daily cap
+  // (node from 2026-11-19), so the cap refuses the third payment while the balance still covers
+  // it; the refusal reasons in the result show which check refused each payment. (A node without
+  // that pool check accepts payments the cap later keeps out of blocks; there the balance has to
+  // cover all 20, or the pool refuses for insufficient funds and the run measures the balance.)
+  const funding = parseEther(CAPS.daily) * 2n;
+  // The key is kept outside the repository (the team's local notes), so the test USDC on this
+  // agent can be recovered if the run stops before its clean-up.
+  const key = generatePrivateKey();
+  const keep = resolve(ROOT, "../docs-noi-bo/local-runs");
+  if (existsSync(keep))
+    appendFileSync(
+      resolve(keep, "compare-agents.jsonl"),
+      `${JSON.stringify({ at: new Date().toISOString(), agent: privateKeyToAccount(key).address, key })}\n`,
+    );
   const agent = await sealed.freshAgent(n, [SELLER], {
+    key,
     funding,
     perTxCap: parseEther(CAPS.perTx),
     dailyCap: parseEther(CAPS.daily),
@@ -466,7 +479,23 @@ async function runS() {
   const toSeller = receipts.filter((r) => r.status === "success").length;
   const valueSent = parseEther(CAPS.payment) * BigInt(toSeller);
   const balanceAfter = await n.client.getBalance({ address: agent.address });
-  const afterMeasurement = await cleanUp(n, agent, accepted.slice(mined) as Hex[]);
+  // Accepted but not in a block: still waiting in the pool, or dropped by it (a node that counts
+  // pooled payments drops the ones that no longer fit the day's budget at the next block).
+  const notMined = accepted.slice(mined) as Hex[];
+  const lookups = await Promise.all(
+    notMined.map((hash) =>
+      n.client.request({ method: "eth_getTransactionByHash", params: [hash] }),
+    ),
+  );
+  const waiting = notMined.filter((_, i) => lookups[i] !== null);
+  const dropped = notMined.length - waiting.length;
+  console.log(
+    `measured: ${accepted.length} accepted, ${CAPS.count - accepted.length} refused (${JSON.stringify(refusals)}), ${mined} in blocks, ${toSeller} to the seller, ${waiting.length} waiting, ${dropped} dropped by the pool`,
+  );
+  // A failed clean-up must not lose the measurement: record the error instead.
+  const afterMeasurement = await cleanUp(n, agent, waiting).catch((e: unknown) => ({
+    error: e instanceof Error ? e.message.split("\n")[0] : String(e),
+  }));
   return {
     agent: agent.address,
     caps: { perTx: CAPS.perTx, daily: CAPS.daily },
@@ -477,7 +506,8 @@ async function runS() {
     refusedByPool: CAPS.count - accepted.length,
     refusals,
     settledOnChain: toSeller,
-    leftOutOfBlocks: accepted.length - mined,
+    leftOutOfBlocks: waiting.length,
+    droppedByPool: dropped,
     spent: formatEther(valueSent),
     gasPaidByRefused: "0 (a payment the rule refuses is never in a block)",
     funding: formatEther(funding),

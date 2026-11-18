@@ -98,11 +98,13 @@ describe("page wording", () => {
     expect(landingText("vi").refusedSource).toMatch(/ngoài chain/);
   });
 
-  it.each(["en", "vi"] as const)("S burst outcomes in %s describe block inclusion", (lang) => {
+  it.each(["en", "vi"] as const)("S burst labels in %s say what each number counts", (lang) => {
     const t = landingText(lang);
-    expect([t.inBlocks, t.keptOut, t.reverted, t.sealedResult].join(" ")).not.toMatch(
-      /refused|từ chối/i,
-    );
+    // The second count is the payments the node refused on arrival (refusedByPool).
+    expect(t.keptOut).toMatch(/refused|từ chối/i);
+    expect(t.inBlocks).not.toMatch(/refused|từ chối/i);
+    // The summary does not claim that refused payments were kept waiting.
+    expect(t.sealedResult).not.toMatch(/waiting payment can enter|giao dịch chờ có thể/i);
   });
 
   it("landing page numbers come from the comparison results, not the text", () => {
@@ -116,8 +118,12 @@ describe("page wording", () => {
     if (!a) throw new Error("compare-result.json has no afterMeasurement for S");
     for (const lang of ["en", "vi"] as const) {
       const note = compareText(lang, r).notes.at(-1) ?? "";
-      expect(note).toContain(`block ${a.waitingIncluded.block}`);
-      expect(note).toContain(String(a.waitingIncluded.count));
+      expect(note).toContain(`block ${a.mandateWidened.block}`);
+      if (a.waitingIncluded.count > 0) {
+        expect(note).toContain(`block ${a.waitingIncluded.block}`);
+        expect(note).toContain(String(a.waitingIncluded.count));
+      }
+      if (a.leftoverReturned) expect(note).toContain(`block ${a.leftoverReturned.block}`);
     }
   });
 
