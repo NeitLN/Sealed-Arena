@@ -555,10 +555,18 @@ async function wallet(group: string) {
  * Replaces the 9.L cases of an S result file with those of the current leaked-key run on the same
  * network, for when the leaked-key run was redone after the wallet run. Nothing else changes.
  */
-function relinkLeaked(name: string) {
+function relinkLeaked(name: string, none: boolean) {
   const file = resolve(RESULTS, name);
   const run = JSON.parse(readFileSync(file, "utf8")) as WalletRun;
   if (run.group !== "S") throw new Error("relink-leaked: not an S result file");
+  if (none) {
+    // No valid leaked-key run on this network yet: keep the 45 wallet cases only.
+    run.cases = run.cases.filter((c) => !c.id.startsWith("9.L"));
+    delete run.leakedKeyAt;
+    writeFileSync(file, `${JSON.stringify(run, null, 2)}\n`);
+    console.log(`unlinked: ${file} (no leaked-key cases)`);
+    return;
+  }
   const fuji = run.network.includes("Fuji");
   const lkFile = resolve(RESULTS, fuji ? "leaked-key-fuji.json" : "leaked-key.json");
   const lk = JSON.parse(readFileSync(lkFile, "utf8")) as LeakedKeyFile;
@@ -679,11 +687,11 @@ const FUJI = process.argv.includes("--fuji");
 const main = async () => {
   if (cmd === "wallet") return wallet(arg ?? "");
   if (cmd === "leaked-key") return leakedKey(FUJI);
-  if (cmd === "relink-leaked") return relinkLeaked(arg ?? "");
+  if (cmd === "relink-leaked") return relinkLeaked(arg ?? "", process.argv.includes("--none"));
   if (cmd === "report") return report();
   if (cmd === "agent") return agentTier(Number(arg ?? "5"), process.argv.slice(4).map(Number));
   console.error(
-    "usage: suite <wallet P|O|O+|S | leaked-key | relink-leaked <S file> | agent [runs] | report>",
+    "usage: suite <wallet P|O|O+|S | leaked-key | relink-leaked <S file> [--none] | agent [runs] | report>",
   );
   process.exit(2);
 };

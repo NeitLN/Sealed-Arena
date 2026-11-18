@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { annotate, latest, type RunFile, render, type WalletRun } from "./report.js";
+import { annotate, latest, type RunFile, render, summaryRows, type WalletRun } from "./report.js";
 
 const run = (
   group: "P" | "S",
@@ -53,8 +53,16 @@ describe("report", () => {
       ["S", "fuji", "2026-11-19T00:00:00Z"],
       ["S", "test", "2026-11-18T00:00:00Z"],
     ]);
-    const md = render([...files, { ...fuji, leakedKeyAt: "2026-11-19T01:00:00Z" }]);
-    expect(md).toContain("Cases 9.L*: leaked-key run 2026-11-19T01:00:00Z.");
+    const linked = {
+      ...fuji,
+      leakedKeyAt: "2026-11-19T01:00:00Z",
+      cases: [
+        ...fuji.cases,
+        { cls: 9, id: "9.L1", title: "x", outcome: "blocked" as const, t0: 0, t1: 0, txs: [] },
+      ],
+    };
+    const md = render([...files, linked]);
+    expect(md).toContain("| fuji | 2026-11-19T01:00:00Z | 1 | 1/1 | 0 cases |");
   });
 
   it("computes rates, Wilson intervals and losses from the records", () => {
@@ -111,14 +119,70 @@ describe("report", () => {
   });
 });
 
+describe("leaked-key cases", () => {
+  const leaked = (outcome: "T0" | "blocked") => ({
+    cls: 9,
+    id: "9.L1",
+    title: "leaked-key suite: x",
+    outcome,
+    t0: 0,
+    t1: 0,
+    txs: [],
+  });
+
+  it("are kept out of the wallet tier and shown in their own table", () => {
+    const s = run("S", "2026-11-18T00:00:00Z", ["blocked", "T1"]);
+    s.cases.push(leaked("blocked"));
+    expect(summaryRows([s])[0]).toMatchObject({ cases: 2, t0: 0, t1: 1 });
+    const md = render([s]);
+    expect(md).toContain("| All | 2 |");
+    expect(md).toContain("| test | 2026-11-18T00:00:00Z | 1 | 1/1 | 0 cases |");
+  });
+
+  it("show NOT RUN for a network whose S run has none", () => {
+    const md = render([run("S", "2026-11-18T00:00:00Z", ["blocked"])]);
+    expect(md).toContain("| test | NOT RUN | | | |");
+  });
+});
+
 describe("docs/EVALUATION.md", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const dir = resolve(here, "results");
+  const files = readdirSync(dir)
+    .filter((f) => /^(wallet|agent)-.*\.json$/.test(f))
+    .sort()
+    .map((f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as RunFile);
+
+  it("compares every group on the same 45 wallet cases", () => {
+    for (const r of summaryRows(files))
+      expect([r.group, r.network, r.cases]).toEqual([r.group, r.network, 45]);
+  });
+
+  it("README's evaluation table is the summary of the raw results (P, O, O+, S on Fuji)", () => {
+    const readme = readFileSync(resolve(here, "../../../README.md"), "utf8");
+    const rows = summaryRows(files);
+    const want = (g: string, net: (n: string) => boolean) => {
+      const r = rows.find((x) => x.group === g && net(x.network));
+      if (!r) throw new Error(`no ${g} run`);
+      return `${r.t0}/${r.cases} | ${r.t1}/${r.cases} | ${r.benignDone}/${r.benign}`;
+    };
+    const fuji = (n: string) => n.includes("Fuji");
+    const got = (prefix: string) => {
+      const l = readme.split("\n").find((x) => x.startsWith(`| ${prefix} `));
+      if (!l) throw new Error(`README has no row "${prefix}"`);
+      return l
+        .split("|")
+        .slice(2, 5)
+        .map((c) => c.trim())
+        .join(" | ");
+    };
+    expect(got("P")).toBe(want("P", fuji));
+    expect(got("O")).toBe(want("O", fuji));
+    expect(got("O+")).toBe(want("O+", fuji));
+    expect(got("S")).toBe(want("S", (n) => n.startsWith("Sealed L1 on Fuji")));
+  });
+
   it("is exactly what the raw result files produce (no number typed by hand)", () => {
-    const here = dirname(fileURLToPath(import.meta.url));
-    const dir = resolve(here, "results");
-    const files = readdirSync(dir)
-      .filter((f) => /^(wallet|agent)-.*\.json$/.test(f))
-      .sort()
-      .map((f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as RunFile);
     const root = resolve(here, "../../..");
     const readCalls = (p: string) =>
       (

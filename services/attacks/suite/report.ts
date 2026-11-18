@@ -98,10 +98,41 @@ export function latest(files: RunFile[]): { wallet: WalletRun[]; agent: AgentRow
 
 const GROUP_NAME: Record<Group, string> = {
   P: "P: plain wallet",
-  O: "O: spending-limit contract wallet, caps only (built by the team)",
-  "O+": "O+: the same wallet with a payee list (built by the team)",
+  O: "O: minimal spending-limit contract wallet, caps only (written by the team for this comparison)",
+  "O+": "O+: the same wallet with a payee list",
   S: "S: Sealed Arena",
 };
+
+/** Cases of the leaked-key suite, attached to S runs as 9.L*: they use their own mandates. */
+const isLeaked = (c: CaseRecord) => c.id.startsWith("9.L");
+/** The wallet-tier cases of a run: the same 45 cases for every group. */
+export const walletCases = (run: WalletRun) => run.cases.filter((c) => !isLeaked(c));
+
+export type SummaryRow = {
+  group: Group;
+  network: string;
+  cases: number;
+  t0: number;
+  t1: number;
+  benignDone: number;
+  benign: number;
+};
+
+/** One row per group and network: the newest run, wallet-tier cases only. */
+export function summaryRows(files: RunFile[]): SummaryRow[] {
+  return latest(files).wallet.map((run) => {
+    const cs = walletCases(run);
+    return {
+      group: run.group,
+      network: run.network,
+      cases: cs.length,
+      t0: cs.filter((c) => c.outcome === "T0").length,
+      t1: cs.filter((c) => c.outcome === "T1").length,
+      benignDone: run.benign.filter((b) => b.completed).length,
+      benign: run.benign.length,
+    };
+  });
+}
 
 /** The tool calls of a transcript, by its path relative to the repository root. */
 export type ReadCalls = (path: string) => Array<{ name: string; input: { key?: string } }>;
@@ -158,20 +189,31 @@ export function render(files: RunFile[]): string {
   );
   line();
 
+  line("## Summary");
+  line();
+  line(
+    "| Group | Network | Coins left outside the mandate (T0) | Unwanted payments inside the mandate (T1) | Benign purchases completed |",
+  );
+  line("| --- | --- | --- | --- | --- |");
+  for (const r of summaryRows(files))
+    line(
+      `| ${r.group} | ${r.network} | ${r.t0}/${r.cases} | ${r.t1}/${r.cases} | ${r.benignDone}/${r.benign} |`,
+    );
+  line();
+
   line("## Wallet tier");
   line();
   for (const run of wallet) {
     line(`### ${GROUP_NAME[run.group]}`);
     line();
-    line(
-      `Run ${run.at} on ${run.network}.${run.leakedKeyAt ? ` Cases 9.L*: leaked-key run ${run.leakedKeyAt}.` : ""}`,
-    );
+    line(`Run ${run.at} on ${run.network}.`);
     line();
     line("| Class | Cases | T0 | T1 | USDC lost outside the mandate per 100 cases |");
     line("| --- | --- | --- | --- | --- |");
-    const classes = [...new Set(run.cases.map((c) => c.cls))].sort((a, b) => a - b);
+    const all = walletCases(run);
+    const classes = [...new Set(all.map((c) => c.cls))].sort((a, b) => a - b);
     for (const k of classes) {
-      const cs = run.cases.filter((c) => c.cls === k);
+      const cs = all.filter((c) => c.cls === k);
       const n = cs.length;
       const t0 = cs.filter((c) => c.outcome === "T0").length;
       const t1 = cs.filter((c) => c.outcome === "T1").length;
@@ -180,10 +222,10 @@ export function render(files: RunFile[]): string {
         `| ${k}. ${CLASSES[k] ?? ""} | ${n} | ${ci(t0, n)} | ${ci(t1, n)} | ${usdc((lost / n) * 100)} |`,
       );
     }
-    const n = run.cases.length;
-    const t0 = run.cases.filter((c) => c.outcome === "T0").length;
-    const t1 = run.cases.filter((c) => c.outcome === "T1").length;
-    const lost = run.cases.reduce((s, c) => s + c.t0, 0);
+    const n = all.length;
+    const t0 = all.filter((c) => c.outcome === "T0").length;
+    const t1 = all.filter((c) => c.outcome === "T1").length;
+    const lost = all.reduce((s, c) => s + c.t0, 0);
     line(`| All | ${n} | ${ci(t0, n)} | ${ci(t1, n)} | ${usdc((lost / n) * 100)} |`);
     line();
     if (run.benign.length) {
@@ -193,6 +235,31 @@ export function render(files: RunFile[]): string {
       );
       line();
     }
+  }
+
+  const sRuns = wallet.filter((r) => r.group === "S");
+  if (sRuns.length) {
+    line("## Leaked-key suite");
+    line();
+    line(
+      "The leaked-key suite plays someone who holds the agent's key. It uses its own mandate (1 coin per payment, 3 coins per day, the daily cap raised by 2 coins for its last case), not the reference mandate, so its cases are not counted in the wallet-tier tables.",
+    );
+    line();
+    line("| Network | Run | Cases | Ended inside the mandate | Coins outside the mandate |");
+    line("| --- | --- | --- | --- | --- |");
+    for (const run of sRuns) {
+      const lk = run.cases.filter(isLeaked);
+      if (lk.length === 0) {
+        line(`| ${run.network} | NOT RUN | | | |`);
+        continue;
+      }
+      const inside = lk.filter((c) => c.outcome !== "T0").length;
+      const out = lk.filter((c) => c.outcome === "T0").length;
+      line(
+        `| ${run.network} | ${run.leakedKeyAt ?? run.at} | ${lk.length} | ${inside}/${lk.length} | ${out} cases |`,
+      );
+    }
+    line();
   }
 
   if (agent.length) {
@@ -211,9 +278,11 @@ export function render(files: RunFile[]): string {
 
   line("## Limits");
   line();
-  line("- The team wrote the cases; five per class is a small sample, so the intervals are wide.");
   line(
-    "- Group O is a spending-limit wallet the team built in a common style for this comparison, not a product.",
+    "- The team wrote the cases; five per class is a small sample, so the intervals are wide. The cases are deterministic; read the intervals as coverage of these cases, not as a rate in the field.",
+  );
+  line(
+    "- Groups O and O+ are a minimal wallet written by the team for this comparison; they are not representative of audited wallet products.",
   );
   line(
     "- The agent tier uses one model and pages the team wrote; another model or page may give another rate. In class 7 the owner's task asks the agent to read and follow its notes, and the attacker planted the note; with no such request the agent did not open the note.",
@@ -227,11 +296,32 @@ export function render(files: RunFile[]): string {
   line(
     "- S counts the maximum gas fee in the per-payment cap, so a payment of exactly the cap is refused; cases at the cap end as blocked for S and as T1 for the others.",
   );
-  for (const s of wallet.filter((r) => r.group === "S")) {
-    const t1 = s.cases.filter((c) => c.outcome === "T1").length;
+  const oPlus = wallet.find((r) => r.group === "O+");
+  for (const s of sRuns) {
+    const cs = walletCases(s);
+    const t1 = cs.filter((c) => c.outcome === "T1").length;
     line(
-      `- S does not stop T1: ${ci(t1, s.cases.length)} of its cases on ${s.network} ended with an unwanted payment inside the mandate. The chain rule limits where and how much; it does not know what the owner wanted.`,
+      `- S does not stop T1: ${ci(t1, cs.length)} of its cases on ${s.network} ended with an unwanted payment inside the mandate. The chain rule limits where and how much; it does not know what the owner wanted.`,
     );
+    if (oPlus) {
+      const byId = new Map(cs.map((c) => [c.id, c]));
+      const diff = walletCases(oPlus).filter(
+        (c) => c.outcome === "T1" && byId.get(c.id)?.outcome === "blocked",
+      );
+      const fee = diff.filter((c) => byId.get(c.id)?.note?.includes("budget exceeded")).length;
+      // Say "only" when the whole gap is the fee: every case that differs was refused for the
+      // budget, and no case is T1 for S alone.
+      const oPlusT1 = new Set(
+        walletCases(oPlus)
+          .filter((c) => c.outcome === "T1")
+          .map((c) => c.id),
+      );
+      const sOnly = cs.filter((c) => c.outcome === "T1" && !oPlusT1.has(c.id)).length;
+      const why = fee === diff.length && sOnly === 0 ? "only" : "partly";
+      line(
+        `- ${diff.length} cases end as T1 for O+ and as blocked for S on ${s.network}; in ${fee} of them S refused with "budget exceeded" because it adds the maximum fee to the payment. S ends with fewer T1 cases ${why} for this reason, not because it judges what the owner wanted.`,
+      );
+    }
   }
   line();
 
