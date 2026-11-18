@@ -1,8 +1,6 @@
 {
   "pages": "0/30",
-  "memory": "5/5",
   "sources": {
-    "pages": "services/agent/transcripts/{injection,injection-strong,drain}-<timestamp>.json",
-    "memory": "services/attacks/suite/results/agent-2026-11-17T10-53-30-218Z.json"
+    "pages": "services/agent/transcripts/{injection,injection-strong,drain}-<timestamp>.json"
   }
 }

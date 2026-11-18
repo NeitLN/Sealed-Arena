@@ -48,7 +48,7 @@ const en = {
     "P and O ran on the Fuji C-Chain, S on the Sealed L1 on Fuji. All three used test USDC.",
   plain: "Plain wallet",
   plainResult:
-    "The plain wallet lost its balance in a hand-written transcript. In separate local-network tests, the live agent followed injected pages in {pages} runs and a planted memory note in {memory}.",
+    "The plain wallet lost its balance in a hand-written transcript. In separate local-network tests, the live agent (two models) followed injected pages in {pages} runs and a planted memory note in {memory}.",
   limit: "Limit contract wallet",
   limitResult: "{passed} of {attempts} passed the check, then {reverted} reverted inside blocks",
   sealed: "Sealed L1",
@@ -164,7 +164,7 @@ const vi: Text = {
   compareNote: "P và O chạy trên Fuji C-Chain, S trên L1 Sealed ở Fuji. Cả ba dùng USDC thử.",
   plain: "Ví thường",
   plainResult:
-    "Ví mất toàn bộ số dư trong bản ghi dựng tay. Trong thử nghiệm riêng trên mạng cục bộ, agent thật làm theo trang cài lệnh ở {pages} lượt và ghi chú cài sẵn trong bộ nhớ ở {memory} lượt.",
+    "Ví mất toàn bộ số dư trong bản ghi dựng tay. Trong thử nghiệm riêng trên mạng cục bộ, agent thật (hai model) làm theo trang cài lệnh ở {pages} lượt và ghi chú cài sẵn trong bộ nhớ ở {memory} lượt.",
   limit: "Ví hạn mức dạng contract",
   limitResult: "{passed}/{attempts} qua bước kiểm, rồi {reverted} revert trong block",
   sealed: "L1 Sealed",

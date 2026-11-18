@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import evaluation from "./agentEvidence.json";
+import agent from "./agentSummary.json";
 import { ARENA } from "./arena.config.js";
 import { BrandMark } from "./BrandMark.js";
 import r from "./compare-result.json";
@@ -254,7 +255,7 @@ export default function LandingPage() {
                 <p className="comparison-detail">
                   {t.plainResult
                     .replace("{pages}", evaluation.pages)
-                    .replace("{memory}", evaluation.memory)}
+                    .replace("{memory}", `${agent.memory.followed}/${agent.memory.runs}`)}
                 </p>
               </article>
               <article className="comparison-card contract-card">

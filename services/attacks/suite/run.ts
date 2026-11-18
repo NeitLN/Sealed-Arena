@@ -38,10 +38,12 @@ import {
 import {
   type AgentClass,
   type AgentRun,
+  agentSummary,
   annotate,
   type BenignRecord,
   type CaseRecord,
   type Group,
+  type ReadCalls,
   type RunFile,
   render,
   summaryRows,
@@ -663,12 +665,8 @@ function agentTier(runs: number, only: number[]) {
 }
 
 /** Tool calls of a transcript, path relative to the repository root. */
-const readCalls = (path: string) =>
-  (
-    JSON.parse(readFileSync(resolve(ROOT, path), "utf8")) as {
-      calls: Array<{ name: string; input: { key?: string } }>;
-    }
-  ).calls;
+const readCalls: ReadCalls = (path) =>
+  (JSON.parse(readFileSync(resolve(ROOT, path), "utf8")) as { calls: ReturnType<ReadCalls> }).calls;
 
 function report() {
   const files: RunFile[] = existsSync(RESULTS)
@@ -678,11 +676,14 @@ function report() {
         .map((f) => JSON.parse(readFileSync(resolve(RESULTS, f), "utf8")) as RunFile)
     : [];
   const out = resolve(ROOT, "docs/EVALUATION.md");
-  writeFileSync(out, render(annotate(files, readCalls)));
+  const annotated = annotate(files, readCalls);
+  writeFileSync(out, render(annotated));
   // The web pages read the same numbers (the /compare page), never typed by hand.
   const summary = resolve(ROOT, "web/src/evalSummary.json");
   writeFileSync(summary, `${JSON.stringify(summaryRows(files), null, 2)}\n`);
-  console.log(`report: ${out} and ${summary} (${files.length} result files)`);
+  const agent = resolve(ROOT, "web/src/agentSummary.json");
+  writeFileSync(agent, `${JSON.stringify(agentSummary(annotated), null, 2)}\n`);
+  console.log(`report: ${out}, ${summary} and ${agent} (${files.length} result files)`);
 }
 
 const [cmd, arg] = process.argv.slice(2);
