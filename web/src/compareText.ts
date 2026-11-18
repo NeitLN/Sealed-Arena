@@ -28,6 +28,143 @@ export type Result = {
   };
 };
 
+/** One row of docs/EVALUATION.md's summary, written by `pnpm --filter attacks suite report`. */
+export type EvalRow = { group: string; network: string; cases: number; t0: number; t1: number };
+
+/** O+ and S (Sealed L1 on Fuji) from the 45-case evaluation. */
+export function oPlusAndS(rows: EvalRow[]) {
+  const oPlus = rows.find((r) => r.group === "O+");
+  const s = rows.find((r) => r.group === "S" && r.network.startsWith("Sealed L1 on Fuji"));
+  if (!oPlus || !s) throw new Error("evalSummary.json lacks O+ or S on Fuji");
+  return { oPlus, s };
+}
+
+export const whyText = (lang: Lang, x: Result, rows: EvalRow[]) => {
+  const { oPlus, s } = oPlusAndS(rows);
+  const f = (a: number, n: number) => `${a}/${n}`;
+  return lang === "vi"
+    ? {
+        title: "Sao không dùng ví hợp đồng?",
+        intro:
+          "Ví hợp đồng là lựa chọn hiển nhiên, và trong số đo của chúng tôi một ví tốt (O+) ngang S về T0. Hai cách khác nhau ở chỗ bảo đảm điều gì và tốn gì.",
+        oPlus: "O+: ví hợp đồng có hạn mức và danh sách người nhận (Fuji C-Chain)",
+        s: "S: Sealed L1",
+        rows: [
+          [
+            "Tiền nằm ở đâu",
+            "Trong contract ví; khoá agent ký uỷ quyền",
+            "Trong tài khoản của chính khoá agent, là coin gốc của L1",
+          ],
+          [
+            "Phép kiểm áp cho",
+            "Các khoản đi qua code của ví (ở đây là uỷ quyền EIP-3009 kiểm trong isValidSignature). Tài sản khoá giữ ngoài ví không được kiểm",
+            "Mọi giao dịch gửi từ địa chỉ agent trên L1 này. Chữ ký ngoài chain không được thấy (giới hạn 3)",
+          ],
+          [
+            "Phí",
+            "Trả bằng AVAX bởi bên gửi khoản trả; nằm ngoài hạn mức",
+            "Agent trả bằng cùng loại coin; phí tối đa được tính vào cả hai hạn mức",
+          ],
+          [
+            "Khoản bị từ chối",
+            `Hỏng ở bước kiểm trước khi settle, hoặc revert trong block (với O, cùng đường settle: ${x.O.revertedOnChain}/${x.O.attempts} revert trong lần chạy cùng lúc)`,
+            "Node từ chối; không được đưa vào block",
+          ],
+          [`T0 trong ${oPlus.cases} ca`, f(oPlus.t0, oPlus.cases), f(s.t0, s.cases)],
+          [
+            `T1 trong ${oPlus.cases} ca`,
+            f(oPlus.t1, oPlus.cases),
+            `${f(s.t1, s.cases)}, thấp hơn chỉ vì phí tối đa được cộng vào mỗi khoản`,
+          ],
+          [
+            "Một quy tắc cho mọi agent",
+            "Mỗi ví là một contract riêng và có thể khác nhau",
+            "Một quy tắc trong node; agent đã đăng ký không thoát ra được",
+          ],
+          [
+            "Bạn phải tin ai",
+            "Các validator của C-Chain (nhiều bên độc lập) và code của ví",
+            "Validator của Sealed L1 (hiện có một, do đội vận hành), node đã vá và các khoá admin của đội",
+          ],
+          [
+            "Thanh toán",
+            "x402 với EIP-3009, người bán đã nhận sẵn",
+            "Phương thức x402 riêng signed-native-tx; người bán thêm mạng và facilitator của chúng tôi",
+          ],
+          [
+            "Chi phí áp dụng",
+            "Triển khai một ví cho mỗi agent",
+            "Chuyển USDC sang một L1 riêng; đội phải cập nhật bản fork Subnet-EVM",
+          ],
+        ],
+        whenOPlus:
+          "Khi O+ là lựa chọn tốt hơn: agent trả bằng USDC trên C-Chain, người bán dùng x402 chuẩn, và bạn muốn một chain do nhiều validator độc lập vận hành ngay hôm nay.",
+        whenS:
+          "Khi Sealed đáng cái giá của nó: bạn muốn hạn mức ràng buộc chính khoá, tính cả phí, không cần code ví cho từng agent, và chấp nhận một L1 riêng. Chúng tôi chưa chứng minh được khách hàng thấy điều này đáng giá.",
+        note: "O+ không có trong lần chạy cùng lúc ở trên; kết quả 45 ca của nó nằm trong docs/EVALUATION.md.",
+      }
+    : {
+        title: "Why not a contract wallet?",
+        intro:
+          "A contract wallet is the obvious alternative, and in our measurements a good one (O+) matches Sealed on T0. The two differ in what is guaranteed and what it costs.",
+        oPlus: "O+: contract wallet with caps and a payee list (Fuji C-Chain)",
+        s: "S: Sealed L1",
+        rows: [
+          [
+            "Where the money sits",
+            "In the wallet contract; the agent key signs authorisations",
+            "In the agent key's own account, as the L1's native coin",
+          ],
+          [
+            "What the check covers",
+            "Payments that go through the wallet's code (here EIP-3009 authorisations checked in isValidSignature). Anything the key holds outside the wallet is not covered",
+            "Every transaction sent from the agent's address on this L1. Off-chain signatures are not seen (limit 3)",
+          ],
+          [
+            "Fees",
+            "Paid in AVAX by whoever submits the payment; outside the caps",
+            "Paid by the agent in the same coin; the maximum fee is counted in both caps",
+          ],
+          [
+            "A refused payment",
+            `Fails the check before settlement, or reverts inside a block (with O, same settlement path: ${x.O.revertedOnChain} of ${x.O.attempts} reverted in the burst run)`,
+            "Refused by the node; not included in a block",
+          ],
+          [`T0 in ${oPlus.cases} cases`, f(oPlus.t0, oPlus.cases), f(s.t0, s.cases)],
+          [
+            `T1 in ${oPlus.cases} cases`,
+            f(oPlus.t1, oPlus.cases),
+            `${f(s.t1, s.cases)}, lower only because the maximum fee is added to each payment`,
+          ],
+          [
+            "One rule for all agents",
+            "Each wallet is its own contract and can differ",
+            "One rule in the node; a registered agent cannot opt out",
+          ],
+          [
+            "Who you trust",
+            "The C-Chain's validators (many independent operators) and the wallet's code",
+            "The Sealed L1's validator (one today, run by the team), the patched node and the team's admin keys",
+          ],
+          [
+            "Payments",
+            "x402 with EIP-3009, which sellers already accept",
+            "Our x402 method signed-native-tx; sellers add the network and our facilitator",
+          ],
+          [
+            "Cost to adopt",
+            "Deploy a wallet per agent",
+            "Bridge USDC to a separate L1; the team must keep a Subnet-EVM fork up to date",
+          ],
+        ],
+        whenOPlus:
+          "When O+ is the better choice: your agents pay in USDC on the C-Chain, your sellers use standard x402, and you want a chain run by many independent validators today.",
+        whenS:
+          "When Sealed is worth its price: you want the limit to hold for the key itself, fees included, with no wallet code per agent, and you accept a separate L1. We have not yet shown that customers find this worth the price.",
+        note: "O+ was not part of the burst run above; its 45-case results are in docs/EVALUATION.md.",
+      };
+};
+
 export const compareText = (lang: Lang, x: Result) =>
   lang === "vi"
     ? {

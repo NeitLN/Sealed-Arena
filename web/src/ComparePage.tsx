@@ -12,7 +12,8 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import type { ReactNode } from "react";
 import { ARENA } from "./arena.config.js";
 import result from "./compare-result.json";
-import { compareText, type Result, type Tx } from "./compareText.js";
+import { compareText, type EvalRow, type Result, type Tx, whyText } from "./compareText.js";
+import evalSummary from "./evalSummary.json";
 import { useI18n } from "./i18n.js";
 import { SiteShell } from "./SiteShell.js";
 
@@ -105,6 +106,7 @@ function Wallet(o: {
 export default function ComparePage() {
   const { lang, setLang } = useI18n();
   const t = compareText(lang, r);
+  const why = whyText(lang, r, evalSummary as EvalRow[]);
   const base = r.explorers.cChain;
   const vi = lang === "vi";
   const notMeasured = <Verdict variant="neutral" badge={t.notRun} line="" />;
@@ -196,6 +198,40 @@ export default function ComparePage() {
             <TxList txs={r.S.txs} title={t.txs} />
           </Wallet>
         </Grid>
+
+        <Card>
+          <VStack gap={3}>
+            <Heading level={2}>{why.title}</Heading>
+            <Text type="body" color="secondary">
+              {why.intro}
+            </Text>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableCell> </TableCell>
+                  <TableCell>{why.oPlus}</TableCell>
+                  <TableCell>{why.s}</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {why.rows.map(([k, a, b]) => (
+                  <TableRow key={k}>
+                    <TableCell>
+                      <Text weight="bold">{k}</Text>
+                    </TableCell>
+                    <TableCell>{a}</TableCell>
+                    <TableCell>{b}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Text type="body">{why.whenOPlus}</Text>
+            <Text type="body">{why.whenS}</Text>
+            <Text type="supporting" color="secondary">
+              {why.note}
+            </Text>
+          </VStack>
+        </Card>
 
         <VStack gap={2}>
           <Heading level={2}>{vi ? "Cách đo và lưu ý" : "Method and caveats"}</Heading>

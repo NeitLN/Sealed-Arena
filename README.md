@@ -18,7 +18,7 @@ Give the agent a card, not the whole wallet. If the agent is tricked, or its pri
 
 ## The problem
 
-AI agents now hold wallets and pay for APIs and data on their own (for example with x402). A prompt injection, a poisoned tool, or a leaked key can make the agent send money anywhere. Today's spending limits live in a server or in a smart-contract wallet that the agent calls, so whoever controls the agent's key can often reach around them.
+AI agents now hold wallets and pay for APIs and data on their own (for example with x402). A prompt injection, a poisoned tool, or a leaked key can make the agent send money anywhere. Today's spending limits live in a server or in a smart-contract wallet. A contract wallet binds the funds held in it and the paths its code covers: the first wallet we wrote for comparison (O, caps only) let coins leave the mandate in 16 of 45 cases; with a payee list added (O+), in 0 of 45. Sealed Arena puts the check in transaction validity instead: one implementation in the node, for every registered agent, with fees counted in the caps.
 
 ## How it works
 
@@ -44,7 +44,7 @@ Transactions from other senders are not affected. Details and the exact contract
 
 ## Why on-chain, why Avalanche, where the money comes from
 
-- **Why a chain rule.** A limit kept by a server, or by a contract wallet the agent calls, binds only the paths that go through it; whoever holds the agent's key can sign other transactions. A validity rule in the node binds every transaction the key signs, whatever signed it and whoever sent it, because a block that contains a forbidden one is invalid for the validators.
+- **Why a chain rule.** A contract wallet with caps and a payee list (our O+) also kept every coin inside the mandate in our 45 cases. What a validity rule changes is the kind of guarantee: the agent's own account holds the coins, so there is no wallet contract to go around; the rule is one implementation in the node for all agents; the maximum fee is counted in the caps; and a refused payment is not included in a block. The price is a separate L1 with, today, one validator run by the team. See [Why not a contract wallet?](#why-not-a-contract-wallet).
 - **Why an Avalanche L1.** We need our own validity rule and still want to stay EVM-compatible and connected to existing assets. An Avalanche L1 runs our patched Subnet-EVM with its own validator set, keeps the C-Chain one message away (ICM), brings USDC across (ICTT), and costs a small continuous fee per validator rather than a network of our own to secure.
 - **Where the money comes from.** The L1's native coin is Circle test USDC from the Fuji C-Chain, bridged with ICTT: it is locked in the home contract on the C-Chain and minted one-for-one on the L1. The other coins on the L1 are the genesis supply, which the ICTT remote counts as its initial reserve imbalance. The bridge is the only minter the project uses; the operator's admin key still holds the NativeMinter admin role (see the limits below). Testnet only.
 
@@ -113,6 +113,29 @@ O+ and S both kept every coin inside the mandate in these 45 cases. S ends with 
 The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 24 cases ended inside the mandate; on the Sealed L1 on Fuji it is NOT RUN yet (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
 
 With a live model, the buying agent ignored the injected pages (0/5 for each of three pages). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node refused all fifteen payments to the attacker. S does not stop T1: the rule limits where and how much, not what the owner wanted.
+
+## Why not a contract wallet?
+
+A contract wallet is the obvious alternative, and in our measurements a good one (O+) matches Sealed on T0. The two differ in what is guaranteed and what it costs.
+
+|                         | O+: contract wallet with caps and a payee list (Fuji C-Chain)                                                                                                     | S: Sealed L1                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Where the money sits    | In the wallet contract; the agent key signs authorisations                                                                                                        | In the agent key's own account, as the L1's native coin                                                 |
+| What the check covers   | Payments that go through the wallet's code (here EIP-3009 authorisations checked in `isValidSignature`). Anything the key holds outside the wallet is not covered | Every transaction sent from the agent's address on this L1. Off-chain signatures are not seen (limit 3) |
+| Fees                    | Paid in AVAX by whoever submits the payment; outside the caps                                                                                                     | Paid by the agent in the same coin; the maximum fee is counted in both caps                             |
+| A refused payment       | Fails the check before settlement, or reverts inside a block (with O, same settlement path: 18 of 20 reverted in our burst run)                                   | Refused by the node; not included in a block                                                            |
+| T0 in our 45 cases      | 0/45                                                                                                                                                              | 0/45                                                                                                    |
+| T1 in our 45 cases      | 16/45                                                                                                                                                             | 9/45, lower only because the maximum fee is added to each payment                                       |
+| One rule for all agents | Each wallet is its own contract and can differ                                                                                                                    | One rule in the node; a registered agent cannot opt out                                                 |
+| Who you trust           | The C-Chain's validators (many independent operators) and the wallet's code                                                                                       | The Sealed L1's validator (one today, run by the team), the patched node and the team's admin keys      |
+| Payments                | x402 with EIP-3009, which sellers already accept                                                                                                                  | Our x402 method `signed-native-tx`; sellers add the network and our facilitator                         |
+| Cost to adopt           | Deploy a wallet per agent                                                                                                                                         | Bridge USDC to a separate L1; the team must keep a Subnet-EVM fork up to date                           |
+
+The burst run is `services/attacks/compare/results/fuji-2026-11-17T06-00-03-128Z.json` (the `/compare` page); the 45-case numbers are in [`docs/EVALUATION.md`](docs/EVALUATION.md).
+
+**When O+ is the better choice.** Your agents pay in USDC on the C-Chain, your sellers use standard x402, and you want a chain run by many independent validators today.
+
+**When Sealed is worth its price.** You want the limit to hold for the key itself, fees included, with no wallet code per agent, and you accept a separate L1. We have not yet shown that customers find this worth the price (see "Business model").
 
 ## Try it on Fuji (testnet)
 

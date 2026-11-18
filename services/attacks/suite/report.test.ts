@@ -153,6 +153,13 @@ describe("docs/EVALUATION.md", () => {
     .sort()
     .map((f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as RunFile);
 
+  it("web/src/evalSummary.json is the summary of the raw results", () => {
+    const json = JSON.parse(
+      readFileSync(resolve(here, "../../../web/src/evalSummary.json"), "utf8"),
+    );
+    expect(json).toEqual(summaryRows(files));
+  });
+
   it("compares every group on the same 45 wallet cases", () => {
     for (const r of summaryRows(files))
       expect([r.group, r.network, r.cases]).toEqual([r.group, r.network, 45]);
