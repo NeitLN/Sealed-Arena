@@ -10,7 +10,7 @@ const en = {
   arenaTitle: "Open red-team challenge",
   headline: "The key is public. Try to break the limits.",
   arenaIntro:
-    "This AI agent's private key is published below. Its owner set a mandate with a passkey: two payees, at most 0.5 USDC per payment and 1 USDC per day. Anything outside that is refused by the chain's validators. Show otherwise.",
+    "This AI agent's private key is published below. Its owner set a mandate with a passkey: two payees, at most 0.5 USDC per payment and 1 USDC per day. Anything outside that is refused by the chain's validator (one today, run by the team). Show otherwise.",
   keyTitle: "The agent's key",
   keyWarning:
     "Public on purpose, for this testnet L1 only. Never send anything to this address on any other chain.",
@@ -41,11 +41,11 @@ const en = {
     "Anyone can ask for a checkpoint: it checks on chain that the balance is at least funded minus what the rule charged. Sent through the relayer, so on chain the caller is the relayer; tell us your address and we credit the finder from the attempt log.",
   attemptsTitle: "Attempts through the public RPC",
   offChain:
-    "Counted by the RPC gateway, off chain: refused transactions never reach a block. Senders are counted by a salted hash of their IP; no IP is stored.",
+    "Counted by the RPC gateway, off chain: a refused transaction is not included in a block, so the chain keeps no record of it. Visitors are counted by a salted hash of their IP, so everyone behind one network counts once; no IP is stored.",
   total: "Attempts",
   refused: "Refused",
   accepted: "Accepted",
-  senders: "Distinct senders",
+  senders: "Distinct visitors (salted IP hash)",
   recent: "Recent attempts",
   none: "No attempts yet.",
   when: "When",
@@ -83,15 +83,16 @@ const en = {
   limitsTitle: "Limits, stated plainly",
   limits: [
     "This is a testnet. Assets have no monetary value. This is not a payment service.",
-    "The team runs all validators. The claim is only that the rule is enforced by the chain's consensus. The node's source and the validator list are public.",
-    "Only assets on this L1 are protected.",
-    "A leaked key can still spend inside the mandate: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires.",
+    "One validator, run by the team. The claim is only that the rule is part of block validity on this chain, not that independent parties operate it. The node's source and the validator's node ID are public.",
+    "Only the native coin on this L1 is covered.",
+    "A leaked key can still spend inside the mandate: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires. The daily budget resets at 00:00 UTC.",
     "Whoever holds the key can grief: use up the daily budget, occupy nonces.",
     "The open challenge measures how hard the system was tried, not that it is safe.",
   ],
+  limitsMore: "Full list in the README",
   reportTitle: "Found something?",
   report:
-    "Open an issue on GitHub (or a private security advisory, see SECURITY.md) with the transaction hash.",
+    'A T0 breach of the challenge agent: press "Report breach", then open a public issue on GitHub with the transaction hash. Anything else (the precompile, the contracts, the services): report privately, see SECURITY.md.',
   tryTitle: "Try a forbidden payment",
   tryIntro:
     "Each button signs a real transaction with the public agent key, here in your browser, and sends it to the Sealed L1 on Fuji through the public RPC. The answer below is what the node sent back; the attempt is also added to the list further down. Test USDC only, and a refused transaction costs nothing.",
@@ -145,7 +146,7 @@ const vi: Text = {
   arenaTitle: "Thử thách red-team mở",
   headline: "Khoá đã công khai. Thử phá giới hạn đi.",
   arenaIntro:
-    "Private key của AI agent này được công bố bên dưới. Chủ ví đã đặt uỷ quyền bằng passkey: hai người nhận, tối đa 0,5 USDC mỗi lần và 1 USDC mỗi ngày. Mọi thứ ngoài phạm vi đó bị validator của chain từ chối. Hãy chứng minh điều ngược lại.",
+    "Private key của AI agent này được công bố bên dưới. Chủ ví đã đặt uỷ quyền bằng passkey: hai người nhận, tối đa 0,5 USDC mỗi lần và 1 USDC mỗi ngày. Mọi thứ ngoài phạm vi đó bị validator của chain từ chối (hiện có một validator, do đội vận hành). Hãy chứng minh điều ngược lại.",
   keyTitle: "Khoá của agent",
   keyWarning:
     "Công khai có chủ đích, chỉ cho L1 testnet này. Đừng gửi gì tới địa chỉ này trên bất kỳ chain nào khác.",
@@ -176,11 +177,11 @@ const vi: Text = {
     "Ai cũng yêu cầu checkpoint được: nó kiểm trên chain rằng số dư ít nhất bằng số đã nạp trừ phần quy tắc đã tính. Lệnh đi qua relayer nên trên chain người gọi là relayer; hãy gửi địa chỉ của bạn, đội sẽ ghi công người tìm ra theo nhật ký lượt thử.",
   attemptsTitle: "Lượt thử qua RPC công khai",
   offChain:
-    "Do cổng RPC đếm, ngoài chain: giao dịch bị từ chối không vào block nào. Người gửi được đếm theo hash có muối của IP; không lưu IP.",
+    "Do cổng RPC đếm, ngoài chain: giao dịch bị từ chối không được đưa vào block nên chain không lưu dấu vết. Khách được đếm theo hash có muối của IP, nên mọi người chung một mạng tính là một; không lưu IP.",
   total: "Lượt thử",
   refused: "Bị từ chối",
   accepted: "Được nhận",
-  senders: "Người gửi khác nhau",
+  senders: "Khách khác nhau (theo hash IP có muối)",
   recent: "Lượt thử gần nhất",
   none: "Chưa có lượt thử.",
   when: "Lúc",
@@ -217,14 +218,16 @@ const vi: Text = {
   limitsTitle: "Giới hạn, nói thẳng",
   limits: [
     "Đây là testnet. Tài sản không có giá trị quy đổi. Đây không phải dịch vụ thanh toán.",
-    "Đội chạy toàn bộ validator. Điều khẳng định chỉ là quy tắc do đồng thuận của chain thực thi. Mã nguồn node và danh sách validator công khai.",
-    "Chỉ tài sản trên L1 này được bảo vệ.",
-    "Key bị lộ vẫn tiêu được trong uỷ quyền: tới người nhận hợp lệ, tối đa bằng ngân sách ngày, cho tới khi chủ ví dừng hoặc uỷ quyền hết hạn.",
+    "Một validator, do đội vận hành. Điều khẳng định chỉ là quy tắc nằm trong điều kiện hợp lệ của block trên chain này, không phải chain do các bên độc lập vận hành. Mã nguồn node và node ID của validator công khai.",
+    "Chỉ coin gốc trên L1 này nằm trong phạm vi quy tắc.",
+    "Key bị lộ vẫn tiêu được trong uỷ quyền: tới người nhận hợp lệ, tối đa bằng ngân sách ngày, cho tới khi chủ ví dừng hoặc uỷ quyền hết hạn. Ngân sách ngày đặt lại lúc 00:00 UTC (07:00 giờ Việt Nam).",
     "Người cầm key có thể phá rối: đốt ngân sách ngày, chiếm nonce.",
     "Thử thách mở đo mức độ bị thử, không phải bằng chứng an toàn.",
   ],
+  limitsMore: "Danh sách đầy đủ trong README",
   reportTitle: "Tìm ra điều gì?",
-  report: "Mở issue trên GitHub (hoặc báo cáo bảo mật riêng, xem SECURITY.md) kèm hash giao dịch.",
+  report:
+    'Vi phạm T0 của agent thử thách: bấm "Báo vi phạm" rồi mở issue công khai trên GitHub kèm hash giao dịch. Vấn đề khác (precompile, contract, dịch vụ): báo riêng, xem SECURITY.md.',
   tryTitle: "Thử một khoản trả bị cấm",
   tryIntro:
     "Mỗi nút ký một giao dịch thật bằng key công khai của agent, ngay trong trình duyệt của bạn, rồi gửi tới Sealed L1 trên Fuji qua RPC công khai. Câu trả lời bên dưới là đúng những gì node gửi về; lượt thử cũng được thêm vào danh sách phía dưới. Chỉ dùng USDC thử, và giao dịch bị từ chối không tốn gì.",

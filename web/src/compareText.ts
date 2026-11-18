@@ -183,18 +183,18 @@ export const compareText = (lang: Lang, x: Result) =>
         pLoss: `Mất ${x.P.attackerReceived} trên ${x.P.balanceBefore} USDC; còn ${x.P.balanceAfter}.`,
         oName: "O: ví hạn mức dạng contract",
         oWhat:
-          "Contract trên Fuji C-Chain, trả bằng USDC qua EIP-3009; kiểm hạn mức trong isValidSignature (ERC-1271). Bản đội tự dựng theo kiểu phổ biến.",
+          "Contract trên Fuji C-Chain, trả bằng USDC qua EIP-3009; kiểm hạn mức trong isValidSignature (ERC-1271). Bản tối giản do đội viết cho phép so sánh này; không đại diện cho các sản phẩm ví đã được audit.",
         oBurst: `${x.O.passedVerifyBeforeSettle}/${x.O.attempts} qua bước kiểm trước khi settle; ${x.O.settledOnChain} settle; ${x.O.revertedOnChain} revert trong block. Đã chi ${x.O.spent} USDC.`,
         sName: "S: Sealed Arena",
         sWhat: "Khoá agent trên L1 Sealed; uỷ quyền do node kiểm khi nhận và khi đưa vào block.",
         sInjection: x.S.injection.refused
-          ? `Node từ chối (${x.S.injection.reason}); không vào block.`
+          ? `Node từ chối (${x.S.injection.reason}); không được đưa vào block.`
           : "Node nhận giao dịch.",
         sBurst: `${x.S.settledOnChain} vào block; ${x.S.leftOutOfBlocks} chưa vào block (còn chờ trong pool); ${x.S.refusedByPool} bị pool từ chối. Đã chi ${x.S.spent} USDC.`,
         notes: [
           `Cột P chạy lại một bản ghi dựng tay (gửi hết số dư cho kẻ tấn công). Với model thật (claude-sonnet-5-5 và claude-haiku-5-5), agent không làm theo trang cài lệnh lượt nào: 0/30, gồm 15 lượt ở services/agent/README.md và 15 lượt ở docs/EVALUATION.md. Nó làm theo một ghi chú cài vào bộ nhớ ${memory} lượt khi chủ ví bảo đọc ghi chú; với S (Sealed L1 cục bộ), node từ chối ${agent.toAttacker.refused}/${agent.toAttacker.tried} khoản trả tới địa chỉ kẻ tấn công (bảng agent tier trong docs/EVALUATION.md).`,
           "Cả O và S đều không vượt hạn mức ngày. Khác biệt ở chỗ bị từ chối: với O, các khoản hỏng vẫn vào block sau khi đã qua bước kiểm của facilitator; với S, khoản bị từ chối không vào block nào.",
-          "Giao dịch của S đang chờ trong pool có thể vào block ở ngày sau, trong hạn mức của ngày đó, cho tới khi uỷ quyền hết hạn.",
+          "Giao dịch của S đang chờ trong pool có thể vào block ở ngày sau, trong hạn mức của ngày đó, cho tới khi uỷ quyền hết hạn hoặc chủ ví dừng agent.",
         ],
         txs: "Giao dịch",
         source: "Kết quả thô và script",
@@ -210,19 +210,19 @@ export const compareText = (lang: Lang, x: Result) =>
         pLoss: `Lost ${x.P.attackerReceived} of ${x.P.balanceBefore} USDC; ${x.P.balanceAfter} left.`,
         oName: "O: spending-limit contract wallet",
         oWhat:
-          "Contract on the Fuji C-Chain paying USDC with EIP-3009; caps checked in isValidSignature (ERC-1271). Built by the team in a common style.",
+          "Contract on the Fuji C-Chain paying USDC with EIP-3009; caps checked in isValidSignature (ERC-1271). A minimal wallet written by the team for this comparison; not representative of audited wallet products.",
         oBurst: `${x.O.passedVerifyBeforeSettle}/${x.O.attempts} passed the check before settling; ${x.O.settledOnChain} settled; ${x.O.revertedOnChain} reverted in a block. Spent ${x.O.spent} USDC.`,
         sName: "S: Sealed Arena",
         sWhat:
           "Agent key on the Sealed L1; the mandate is checked by the node on arrival and again when building a block.",
         sInjection: x.S.injection.refused
-          ? `Refused by the node (${x.S.injection.reason}); never in a block.`
+          ? `Refused by the node (${x.S.injection.reason}); not included in a block.`
           : "Accepted by the node.",
         sBurst: `${x.S.settledOnChain} in blocks; ${x.S.leftOutOfBlocks} not in a block (still waiting in the pool); ${x.S.refusedByPool} refused by the pool. Spent ${x.S.spent} USDC.`,
         notes: [
           `Column P replays a hand-written transcript (the whole balance to the attacker). With live models (claude-sonnet-5-5 and claude-haiku-5-5) the agent never followed an injected page: 0/30 runs, 15 in services/agent/README.md and 15 in docs/EVALUATION.md. It followed a note planted in its memory in ${memory} runs when its owner asked it to read its notes; on S (local Sealed L1) the node refused ${refusedOf} payments to the attacker's address (agent-tier table in docs/EVALUATION.md).`,
-          "Neither O nor S went over the daily cap. The difference is where refusals happen: O's failed payments still land in blocks after passing the facilitator's check; S's refused payments never enter a block.",
-          "Payments S left waiting in the pool can go into a block on a later day, within that day's cap, until the mandate expires.",
+          "Neither O nor S went over the daily cap. The difference is where refusals happen: O's failed payments still land in blocks after passing the facilitator's check; S's refused payments are not included in a block.",
+          "Payments S left waiting in the pool can go into a block on a later day, within that day's cap, until the mandate expires or the owner freezes the agent.",
         ],
         txs: "Transactions",
         source: "Raw results and script",

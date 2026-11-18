@@ -100,6 +100,7 @@ export default function RulesPage() {
                 {i + 1}. {l}
               </Text>
             ))}
+            <Link href={`${ARENA.source}#security-model-and-limitations`}>{t.limitsMore}</Link>
           </VStack>
         </Block>
         <Card variant="blue">
