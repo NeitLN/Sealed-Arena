@@ -6,6 +6,7 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { HStack, Stack, StackItem, VStack } from "@astryxdesign/core/Layout";
+import { Step, Stepper } from "@astryxdesign/core/Stepper";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -34,7 +35,9 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { useAgentView } from "./agentView.js";
+import { BrandMark } from "./BrandMark.js";
 import { DemoAgents } from "./DemoAgents.js";
+import { designText } from "./designText.js";
 import { useI18n } from "./i18n.js";
 import {
   chainClient,
@@ -57,10 +60,9 @@ const formColBasis: CSSProperties = { flexBasis: 0 };
 const summarySticky: CSSProperties = {
   flexBasis: 0,
   position: "sticky",
-  top: "var(--spacing-4)",
+  top: "96px",
   alignSelf: "flex-start",
 };
-const summaryMobileOrder: CSSProperties = { order: -1 };
 const mono: CSSProperties = {
   fontFamily: "var(--font-family-mono, monospace)",
   wordBreak: "break-all",
@@ -103,6 +105,7 @@ const DEFAULTS = { perTx: "0.02", daily: "0.03", days: "7" };
 export default function OwnerPage() {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const { lang, setLang, t } = useI18n();
+  const d = designText(lang);
   const [saved, setSaved] = useState(loadSaved);
   // Reads go to the public RPC known at build time, so the page shows the chain even when the
   // relayer is down; the relayer's /info can point to another RPC (the local network).
@@ -157,7 +160,13 @@ export default function OwnerPage() {
   }, [agent, view]);
 
   useEffect(() => {
-    if (outcome) outcomeRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (outcome)
+      outcomeRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
   }, [outcome]);
 
   const remember = (s: typeof saved) => {
@@ -316,6 +325,10 @@ export default function OwnerPage() {
 
   const summary = (
     <Card padding={5}>
+      <div className="summary-emblem">
+        <BrandMark size={32} />
+        <span className="micro-label">SEALED / AGENT POLICY</span>
+      </div>
       <VStack gap={4}>
         <HStack gap={2} hAlign="between" vAlign="center">
           <Text type="large" weight="bold">
@@ -323,7 +336,7 @@ export default function OwnerPage() {
           </Text>
           {view?.registered ? (
             <Badge
-              variant={view.frozen ? "error" : "success"}
+              variant={view.frozen ? "warning" : "success"}
               label={view.frozen ? t("frozen") : t("active")}
             />
           ) : null}
@@ -371,7 +384,7 @@ export default function OwnerPage() {
                 {ownedByMe ? null : <Banner status="warning" title={t("notOwnerNote")} />}
                 <Button
                   label={view.frozen ? t("unfreeze") : t("freeze")}
-                  variant={view.frozen ? "primary" : "destructive"}
+                  variant={view.frozen ? "primary" : "secondary"}
                   width="100%"
                   isLoading={busy === "freeze" || busy === "unfreeze"}
                   isDisabled={!!busy}
@@ -385,7 +398,7 @@ export default function OwnerPage() {
           </VStack>
         ) : (
           <Text type="body" color="secondary">
-            {t("agentHelp")}
+            {d.emptyAgent}
           </Text>
         )}
       </VStack>
@@ -403,8 +416,18 @@ export default function OwnerPage() {
           {t("intro")}
         </Text>
 
-        {boot ? <Banner status="error" title={t(boot)} /> : null}
-        <div ref={outcomeRef}>
+        <Stepper
+          activeStep={!saved.passkey ? 0 : !ownedByMe ? 1 : !view?.mandate.payees.length ? 2 : 3}
+          label={d.next}
+          indicatorPosition="on-track"
+          horizontalOptions={{ minimumStepWidth: 140, collapsedVariant: "withLabel" }}
+        >
+          {d.workflow.map((label, index) => (
+            <Step key={label} step={index} label={label} indicator="number" />
+          ))}
+        </Stepper>
+        {boot ? <Banner status="warning" title={t(boot)} /> : null}
+        <div ref={outcomeRef} aria-live="polite">
           {outcome ? (
             <Banner
               status={
@@ -437,45 +460,45 @@ export default function OwnerPage() {
         ) : null}
         {busy ? <Banner status="info" title={t("working")} /> : null}
 
-        {/* 1. Passkey: needed for everything below, the demo agent included */}
-        <VStack gap={3}>
-          <Text type="large" weight="bold">
-            {t("passkeySection")}
-          </Text>
-          <Text type="supporting" color="secondary">
-            {t("passkeyHelp")}
-          </Text>
-          {saved.passkey ? (
-            <VStack gap={2}>
-              <HStack gap={2} vAlign="center">
-                <Badge variant="success" label={t("passkeyReady")} />
-                <Text type="supporting" color="secondary" style={mono}>
-                  {t("publicKey")} {short(saved.passkey.x)}
+        <section className="console-passkey">
+          <VStack gap={3}>
+            <Heading level={2}>{t("passkeySection")}</Heading>
+            <Text type="supporting" color="secondary">
+              {t("passkeyHelp")}
+            </Text>
+            {saved.passkey ? (
+              <VStack gap={2}>
+                <HStack gap={2} vAlign="center" wrap="wrap">
+                  <Badge variant="success" label={t("passkeyReady")} />
+                  <Text type="supporting" color="secondary" style={mono}>
+                    {t("publicKey")} {short(saved.passkey.x)}
+                  </Text>
+                </HStack>
+                <HStack gap={2}>
+                  <Button
+                    label={t("forgetPasskey")}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (window.confirm(t("forgetConfirm")))
+                        remember({ ...(saved.agent ? { agent: saved.agent } : {}) });
+                    }}
+                  />
+                </HStack>
+              </VStack>
+            ) : (
+              <HStack gap={3} vAlign="center" wrap="wrap">
+                <Button label={t("createPasskey")} variant="primary" onClick={onCreatePasskey} />
+                <Text type="supporting" color="secondary">
+                  {t("passkeyMissing")}
                 </Text>
               </HStack>
-              <HStack gap={2}>
-                <Button
-                  label={t("forgetPasskey")}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (window.confirm(t("forgetConfirm")))
-                      remember({ ...(saved.agent ? { agent: saved.agent } : {}) });
-                  }}
-                />
-              </HStack>
-            </VStack>
-          ) : (
-            <HStack gap={3} vAlign="center" wrap="wrap">
-              <Button label={t("createPasskey")} variant="primary" onClick={onCreatePasskey} />
-              <Text type="supporting" color="secondary">
-                {t("passkeyMissing")}
-              </Text>
-            </HStack>
-          )}
-        </VStack>
+            )}
+          </VStack>
+        </section>
 
         <DemoAgents
+          lang={lang}
           t={t}
           client={client}
           passkey={saved.passkey}
@@ -487,151 +510,194 @@ export default function OwnerPage() {
             remember({ ...saved, agent: a });
           }}
           onTried={() => void refresh()}
-        />
-
-        <Stack direction={isMobile ? "vertical" : "horizontal"} gap={8} vAlign="start">
-          <StackItem size="fill" style={isMobile ? undefined : formColBasis}>
-            <VStack gap={8}>
-              {/* 2. Agent */}
-              <VStack gap={3}>
-                <HStack gap={2} hAlign="between" vAlign="center">
-                  <Text type="large" weight="bold">
-                    {t("agentSection")}
-                  </Text>
-                  {registrationBadge}
-                </HStack>
-                <TextInput
-                  label={t("agentAddress")}
-                  description={t("agentHelp")}
-                  value={agentInput}
-                  onChange={(v) => {
-                    setAgentInput(v.trim());
-                    if (isAddress(v.trim())) remember({ ...saved, agent: v.trim() });
-                  }}
-                  placeholder="0x…"
-                  autoComplete="off"
-                  hasSpellCheck={false}
-                  {...(agentInput && !agent
-                    ? { status: { type: "error" as const, message: t("address_invalid") } }
-                    : {})}
-                />
-                {agent && view && !view.registered ? (
-                  <VStack gap={3}>
-                    {digest ? (
-                      <VStack gap={1}>
+        >
+          <Stack direction={isMobile ? "vertical" : "horizontal"} gap={8} vAlign="start">
+            <StackItem size="fill" style={isMobile ? undefined : formColBasis}>
+              <VStack gap={8}>
+                {/* 2. Agent */}
+                <VStack gap={3}>
+                  <HStack gap={2} hAlign="between" vAlign="center">
+                    <Heading level={2}>{t("agentSection")}</Heading>
+                    {registrationBadge}
+                  </HStack>
+                  <TextInput
+                    label={t("agentAddress")}
+                    description={t("agentHelp")}
+                    value={agentInput}
+                    onChange={(v) => {
+                      setAgentInput(v.trim());
+                      if (isAddress(v.trim())) remember({ ...saved, agent: v.trim() });
+                    }}
+                    placeholder="0x…"
+                    autoComplete="off"
+                    hasSpellCheck={false}
+                    {...(agentInput && !agent
+                      ? { status: { type: "error" as const, message: t("address_invalid") } }
+                      : {})}
+                  />
+                  {agent && view && !view.registered ? (
+                    <VStack gap={3}>
+                      {digest ? (
+                        <VStack gap={1}>
+                          <Text type="supporting" color="secondary">
+                            {t("registerHelp")}
+                          </Text>
+                          <Text type="supporting" style={mono}>
+                            {digest}
+                          </Text>
+                        </VStack>
+                      ) : (
                         <Text type="supporting" color="secondary">
-                          {t("registerHelp")}
+                          {t("no_passkey")}
                         </Text>
-                        <Text type="supporting" style={mono}>
-                          {digest}
-                        </Text>
-                      </VStack>
-                    ) : (
-                      <Text type="supporting" color="secondary">
-                        {t("no_passkey")}
-                      </Text>
-                    )}
-                    <TextInput
-                      label={t("agentSignature")}
-                      value={agentSig}
-                      onChange={(v) => setAgentSig(v.trim())}
-                      placeholder="0x…"
-                      autoComplete="off"
-                      hasSpellCheck={false}
-                    />
-                    {local ? (
+                      )}
                       <TextInput
-                        type="password"
-                        label={t("agentPrivateKey")}
-                        description={t("privateKeyWarning")}
-                        value={agentKey}
-                        onChange={(v) => setAgentKey(v.trim())}
+                        label={t("agentSignature")}
+                        value={agentSig}
+                        onChange={(v) => setAgentSig(v.trim())}
+                        placeholder="0x…"
                         autoComplete="off"
+                        hasSpellCheck={false}
                       />
+                      {local ? (
+                        <TextInput
+                          type="password"
+                          label={t("agentPrivateKey")}
+                          description={t("privateKeyWarning")}
+                          value={agentKey}
+                          onChange={(v) => setAgentKey(v.trim())}
+                          autoComplete="off"
+                        />
+                      ) : null}
+                      <HStack gap={2}>
+                        <Button
+                          label={t("register")}
+                          variant="primary"
+                          isLoading={busy === "register"}
+                          isDisabled={!saved.passkey || !!busy || (!agentSig && !agentKey)}
+                          onClick={onRegister}
+                        />
+                      </HStack>
+                    </VStack>
+                  ) : null}
+                </VStack>
+
+                {/* 3. Mandate */}
+                {ownedByMe ? (
+                  <VStack gap={3}>
+                    <Heading level={2}>{t("mandateSection")}</Heading>
+                    <TextArea
+                      label={t("payees")}
+                      description={t("payeesHelp")}
+                      value={payeesText}
+                      onChange={(v: string) => {
+                        setPayeesText(v);
+                        setWarnings(undefined);
+                      }}
+                      placeholder={"0x…\n0x…"}
+                    />
+                    <Grid columns={isMobile ? 1 : 3} gap={3}>
+                      <TextInput
+                        label={t("perTxCapFee")}
+                        value={perTx}
+                        onChange={setPerTx}
+                        inputMode="decimal"
+                      />
+                      <TextInput
+                        label={t("dailyCap")}
+                        value={daily}
+                        onChange={setDaily}
+                        inputMode="decimal"
+                      />
+                      <TextInput
+                        label={t("validDays")}
+                        value={days}
+                        onChange={setDays}
+                        inputMode="numeric"
+                      />
+                    </Grid>
+                    {draftError && payeesText ? (
+                      <Banner status="error" title={t(draftError)} />
                     ) : null}
+                    {typeof draft !== "string" && draft.perTxCap > draft.dailyCap ? (
+                      <Banner status="warning" title={t("capWarning")} />
+                    ) : null}
+                    {unchecked.map((a) => (
+                      <Banner
+                        key={`u-${a}`}
+                        status="warning"
+                        title={`${a} ${t("code_unchecked")}`}
+                      />
+                    ))}
+                    {warnings?.map((w) => (
+                      <Banner
+                        key={w.address}
+                        status="warning"
+                        title={`${w.address} ${t(w.reason)}`}
+                      />
+                    ))}
+                    <section className="sign-preview" aria-label={d.signPreview}>
+                      <p className="micro-label">{d.signPreview}</p>
+                      <p className="caption">{d.previewNote}</p>
+                      <code>{agent}</code>
+                      <dl>
+                        <div>
+                          <dt>{d.perPayment}</dt>
+                          <dd>{perTx || "—"} USDC</dd>
+                        </div>
+                        <div>
+                          <dt>{d.perDay}</dt>
+                          <dd>{daily || "—"} USDC</dd>
+                        </div>
+                        <div>
+                          <dt>{t("validDays")}</dt>
+                          <dd>{days || "—"}</dd>
+                        </div>
+                      </dl>
+                      {typeof draft !== "string" && (
+                        <>
+                          <p className="caption">{t("payees")}</p>
+                          {draft.payees.map((payee) => (
+                            <code key={payee}>{payee}</code>
+                          ))}
+                          <p>
+                            {d.capRisk
+                              .replace("{cap}", daily)
+                              .replace("{payees}", String(draft.payees.length))
+                              .replace(
+                                "{expiry}",
+                                new Date(Number(draft.expiry) * 1000).toLocaleDateString(lang),
+                              )}
+                          </p>
+                        </>
+                      )}
+                    </section>
                     <HStack gap={2}>
                       <Button
-                        label={t("register")}
+                        label={
+                          warnings || unchecked.length > 0 ? t("signAnyway") : t("signMandate")
+                        }
                         variant="primary"
-                        isLoading={busy === "register"}
-                        isDisabled={!saved.passkey || !!busy || (!agentSig && !agentKey)}
-                        onClick={onRegister}
+                        isLoading={busy === "setMandate"}
+                        isDisabled={!!busy || !!draftError}
+                        onClick={onSetMandate}
                       />
                     </HStack>
                   </VStack>
-                ) : null}
+                ) : (
+                  <section className="pending-step">
+                    <h2>{t("mandateSection")}</h2>
+                    <p>{d.pendingMandate}</p>
+                  </section>
+                )}
               </VStack>
+            </StackItem>
 
-              {/* 3. Mandate */}
-              {ownedByMe ? (
-                <VStack gap={3}>
-                  <Text type="large" weight="bold">
-                    {t("mandateSection")}
-                  </Text>
-                  <TextArea
-                    label={t("payees")}
-                    description={t("payeesHelp")}
-                    value={payeesText}
-                    onChange={(v: string) => {
-                      setPayeesText(v);
-                      setWarnings(undefined);
-                    }}
-                    placeholder={"0x…\n0x…"}
-                  />
-                  <Grid columns={isMobile ? 1 : 3} gap={3}>
-                    <TextInput
-                      label={t("perTxCapFee")}
-                      value={perTx}
-                      onChange={setPerTx}
-                      inputMode="decimal"
-                    />
-                    <TextInput
-                      label={t("dailyCap")}
-                      value={daily}
-                      onChange={setDaily}
-                      inputMode="decimal"
-                    />
-                    <TextInput
-                      label={t("validDays")}
-                      value={days}
-                      onChange={setDays}
-                      inputMode="numeric"
-                    />
-                  </Grid>
-                  {draftError && payeesText ? (
-                    <Banner status="error" title={t(draftError)} />
-                  ) : null}
-                  {typeof draft !== "string" && draft.perTxCap > draft.dailyCap ? (
-                    <Banner status="warning" title={t("capWarning")} />
-                  ) : null}
-                  {unchecked.map((a) => (
-                    <Banner key={`u-${a}`} status="warning" title={`${a} ${t("code_unchecked")}`} />
-                  ))}
-                  {warnings?.map((w) => (
-                    <Banner
-                      key={w.address}
-                      status="warning"
-                      title={`${w.address} ${t(w.reason)}`}
-                    />
-                  ))}
-                  <HStack gap={2}>
-                    <Button
-                      label={warnings || unchecked.length > 0 ? t("signAnyway") : t("signMandate")}
-                      variant="primary"
-                      isLoading={busy === "setMandate"}
-                      isDisabled={!!busy || !!draftError}
-                      onClick={onSetMandate}
-                    />
-                  </HStack>
-                </VStack>
-              ) : null}
-            </VStack>
-          </StackItem>
-
-          <StackItem size="fill" style={isMobile ? summaryMobileOrder : summarySticky}>
-            {summary}
-          </StackItem>
-        </Stack>
+            <StackItem size="fill" style={isMobile ? undefined : summarySticky}>
+              {summary}
+            </StackItem>
+          </Stack>
+        </DemoAgents>
       </VStack>
     </SiteShell>
   );

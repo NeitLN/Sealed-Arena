@@ -2,5 +2,12 @@
   "pages": "0/30",
   "sources": {
     "pages": "services/agent/transcripts/{injection,injection-strong,drain}-<timestamp>.json"
+  },
+  "walletRuns": {
+    "wallet-O+-2026-11-17T19-25-54-490Z.json": "2026-11-17T19:25:54.490Z",
+    "wallet-O-2026-11-17T13-19-38-269Z.json": "2026-11-17T13:19:38.269Z",
+    "wallet-P-2026-11-17T10-33-34-505Z.json": "2026-11-17T10:33:34.505Z",
+    "wallet-S-2026-11-17T10-20-38-811Z.json": "2026-11-17T10:20:38.811Z",
+    "wallet-S-2026-11-17T19-53-57-354Z.json": "2026-11-17T19:53:57.354Z"
   }
 }

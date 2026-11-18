@@ -1,5 +1,5 @@
 import { Badge } from "@astryxdesign/core/Badge";
-import { Button } from "@astryxdesign/core/Button";
+
 import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
 import { Grid } from "@astryxdesign/core/Grid";
@@ -9,7 +9,9 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import type { ReactNode } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
+import { designText } from "./designText.js";
 import { useI18n } from "./i18n.js";
+import { limitationsText } from "./limitationsText.js";
 import { SiteShell } from "./SiteShell.js";
 
 function Block({ title, children }: { title: string; children: ReactNode }) {
@@ -43,6 +45,24 @@ export default function RulesPage() {
   const { lang, setLang } = useI18n();
   const t = arenaText(lang);
   const vi = lang === "vi";
+  const d = designText(lang);
+  const limits = limitationsText(lang);
+  const sources = [
+    "README.md#security-model-and-limitations",
+    "chain/patches/0002-agentpolicy-precompile.patch",
+    "chain/patches/0003-agent-rule.patch",
+    "chain/patches/0003-agent-rule.patch",
+    "services/attacks/suite/results/leaked-key-fuji.json",
+    "chain/patches/0003-agent-rule.patch",
+    "contracts/src/ArenaRecorder.sol",
+    "contracts/src/ReputationReceiver.sol",
+    "services/facilitator/src/scheme.ts",
+    "packages/shared/src/agentPolicy.ts",
+    "chain/patches/0002-agentpolicy-precompile.patch",
+    "chain/patches/0003-agent-rule.patch",
+    "services/relayer/src/chain.ts",
+    "chain/patches/0003-agent-rule.patch",
+  ];
   return (
     <SiteShell lang={lang} setLang={setLang} current="rules" maxWidth={860}>
       <VStack gap={6}>
@@ -51,7 +71,9 @@ export default function RulesPage() {
             {t.rulesTitle}
           </Heading>
           <HStack>
-            <Button label={t.navArena} variant="primary" href="/arena" />
+            <a className="text-link" href="/arena">
+              ← {d.back}
+            </a>
           </HStack>
         </VStack>
         <Grid columns={{ minWidth: 280, max: 2 }} gap={4}>
@@ -78,7 +100,7 @@ export default function RulesPage() {
               badge={vi ? "Tính là vi phạm" : "Counts as a breach"}
             />
             <Tier text={t.t1} variant="neutral" badge={vi ? "Ngoài phạm vi" : "Out of scope"} />
-            <Tier text={t.t2} variant="warning" badge={vi ? "Được phép" : "Allowed"} />
+            <Tier text={t.t2} variant="neutral" badge={vi ? "Được phép" : "Allowed"} />
           </VStack>
         </Block>
         <Block title={t.validatorsTitle}>
@@ -94,18 +116,33 @@ export default function RulesPage() {
           </HStack>
         </Block>
         <Block title={t.limitsTitle}>
-          <VStack gap={2}>
-            {t.limits.map((l, i) => (
-              <Text key={l} type="body" color="secondary">
-                {i + 1}. {l}
-              </Text>
+          <ol className="limits-ledger">
+            {limits.map(([title, body], index) => (
+              <li key={title} id={`limitation-${index + 1}`}>
+                <span className="ledger-number" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </div>
+                <a
+                  href={`${ARENA.source}/blob/main/${sources[index]}`}
+                  aria-label={`${vi ? "Nguồn cho hạn chế" : "Source for limitation"} ${index + 1}`}
+                >
+                  ↗
+                </a>
+              </li>
             ))}
-            <Link href={`${ARENA.source}#security-model-and-limitations`}>{t.limitsMore}</Link>
-          </VStack>
+          </ol>
         </Block>
         <Card variant="blue">
           <Block title={t.reportTitle}>
             <Text type="body">{t.report}</Text>
+            <HStack gap={4} wrap="wrap">
+              <Link href={`${ARENA.source}/issues/new`}>GitHub Issues ↗</Link>
+              <Link href={`${ARENA.source}/blob/main/SECURITY.md`}>SECURITY.md ↗</Link>
+            </HStack>
           </Block>
         </Card>
       </VStack>

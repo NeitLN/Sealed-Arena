@@ -1,4 +1,5 @@
 import type { Lang } from "./i18n.js";
+import { limitationsText } from "./limitationsText.js";
 
 /** Text of /arena and /arena/rules. Wording follows the project's honesty rules (no absolute claims). */
 const en = {
@@ -10,7 +11,7 @@ const en = {
   arenaTitle: "Open red-team challenge",
   headline: "The key is public. Try to break the limits.",
   arenaIntro:
-    "This AI agent's private key is published below. Its owner set a mandate with a passkey: two payees, at most 0.5 USDC per payment and 1 USDC per day. Anything outside that is refused by the chain's validator (one today, run by the team). Show otherwise.",
+    "Use the published private key to test the owner’s spending limits. Send a payment outside the mandate, then try an allowed payment as a control. Each button sends a real transaction on this testnet.",
   keyTitle: "The agent's key",
   keyWarning:
     "Public on purpose, for this testnet L1 only. Never send anything to this address on any other chain.",
@@ -27,12 +28,12 @@ const en = {
   funded: "Funded through the recorder",
   required: "Must hold at least",
   score: "Survival score (coin·seconds)",
-  intact: "No breach recorded",
+  intact: "No breach recorded (balance check)",
   breached: "BREACHED",
   mandateTitle: "Mandate",
   payees: "Allowed payees",
-  perTx: "Per payment",
-  perDay: "Per day",
+  perTx: "Per payment · maximum fee included",
+  perDay: "Per UTC day",
   expires: "Expires",
   frozen: "Frozen",
   checkpoint: "Checkpoint",
@@ -64,7 +65,7 @@ const en = {
   survivalHelp:
     "Coins kept inside the mandate multiplied by the time they stayed there (coin·seconds on chain, shown here in hours). A breach sets it to zero for good.",
   emptyHint: "Copy the key above and send a payment outside the mandate.",
-  liveDown: "Live data is unavailable right now; showing the last values.",
+  liveDown: "Live data is unavailable right now. Any last successful reads remain on screen.",
   onChainCheck: "On-chain check",
   // rules page
   rulesTitle: "Challenge rules",
@@ -81,14 +82,7 @@ const en = {
   validators:
     "The team runs the only validator of this L1. The node's source (Subnet-EVM with the patch), the genesis and every deployment address are public:",
   limitsTitle: "Limits, stated plainly",
-  limits: [
-    "This is a testnet. Assets have no monetary value. This is not a payment service.",
-    "One validator, run by the team. The claim is only that the rule is part of block validity on this chain, not that independent parties operate it. The node's source and the validator's node ID are public.",
-    "Only the native coin on this L1 is covered.",
-    "A leaked key can still spend inside the mandate: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires. The daily budget resets at 00:00 UTC.",
-    "Whoever holds the key can grief: use up the daily budget, occupy nonces.",
-    "The open challenge measures how hard the system was tried, not that it is safe.",
-  ],
+  limits: limitationsText("en").map(([title, body]) => `${title}: ${body}`),
   limitsMore: "Full list in the README",
   reportTitle: "Found something?",
   report:
@@ -128,9 +122,10 @@ const en = {
     "Payees with code (contracts and the precompiles) are refused, and so is contract creation.",
   ],
   beforeCommand: "Send from a terminal (Foundry's cast)",
+  beforeViem: "Send from JavaScript (viem)",
   tryTitle: "Try a forbidden payment",
   tryIntro:
-    "Each button signs a real transaction with the public agent key, here in your browser, and sends it to the Sealed L1 on Fuji through the public RPC. The answer below is what the node sent back; the attempt is also added to the list further down. Test USDC only, and a refused transaction costs nothing.",
+    "Each button signs a real transaction with the published agent private key, here in your browser, and sends it to the Sealed L1 on Fuji through the public RPC. The answer below is what the node sent back; the attempt is also added to the list further down. Test USDC only, and a refused transaction costs nothing.",
   tryStranger: "Pay a stranger 0.01 USDC",
   tryOverCap: "Pay an allowed seller above the cap",
   trySending: "Sending…",
@@ -145,7 +140,7 @@ const en = {
   tryError: "Could not reach the node",
   tryNode: "The node answered with an error that is not the mandate rule",
   tryNote:
-    "This shows the node refusing the transaction when it arrives. A block that contains such a transaction is also invalid for the validator (one, run by the team, today):",
+    "This shows the node refusing the transaction when it arrives. A block that contains such a transaction is also invalid under the patched block-validity rule:",
   tryNoteLink: "decision D1",
   verifyTitle: "Verify it yourself",
   verifyIntro:
@@ -174,15 +169,15 @@ const en = {
 type Text = typeof en;
 
 const vi: Text = {
-  navOwner: "Trang chủ ví",
+  navOwner: "Bảng điều khiển chủ sở hữu",
   navArena: "Thử thách",
   navRules: "Luật",
   navCompare: "So sánh",
   testnet: "Testnet. Tài sản không có giá trị quy đổi.",
   arenaTitle: "Thử thách red-team mở",
-  headline: "Khoá đã công khai. Thử phá giới hạn đi.",
+  headline: "Private key đã công bố. Hãy thử giới hạn.",
   arenaIntro:
-    "Private key của AI agent này được công bố bên dưới. Chủ ví đã đặt uỷ quyền bằng passkey: hai người nhận, tối đa 0,5 USDC mỗi lần và 1 USDC mỗi ngày. Mọi thứ ngoài phạm vi đó bị validator của chain từ chối (hiện có một validator, do đội vận hành). Hãy chứng minh điều ngược lại.",
+    "Dùng private key đã công bố để thử giới hạn chi tiêu do chủ sở hữu đặt. Gửi khoản trả ngoài uỷ quyền, rồi thử một khoản được phép để đối chứng. Mỗi nút gửi một giao dịch thật trên testnet này.",
   keyTitle: "Khoá của agent",
   keyWarning:
     "Công khai có chủ đích, chỉ cho L1 testnet này. Đừng gửi gì tới địa chỉ này trên bất kỳ chain nào khác.",
@@ -199,12 +194,12 @@ const vi: Text = {
   funded: "Đã nạp qua recorder",
   required: "Phải giữ tối thiểu",
   score: "Điểm sống sót (coin·giây)",
-  intact: "Chưa ghi nhận vi phạm",
+  intact: "Chưa ghi nhận vi phạm (kiểm số dư)",
   breached: "ĐÃ VI PHẠM",
   mandateTitle: "Uỷ quyền",
   payees: "Người nhận được phép",
-  perTx: "Mỗi lần",
-  perDay: "Mỗi ngày",
+  perTx: "Mỗi lần · đã gồm phí tối đa",
+  perDay: "Mỗi ngày UTC",
   expires: "Hết hạn",
   frozen: "Đã dừng",
   checkpoint: "Checkpoint",
@@ -236,7 +231,8 @@ const vi: Text = {
   survivalHelp:
     "Số coin giữ được trong uỷ quyền nhân với thời gian giữ (coin·giây trên chain, ở đây đổi ra giờ). Vi phạm đưa về 0 vĩnh viễn.",
   emptyHint: "Copy khoá ở trên và gửi một khoản ra ngoài uỷ quyền.",
-  liveDown: "Hiện chưa lấy được dữ liệu trực tiếp; đang hiện giá trị gần nhất.",
+  liveDown:
+    "Hiện chưa lấy được dữ liệu trực tiếp. Giá trị đọc được gần nhất, nếu có, vẫn được giữ trên màn hình.",
   onChainCheck: "Kiểm trên chain",
   rulesTitle: "Luật thử thách",
   scopeTitle: "Phạm vi",
@@ -252,14 +248,7 @@ const vi: Text = {
   validators:
     "Đội chạy validator duy nhất của L1 này. Mã nguồn node (Subnet-EVM có bản vá), genesis và mọi địa chỉ triển khai đều công khai:",
   limitsTitle: "Giới hạn, nói thẳng",
-  limits: [
-    "Đây là testnet. Tài sản không có giá trị quy đổi. Đây không phải dịch vụ thanh toán.",
-    "Một validator, do đội vận hành. Điều khẳng định chỉ là quy tắc nằm trong điều kiện hợp lệ của block trên chain này, không phải chain do các bên độc lập vận hành. Mã nguồn node và node ID của validator công khai.",
-    "Chỉ coin gốc trên L1 này nằm trong phạm vi quy tắc.",
-    "Key bị lộ vẫn tiêu được trong uỷ quyền: tới người nhận hợp lệ, tối đa bằng ngân sách ngày, cho tới khi chủ ví dừng hoặc uỷ quyền hết hạn. Ngân sách ngày đặt lại lúc 00:00 UTC (07:00 giờ Việt Nam).",
-    "Người cầm key có thể phá rối: đốt ngân sách ngày, chiếm nonce.",
-    "Thử thách mở đo mức độ bị thử, không phải bằng chứng an toàn.",
-  ],
+  limits: limitationsText("vi").map(([title, body]) => `${title}: ${body}`),
   limitsMore: "Danh sách đầy đủ trong README",
   reportTitle: "Tìm ra điều gì?",
   report:
@@ -297,9 +286,10 @@ const vi: Text = {
     "Người nhận có code (contract và các precompile) bị từ chối, tạo contract cũng vậy.",
   ],
   beforeCommand: "Gửi từ terminal (cast của Foundry)",
+  beforeViem: "Gửi bằng JavaScript (viem)",
   tryTitle: "Thử một khoản trả bị cấm",
   tryIntro:
-    "Mỗi nút ký một giao dịch thật bằng key công khai của agent, ngay trong trình duyệt của bạn, rồi gửi tới Sealed L1 trên Fuji qua RPC công khai. Câu trả lời bên dưới là đúng những gì node gửi về; lượt thử cũng được thêm vào danh sách phía dưới. Chỉ dùng USDC thử, và giao dịch bị từ chối không tốn gì.",
+    "Mỗi nút ký một giao dịch thật bằng private key đã công bố của agent, ngay trong trình duyệt của bạn, rồi gửi tới Sealed L1 trên Fuji qua RPC công khai. Câu trả lời bên dưới là đúng những gì node gửi về; lượt thử cũng được thêm vào danh sách phía dưới. Chỉ dùng USDC thử, và giao dịch bị từ chối không tốn gì.",
   tryStranger: "Trả 0,01 USDC cho người lạ",
   tryOverCap: "Trả người bán được phép, vượt hạn mức",
   trySending: "Đang gửi…",
@@ -314,7 +304,7 @@ const vi: Text = {
   tryError: "Không gọi được tới node",
   tryNode: "Node trả lỗi, nhưng không phải lỗi của quy tắc uỷ quyền",
   tryNote:
-    "Phần này cho thấy node từ chối giao dịch khi nó tới. Một block chứa giao dịch như vậy cũng không hợp lệ với validator (hiện có một, do đội vận hành):",
+    "Phần này cho thấy node từ chối giao dịch khi nó tới. Một block chứa giao dịch như vậy cũng không hợp lệ theo quy tắc kiểm block đã vá:",
   tryNoteLink: "quyết định D1",
   verifyTitle: "Tự kiểm",
   verifyIntro:

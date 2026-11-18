@@ -15,7 +15,6 @@ import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList"
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { Skeleton } from "@astryxdesign/core/Skeleton";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Table } from "@astryxdesign/core/Table";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { Token } from "@astryxdesign/core/Token";
@@ -23,12 +22,17 @@ import { formatUsdc } from "@sealed-arena/shared";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
+import { designText } from "./designText.js";
+import { StatusPill } from "./Evidence.js";
 import { useI18n } from "./i18n.js";
-import { survivalHours } from "./LandingPage.js";
+import { PublishedKey } from "./PublishedKey.js";
+
+const survivalHours = (score: bigint) => Number(score / 10n ** 15n) / 1000 / 3600;
+
 import { RELAYER_URL } from "./owner.js";
 import { SiteShell } from "./SiteShell.js";
 import { TryPayment } from "./TryPayment.js";
-import { type Attempt, RPC, useArenaLive } from "./useArenaLive.js";
+import { RPC, useArenaLive } from "./useArenaLive.js";
 
 const colBasis: CSSProperties = { flexBasis: 0 };
 
@@ -59,12 +63,11 @@ const big = (v: number | undefined) =>
     <Text type="display-3">{v.toLocaleString()}</Text>
   );
 
-type Row = Attempt & Record<string, unknown>;
-
 export default function ArenaPage() {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const { lang, setLang } = useI18n();
   const t = arenaText(lang);
+  const d = designText(lang);
   const live = useArenaLive(15);
   const { view, rec, summary, recent } = live;
   const [busy, setBusy] = useState<string>();
@@ -126,10 +129,11 @@ export default function ArenaPage() {
 
   const hours = rec ? survivalHours(rec.score) : undefined;
   const statusBadge = rec ? (
-    <Badge
-      variant={rec.breached ? "error" : "success"}
-      label={rec.breached ? t.breached : t.intact}
-    />
+    <StatusPill state={rec.breached ? "breach" : "passed"}>
+      {rec.breached ? t.breached : t.intact}
+    </StatusPill>
+  ) : live.error ? (
+    <StatusPill state="neutral">{d.unavailable}</StatusPill>
   ) : (
     <Skeleton width={96} height={24} />
   );
@@ -137,10 +141,8 @@ export default function ArenaPage() {
   const keyCard = (
     <Card>
       <VStack gap={4}>
-        <Heading level={2}>{t.keyTitle}</Heading>
-        <CodeBlock title={t.privateKey} code={ARENA.agentPrivateKey} isWrapped size="sm" />
+        <Heading level={2}>{t.beforeTitle}</Heading>
         <CodeBlock title={t.address} code={ARENA.agent} isWrapped size="sm" />
-        <Banner status="warning" title={t.keyWarning} />
         <Divider />
         <Heading level={3}>{t.networkTitle}</Heading>
         <MetadataList>
@@ -148,7 +150,7 @@ export default function ArenaPage() {
             <Code>{RPC}</Code>
           </MetadataListItem>
           <MetadataListItem label={t.chainId}>
-            <Code>{`261126 (${ARENA.chainIdHex})`}</Code>
+            <Code>{`${parseInt(ARENA.chainIdHex, 16)} (${ARENA.chainIdHex})`}</Code>
           </MetadataListItem>
           <MetadataListItem label={t.currency}>USDC (18 decimals)</MetadataListItem>
         </MetadataList>
@@ -162,7 +164,6 @@ export default function ArenaPage() {
         </HStack>
         {walletMsg ? <Banner status="info" title={walletMsg} /> : null}
         <Divider />
-        <Heading level={3}>{t.beforeTitle}</Heading>
         <VStack gap={1}>
           {t.beforeItems.map((x) => (
             <Text key={x} type="supporting">
@@ -176,6 +177,26 @@ export default function ArenaPage() {
           isWrapped
           size="sm"
         />
+        <Collapsible defaultIsOpen={false} trigger={<Text weight="bold">{t.beforeViem}</Text>}>
+          <CodeBlock
+            title="viem"
+            isWrapped
+            size="sm"
+            code={`import { createWalletClient, http, parseEther } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+
+const client = createWalletClient({
+  account: privateKeyToAccount('${ARENA.agentPrivateKey}'),
+  transport: http('${RPC}'),
+});
+await client.sendTransaction({
+  chain: null,
+  to: '0x000000000000000000000000000000000000dEaD',
+  value: parseEther('0.01'),
+  gas: 21_000n,
+});`}
+          />
+        </Collapsible>
       </VStack>
     </Card>
   );
@@ -217,6 +238,8 @@ export default function ArenaPage() {
               </MetadataListItem>
             </MetadataList>
           </>
+        ) : live.error ? (
+          <Text color="secondary">{d.liveUnavailable}</Text>
         ) : (
           <Skeleton height={120} />
         )}
@@ -265,11 +288,29 @@ export default function ArenaPage() {
         <HStack gap={2} vAlign="center" hAlign="between" wrap="wrap">
           <HStack gap={2} vAlign="center">
             <Heading level={2}>{t.attemptsTitle}</Heading>
-            <StatusDot variant={live.error ? "warning" : "success"} label="Live" />
+            <StatusDot
+              variant={live.error || !recent ? "warning" : "success"}
+              label={
+                live.error
+                  ? lang === "vi"
+                    ? "Mất kết nối"
+                    : "Unavailable"
+                  : recent
+                    ? lang === "vi"
+                      ? "Trực tiếp"
+                      : "Live"
+                    : lang === "vi"
+                      ? "Đang kết nối"
+                      : "Connecting"
+              }
+            />
           </HStack>
           <InfoTip content={t.offChain} />
         </HStack>
-        {live.error ? <Banner status="error" title={t.liveDown} /> : null}
+        <Text type="supporting" color="secondary">
+          {t.offChain}
+        </Text>
+        {live.error ? <Banner status="warning" title={t.liveDown} /> : null}
         {summary && Object.keys(summary.byReason).length > 0 ? (
           <HStack gap={2} wrap="wrap">
             {Object.entries(summary.byReason)
@@ -280,56 +321,31 @@ export default function ArenaPage() {
           </HStack>
         ) : null}
         {recent === undefined ? (
-          <Skeleton height={160} />
+          live.error ? (
+            <EmptyState isCompact title={d.unavailable} description={t.emptyHint} />
+          ) : (
+            <Skeleton height={160} />
+          )
         ) : recent.length === 0 ? (
           <EmptyState isCompact title={t.none} description={t.emptyHint} />
         ) : (
-          <Table<Row>
-            density="compact"
-            data={recent as Row[]}
-            idKey={(a) => `${a.ts}-${a.to}-${a.value}-${a.result}`}
-            columns={[
-              {
-                key: "ts",
-                header: t.when,
-                renderCell: (a) => (
+          <ol className="attempt-feed">
+            {recent.map((a) => (
+              <li key={`${a.ts}-${a.to}-${a.value}-${a.result}`}>
+                <div className="attempt-topline">
+                  <StatusPill state={a.result === "accepted" ? "passed" : "refused"}>
+                    {a.result === "accepted" ? t.accepted : t.refused}
+                  </StatusPill>
                   <Timestamp value={Math.floor(a.ts / 1000)} format="relative" isLive />
-                ),
-              },
-              { key: "to", header: t.to, renderCell: (a) => <Code>{short(a.to)}</Code> },
-              {
-                key: "value",
-                header: t.amount,
-                renderCell: (a) => `${usdc(BigInt(a.value || "0"))} USDC`,
-              },
-              {
-                key: "result",
-                header: t.result,
-                renderCell: (a) =>
-                  a.result === "accepted" ? (
-                    <Badge variant="info" label={t.accepted} />
-                  ) : (
-                    <Text type="supporting" color="secondary">
-                      {t.refused}
-                    </Text>
-                  ),
-              },
-              // On a phone the reasons are already shown as tokens above the table.
-              ...(isMobile
-                ? []
-                : [
-                    {
-                      key: "reason",
-                      header: t.reason,
-                      renderCell: (a: Row) => (
-                        <Text type="supporting" color="secondary">
-                          {a.reason || "-"}
-                        </Text>
-                      ),
-                    },
-                  ]),
-            ]}
-          />
+                </div>
+                <div className="attempt-detail">
+                  <code>{short(a.to)}</code>
+                  <span>{usdc(BigInt(a.value || "0"))} USDC</span>
+                </div>
+                {a.reason && <code className="attempt-reason">{a.reason}</code>}
+              </li>
+            ))}
+          </ol>
         )}
       </VStack>
     </Card>
@@ -356,12 +372,16 @@ export default function ArenaPage() {
           </Text>
         </VStack>
 
-        <TryPayment
-          t={t}
-          view={view}
-          onSent={() => void live.refreshChain()}
-          onReportBreach={() => void act("reportBreach")}
-        />
+        <PublishedKey lang={lang} />
+        <div className="arena-workbench">
+          <TryPayment
+            t={t}
+            view={view}
+            onSent={() => void live.refreshChain()}
+            onReportBreach={() => void act("reportBreach")}
+          />
+          {mandateCard}
+        </div>
         {outcome ? (
           <Banner status={outcome.ok ? "success" : "warning"} title={outcome.text} />
         ) : null}
@@ -369,63 +389,63 @@ export default function ArenaPage() {
           <Banner status="warning" title={t.lowBalance} />
         ) : null}
 
-        <Grid columns={{ minWidth: 160, max: 3 }} gap={4}>
-          <Tile label={t.atStake}>
-            {view ? (
-              <HStack gap={2} vAlign="end">
-                <Text type="display-3">{usdc(view.balance)}</Text>
-                <Text type="supporting" color="secondary">
-                  USDC
-                </Text>
-              </HStack>
-            ) : (
-              <Skeleton width={72} height={36} />
-            )}
-          </Tile>
-          <Tile label={t.breaches}>{big(rec ? (rec.breached ? 1 : 0) : undefined)}</Tile>
-          <Tile
-            label={
-              <HStack gap={1} vAlign="center">
-                <span>{t.survival}</span>
-                <InfoTip content={t.survivalHelp} size="xsm" />
-              </HStack>
-            }
-          >
-            {hours === undefined ? (
-              <Skeleton width={72} height={36} />
-            ) : (
-              <HStack gap={2} vAlign="end">
-                <Text type="display-3">{hours.toFixed(1)}</Text>
-                <Text type="supporting" color="secondary">
-                  {t.survivalUnit}
-                </Text>
-              </HStack>
-            )}
-          </Tile>
-          <Tile
-            label={
-              <HStack gap={1} vAlign="center">
-                <span>{t.refused}</span>
-                <InfoTip content={t.offChain} size="xsm" />
-              </HStack>
-            }
-          >
-            {big(summary?.rejected)}
-          </Tile>
-          <Tile label={t.accepted}>{big(summary?.accepted)}</Tile>
-          <Tile label={t.senders}>{big(summary?.distinctSenders)}</Tile>
-        </Grid>
+        <section className="arena-stats" aria-label={t.statusTitle}>
+          <Grid columns={{ minWidth: 160, max: 3 }} gap={4}>
+            <Tile label={t.atStake}>
+              {view ? (
+                <HStack gap={2} vAlign="end">
+                  <Text type="display-3">{usdc(view.balance)}</Text>
+                  <Text type="supporting" color="secondary">
+                    USDC
+                  </Text>
+                </HStack>
+              ) : (
+                <Skeleton width={72} height={36} />
+              )}
+            </Tile>
+            <Tile label={t.breaches}>{big(rec ? (rec.breached ? 1 : 0) : undefined)}</Tile>
+            <Tile
+              label={
+                <HStack gap={1} vAlign="center">
+                  <span>{t.survival}</span>
+                  <InfoTip content={t.survivalHelp} size="xsm" />
+                </HStack>
+              }
+            >
+              {hours === undefined ? (
+                <Skeleton width={72} height={36} />
+              ) : (
+                <HStack gap={2} vAlign="end">
+                  <Text type="display-3">{hours.toFixed(1)}</Text>
+                  <Text type="supporting" color="secondary">
+                    {t.survivalUnit}
+                  </Text>
+                </HStack>
+              )}
+            </Tile>
+            <Tile
+              label={
+                <HStack gap={1} vAlign="center">
+                  <span>{t.refused}</span>
+                  <InfoTip content={t.offChain} size="xsm" />
+                </HStack>
+              }
+            >
+              {big(summary?.rejected)}
+            </Tile>
+            <Tile label={t.accepted}>{big(summary?.accepted)}</Tile>
+            <Tile label={t.senders}>{big(summary?.distinctSenders)}</Tile>
+          </Grid>
+        </section>
 
         <Stack direction={isMobile ? "vertical" : "horizontal"} gap={4} vAlign="start">
           <StackItem size="fill" style={isMobile ? undefined : colBasis}>
             {keyCard}
           </StackItem>
           <StackItem size="fill" style={isMobile ? undefined : colBasis}>
-            {mandateCard}
+            {attempts}
           </StackItem>
         </Stack>
-
-        {attempts}
       </VStack>
     </SiteShell>
   );

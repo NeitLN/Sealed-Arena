@@ -18,10 +18,10 @@ const en = {
   injectionLabel: "Payment to the attacker refused by the node",
   challengeEyebrow: "SEALED ARENA / OPEN CHALLENGE",
   eyebrow: "Avalanche L1 · AI agents",
-  headline: "Let agents spend.",
-  headlineAccent: "Keep control.",
-  thesis: "Your limits. Enforced by the chain.",
-  lead: "Choose who your agent can pay and how much. The Sealed L1 checks every payment its key signs, even if the key leaks. Inside the mandate, a leaked key can still spend.",
+  headline: "Give your agent a card,",
+  headlineAccent: "not the wallet.",
+  thesis: "Checked by the node on every transaction on this L1.",
+  lead: "You sign who your agent can pay, how much and until when, with a passkey. On the Sealed L1, the node refuses any transaction sent from the agent’s key outside that mandate.",
   tryIt: "Try to break it",
   seeCompare: "See the comparison",
   ownerConsole: "Owner console",
@@ -33,7 +33,7 @@ const en = {
   survivalHelp:
     "Coins kept inside the mandate multiplied by the time they stayed there, recorded on chain by the ArenaRecorder contract. It can be published to ERC-8004 on the Fuji C-Chain.",
   status: "On-chain check",
-  intact: "No breach",
+  intact: "No breach recorded (balance check)",
   breached: "Breached",
   liveDown: "Live data is unavailable right now.",
   step1Title: "The owner signs a mandate",
@@ -41,8 +41,7 @@ const en = {
   step2Title: "The agent pays with its own key",
   step2: "For data and APIs, for example with x402. The key may be tricked or leaked.",
   step3Title: "The L1 validator checks every payment",
-  step3:
-    "On Fuji today, the team runs the sole validator. It checks the mandate on arrival and again when building a block.",
+  step3: "The node checks the mandate on arrival and again as a block-validity rule on this L1.",
   compareTitle: "Same agent, three wallets",
   compareNote:
     "P and O ran on the Fuji C-Chain, S on the Sealed L1 on Fuji. All three used test USDC.",
@@ -62,7 +61,8 @@ const en = {
   menu: "Navigation",
   navHow: "How it works",
   navBusiness: "Business",
-  heroNote: "Open challenge. Public agent key. Test assets only.",
+  heroNote:
+    "Fuji testnet · one validator, run by the team · the challenge agent’s private key is published.",
   scroll: "Explore the evidence",
   stackNote: "A custom L1. A verifiable payment boundary.",
   liveEyebrow: "THE OPEN CHALLENGE",
@@ -84,7 +84,7 @@ const en = {
     "Both O and S stayed within the daily cap in this run. O’s over-limit payments reverted inside blocks. S’s stayed out of blocks.",
   plainLabel: "Transferred to the attacker",
   limitLabel: "Reverted inside a block",
-  challengeTitle: "The agent key is public.\nPut the limits to the test.",
+  challengeTitle: "The private key is published.\nThe challenge is open.",
   challengeBody:
     "Inspect the mandate. Try a payment. Check the result. The open challenge runs on Fuji, with test assets and published rules.",
   rules: "Read the rules",
@@ -135,13 +135,13 @@ const vi: Text = {
   injectionLabel: "Node từ chối khoản trả cho kẻ tấn công",
   challengeEyebrow: "SEALED ARENA / THỬ THÁCH MỞ",
   eyebrow: "Avalanche L1 · AI agent",
-  headline: "Agent tự chi tiêu.",
-  headlineAccent: "Bạn giữ quyền\nkiểm soát.",
-  thesis: "Bạn đặt giới hạn. Chain thực thi.",
-  lead: "Bạn chọn người nhận và hạn mức. L1 Sealed kiểm từng khoản trả do khoá agent ký, kể cả khi khoá bị lộ. Người giữ khoá vẫn có thể chi trong phạm vi uỷ quyền.",
+  headline: "Đưa agent một chiếc thẻ,",
+  headlineAccent: "đừng đưa cả ví.",
+  thesis: "Node kiểm tra từng giao dịch trên L1 này.",
+  lead: "Bạn dùng passkey ký rõ agent được trả cho ai, tối đa bao nhiêu, đến khi nào. Trên Sealed L1, node từ chối mọi giao dịch gửi từ khoá của agent nằm ngoài uỷ quyền đó.",
   tryIt: "Thử phá giới hạn",
   seeCompare: "Xem so sánh",
-  ownerConsole: "Bảng điều khiển chủ ví",
+  ownerConsole: "Bảng điều khiển chủ sở hữu",
   liveTitle: "Đang chạy trên Fuji",
   liveNote:
     "Private key của agent thử thách được công khai. Các số dưới đây cập nhật vài giây một lần.",
@@ -151,7 +151,7 @@ const vi: Text = {
   survivalHelp:
     "Số coin giữ được trong uỷ quyền nhân với thời gian giữ, do contract ArenaRecorder ghi trên chain. Số này có thể được công bố lên ERC-8004 ở Fuji C-Chain.",
   status: "Kiểm trên chain",
-  intact: "Không vi phạm",
+  intact: "Chưa ghi nhận vi phạm (kiểm tra số dư)",
   breached: "Đã vi phạm",
   liveDown: "Hiện chưa lấy được dữ liệu trực tiếp.",
   step1Title: "Chủ ví ký uỷ quyền",
@@ -160,7 +160,7 @@ const vi: Text = {
   step2: "Mua dữ liệu, API, ví dụ qua x402. Khoá có thể bị lừa hoặc bị lộ.",
   step3Title: "Validator của L1 kiểm từng khoản trả",
   step3:
-    "Hiện đội vận hành validator duy nhất trên Fuji. Validator kiểm uỷ quyền khi nhận giao dịch và kiểm lại khi dựng block.",
+    "Node kiểm uỷ quyền khi nhận giao dịch và kiểm lại trong quy tắc hợp lệ của block trên L1 này.",
   compareTitle: "Một agent, ba loại ví",
   compareNote: "P và O chạy trên Fuji C-Chain, S trên L1 Sealed ở Fuji. Cả ba dùng USDC thử.",
   plain: "Ví thường",
@@ -168,7 +168,7 @@ const vi: Text = {
     "Ví mất toàn bộ số dư trong bản ghi dựng tay. Trong thử nghiệm riêng trên mạng cục bộ, agent thật làm theo trang cài lệnh ở {pages} lượt (hai model) và ghi chú cài sẵn trong bộ nhớ ở {memory} lượt (một model).",
   limit: "Ví hạn mức dạng contract",
   limitResult: "{passed}/{attempts} qua bước kiểm, rồi {reverted} revert trong block",
-  sealed: "L1 Sealed",
+  sealed: "Sealed L1",
   poolResult:
     "Node nhận {accepted}/{attempts} khoản. Node tính cả các khoản đang có trong pool vào hạn mức ngày, nên từ chối phần còn lại ngay khi gửi.",
   sealedResult:
@@ -179,7 +179,8 @@ const vi: Text = {
   menu: "Điều hướng",
   navHow: "Cách hoạt động",
   navBusiness: "Mô hình kinh doanh",
-  heroNote: "Thử thách mở. Khoá agent công khai. Chỉ dùng tài sản thử.",
+  heroNote:
+    "Fuji testnet · một validator, do đội vận hành · private key của agent thử thách đã được công bố.",
   scroll: "Khám phá bằng chứng",
   stackNote: "Một L1 riêng. Giới hạn chi tiêu có thể kiểm chứng.",
   liveEyebrow: "THỬ THÁCH MỞ",
@@ -202,7 +203,7 @@ const vi: Text = {
     "Trong lượt thử này, cả O và S đều giữ hạn mức ngày. Khoản vượt hạn mức của O bị revert trong block. Với S, các khoản đó nằm ngoài block.",
   plainLabel: "Đã chuyển cho kẻ tấn công",
   limitLabel: "Revert bên trong block",
-  challengeTitle: "Khoá agent đã công khai.\nMời bạn thử giới hạn.",
+  challengeTitle: "Private key đã được công bố.\nHãy thử phá giới hạn.",
   challengeBody:
     "Xem uỷ quyền. Thử thanh toán. Kiểm tra kết quả. Thử thách mở chạy trên Fuji, với tài sản thử và luật được công bố.",
   rules: "Đọc luật thử thách",
