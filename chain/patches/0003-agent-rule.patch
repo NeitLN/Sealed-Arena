@@ -819,7 +819,7 @@ index 415a986..789b90b 100644
  
  // TransitionDb will transition the state by applying the current message and
 diff --git a/graft/subnet-evm/core/txpool/legacypool/legacypool.go b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
-index cb2602f..5a15479 100644
+index cb2602f..7dae7de 100644
 --- a/graft/subnet-evm/core/txpool/legacypool/legacypool.go
 +++ b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
 @@ -43,6 +43,7 @@ import (
@@ -838,20 +838,24 @@ index cb2602f..5a15479 100644
  		MinimumFee: pool.minimumFee,
  
  		FirstNonceGap: nil, // Pool allows arbitrary arrival order, don't invalidate nonce gaps
-@@ -734,6 +736,20 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
+@@ -734,6 +736,24 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
  			}
  			return nil
  		},
-+		// Sealed Arena: queued transactions count too, so budget cannot be parked in the queue.
++		// Sealed Arena: the charges of the sender's pooled transactions with a lower nonce, pending
++		// and queued. Counting in nonce order means payments that arrive out of order, or are queued
++		// ahead with a gap, cannot take the budget from an earlier nonce; pruneAgentTxs drops what
++		// no longer fits at the next head. A replacement (same nonce) counts only once.
 +		AgentReserved: func(addr common.Address, nonce uint64) *big.Int {
 +			total := new(big.Int)
 +			for _, list := range []*list{pool.pending[addr], pool.queue[addr]} {
 +				if list == nil {
 +					continue
 +				}
-+				total.Add(total, list.totalcost.ToBig())
-+				if tx := list.txs.Get(nonce); tx != nil {
-+					total.Sub(total, tx.Cost())
++				for _, tx := range list.txs.items {
++					if tx.Nonce() < nonce {
++						total.Add(total, tx.Cost())
++					}
 +				}
 +			}
 +			return total
@@ -859,7 +863,7 @@ index cb2602f..5a15479 100644
  	}
  	if err := txpool.ValidateTransactionWithState(tx, pool.signer, opts); err != nil {
  		return err
-@@ -1381,6 +1397,7 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest,
+@@ -1381,6 +1401,7 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest,
  	// because of another transaction (e.g. higher gas price).
  	if reset != nil {
  		pool.demoteUnexecutables()
@@ -867,7 +871,7 @@ index cb2602f..5a15479 100644
  		if reset.newHead != nil {
  			if pool.chainconfig.IsLondon(reset.newHead.Number) {
  				if err := pool.updateBaseFeeAt(reset.newHead); err != nil {
-@@ -1743,6 +1760,67 @@ func (pool *LegacyPool) truncateQueue() {
+@@ -1743,6 +1764,67 @@ func (pool *LegacyPool) truncateQueue() {
  // Note: transactions are not marked as removed in the priced list because re-heaping
  // is always explicitly triggered by SetBaseFee and it would be unnecessary and wasteful
  // to trigger a re-heap is this function
@@ -936,7 +940,7 @@ index cb2602f..5a15479 100644
  	// Iterate over all accounts and demote any non-executable transactions
  	gasLimit := pool.currentHead.Load().GasLimit
 diff --git a/graft/subnet-evm/core/txpool/validation.go b/graft/subnet-evm/core/txpool/validation.go
-index 1827192..961f834 100644
+index 1827192..36d1e55 100644
 --- a/graft/subnet-evm/core/txpool/validation.go
 +++ b/graft/subnet-evm/core/txpool/validation.go
 @@ -31,10 +31,12 @@ import (
@@ -980,8 +984,8 @@ index 1827192..961f834 100644
 +	Time  uint64         // Time for time-based admission rules (Sealed Arena agent rule), see PoolTime
 +
 +	// AgentReserved is an optional callback (Sealed Arena agent rule): the sum of the charges of
-+	// the sender's other pooled transactions, pending and queued, leaving out the one at `nonce`
-+	// that this transaction would replace. The rule counts it toward the daily budget.
++	// the sender's pooled transactions, pending and queued, with a nonce lower than `nonce`. The
++	// rule counts it toward the daily budget.
 +	AgentReserved func(addr common.Address, nonce uint64) *big.Int
  
  	// FirstNonceGap is an optional callback to retrieve the first nonce gap in
@@ -1087,10 +1091,10 @@ index 0000000..6de1051
 +}
 diff --git a/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
 new file mode 100644
-index 0000000..85cecda
+index 0000000..e6c7435
 --- /dev/null
 +++ b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
-@@ -0,0 +1,410 @@
+@@ -0,0 +1,429 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package evm
@@ -1385,16 +1389,35 @@ index 0000000..85cecda
 +	require.Empty(t, queued, "frozen agent keeps nothing queued")
 +}
 +
-+// Queued (nonce-gapped) payments count toward the daily budget, so the budget cannot be
-+// parked in the queue and then topped up through the pending list.
-+func TestAgentRulePoolQueuedCountsTowardBudget(t *testing.T) {
-+	e := newAgentPoolEnv(t, 3)
-+	errs := e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{e.pay(1), e.pay(2), e.pay(3)})
-+	for i, err := range errs {
-+		require.NoError(t, err, "queued payment %d", i)
++// The budget is counted in nonce order: a payment counts only the agent's pooled payments with a
++// lower nonce. Payments that arrive out of order (or are queued ahead with a nonce gap) cannot
++// take the budget from an earlier nonce; the excess at the end is dropped at the next head.
++func TestAgentRulePoolBudgetFollowsNonceOrder(t *testing.T) {
++	e := newAgentPoolEnv(t, 2)
++	// Nonces 2, 0, 1 arrive in that order; all are admitted (each fits with the lower ones).
++	for i, tx := range []*types.Transaction{e.pay(2), e.pay(0), e.pay(1)} {
++		require.NoError(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{tx})[0], "payment %d", i)
 +	}
-+	require.ErrorIs(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{e.pay(0)})[0], core.ErrAgentBudgetExceeded)
-+	require.ErrorIs(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{e.pay(4)})[0], core.ErrAgentBudgetExceeded)
++	// The block takes nonces 0 and 1 (the budget); nonce 2 does not fit and is dropped.
++	e.block()
++	state, err := e.tvm.vm.blockChain.State()
++	require.NoError(t, err)
++	require.Equal(t, uint64(2), state.GetNonce(e.agent))
++	pending, queued := e.tvm.vm.txPool.ContentFrom(e.agent)
++	require.Empty(t, pending)
++	require.Empty(t, queued, "the payment over the budget is not left waiting")
++}
++
++// Payments queued far ahead do not hold the budget for the next nonce.
++func TestAgentRulePoolQueuedAheadDoesNotBlock(t *testing.T) {
++	e := newAgentPoolEnv(t, 2)
++	for i, tx := range []*types.Transaction{e.pay(5), e.pay(6)} {
++		require.NoError(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{tx})[0], "queued payment %d", i)
++	}
++	require.NoError(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{e.pay(0)})[0])
++	require.NoError(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{e.pay(1)})[0])
++	// Within the pending run (nonces 0 and 1) the daily budget still holds.
++	require.ErrorIs(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{e.pay(2)})[0], core.ErrAgentBudgetExceeded)
 +}
 +
 +// Replacing a pooled payment counts only the difference: a replacement with a higher fee that
