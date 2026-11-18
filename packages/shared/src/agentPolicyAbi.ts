@@ -25,6 +25,49 @@ export const agentPolicyAbi = [
   },
   {
     type: "function",
+    name: "freezeEpoch",
+    inputs: [
+      {
+        name: "agent",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "epoch",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getFeeSpend",
+    inputs: [
+      {
+        name: "agent",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "feeSpentToday",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "dayIndex",
+        type: "uint64",
+        internalType: "uint64",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "getMandate",
     inputs: [
       {
@@ -60,6 +103,62 @@ export const agentPolicyAbi = [
             internalType: "uint64",
           },
         ],
+      },
+      {
+        name: "frozen",
+        type: "bool",
+        internalType: "bool",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getMandateV2",
+    inputs: [
+      {
+        name: "agent",
+        type: "address",
+        internalType: "address",
+      },
+    ],
+    outputs: [
+      {
+        name: "m",
+        type: "tuple",
+        internalType: "struct IAgentPolicy.MandateV2",
+        components: [
+          {
+            name: "payees",
+            type: "address[]",
+            internalType: "address[]",
+          },
+          {
+            name: "perTxCap",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "dailyCap",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "dailyFeeCap",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "expiry",
+            type: "uint64",
+            internalType: "uint64",
+          },
+        ],
+      },
+      {
+        name: "feeCapSet",
+        type: "bool",
+        internalType: "bool",
       },
       {
         name: "frozen",
@@ -190,6 +289,19 @@ export const agentPolicyAbi = [
   },
   {
     type: "function",
+    name: "ruleVersion",
+    inputs: [],
+    outputs: [
+      {
+        name: "version",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
     name: "setMandate",
     inputs: [
       {
@@ -214,6 +326,61 @@ export const agentPolicyAbi = [
           },
           {
             name: "dailyCap",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "expiry",
+            type: "uint64",
+            internalType: "uint64",
+          },
+        ],
+      },
+      {
+        name: "nonce",
+        type: "uint256",
+        internalType: "uint256",
+      },
+      {
+        name: "auth",
+        type: "bytes",
+        internalType: "bytes",
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setMandateV2",
+    inputs: [
+      {
+        name: "agent",
+        type: "address",
+        internalType: "address",
+      },
+      {
+        name: "m",
+        type: "tuple",
+        internalType: "struct IAgentPolicy.MandateV2",
+        components: [
+          {
+            name: "payees",
+            type: "address[]",
+            internalType: "address[]",
+          },
+          {
+            name: "perTxCap",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "dailyCap",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "dailyFeeCap",
             type: "uint256",
             internalType: "uint256",
           },

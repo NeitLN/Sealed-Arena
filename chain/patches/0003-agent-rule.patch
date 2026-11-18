@@ -1,9 +1,151 @@
+diff --git a/graft/subnet-evm/core/agent_policy_v2_test.go b/graft/subnet-evm/core/agent_policy_v2_test.go
+new file mode 100644
+index 0000000..2e86701
+--- /dev/null
++++ b/graft/subnet-evm/core/agent_policy_v2_test.go
+@@ -0,0 +1,136 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package core
++
++import (
++	"math/big"
++	"testing"
++
++	"github.com/ava-labs/libevm/common"
++	"github.com/ava-labs/libevm/core/types"
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++)
++
++// mandate reads the agent's mandate at the head.
++func (e *arEnv) mandate() (agentpolicy.Mandate, bool) {
++	st, err := e.chain.State()
++	require.NoError(e.t, err)
++	_, m, frozen, _ := agentpolicy.GetMandateForRule(st, arAgent)
++	return m, frozen
++}
++
++// Under rule v2 a mandate carries a daily fee cap: the fourth payment of the day goes over it.
++func TestAgentPolicyV2DailyFeeCap(t *testing.T) {
++	gas := new(big.Int).Mul(new(big.Int).SetUint64(arTransfer), arFeeCap)
++	m := arBigMandate()
++	e := newArEnvWith(t, nil, arConfigV2At(0), dummy.NewCoinbaseFaker())
++	e.good(10, e.relayerCall(e.setMandateV2Data(agentpolicy.IAgentPolicyMandateV2{
++		Payees: m.Payees, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap,
++		DailyFeeCap: new(big.Int).Mul(gas, big.NewInt(3)), Expiry: m.Expiry,
++	}), 1_000_000))
++	got, _ := e.mandate()
++	require.True(t, got.FeeCapSet)
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil), e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil), e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil))
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil)), ErrAgentFeeBudgetExceeded)
++	// The next UTC day the fee counter starts again.
++	e.good(86_400, e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil))
++	e.checkInvariant()
++}
++
++// A mandate set before rule v2 has no fee cap after the switch: payments go on within dailyCap.
++func TestAgentPolicyV2MandateFromV1KeepsWorking(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(40), dummy.NewCoinbaseFaker())
++	got, _ := e.mandate()
++	require.False(t, got.FeeCapSet)
++	e.good(10, e.pay(1))                                                       // t = 20, v1
++	e.good(10, e.pay(1))                                                       // t = 30, v1
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil)) // t = 40, v2
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil)) // t = 50, v2
++	e.checkInvariant()
++}
++
++// From the switch, setMandate (v1) is refused and setMandateV2 works; before it, setMandateV2 is
++// not a function of the precompile.
++func TestAgentPolicyV2SetMandateSwitch(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(40), dummy.NewCoinbaseFaker())
++	m := arBigMandate()
++	v2 := agentpolicy.IAgentPolicyMandateV2{Payees: []common.Address{arPayee}, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap, DailyFeeCap: m.DailyCap, Expiry: m.Expiry}
++
++	// t = 20: setMandateV2 does not exist yet (the call fails, nothing changes).
++	r := e.good(10, e.relayerCall(e.setMandateV2Data(v2), 1_000_000))
++	require.Equal(t, types.ReceiptStatusFailed, r[0].Status)
++	e.ownerNo-- // the proof was not used
++	got, _ := e.mandate()
++	require.Len(t, got.Payees, len(m.Payees))
++
++	e.good(10) // t = 30
++	// t = 40, rule v2: the v1 setMandate (and its v1 proof) is refused.
++	nonce := new(big.Int).SetUint64(e.ownerNo)
++	v1Data, err := agentpolicy.PackSetMandate(agentpolicy.SetMandateInput{Agent: arAgent, M: *arMandate([]common.Address{arPayee}, m.PerTxCap, m.DailyCap, m.Expiry), Nonce: nonce, Auth: e.assertion(agentpolicy.SetMandateChallenge(e.chainID(), arAgent, *arMandate([]common.Address{arPayee}, m.PerTxCap, m.DailyCap, m.Expiry), nonce))})
++	require.NoError(t, err)
++	r = e.good(10, e.relayerCall(v1Data, 1_000_000))
++	require.Equal(t, types.ReceiptStatusFailed, r[0].Status)
++	got, _ = e.mandate()
++	require.Len(t, got.Payees, len(m.Payees), "the v1 call changed nothing")
++
++	// setMandateV2 with a v2 proof works.
++	r = e.good(10, e.relayerCall(e.setMandateV2Data(v2), 1_000_000))
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	got, _ = e.mandate()
++	require.Equal(t, []common.Address{arPayee}, got.Payees)
++	require.True(t, got.FeeCapSet)
++}
++
++// A v2 proof made for another blockchain (same EVM chain id) is refused.
++func TestAgentPolicyV2CrossNetworkReplayRefused(t *testing.T) {
++	e := newArEnvWith(t, nil, arConfigV2At(0), dummy.NewCoinbaseFaker())
++	m := arBigMandate()
++	v2 := agentpolicy.IAgentPolicyMandateV2{Payees: m.Payees, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap, DailyFeeCap: m.DailyCap, Expiry: m.Expiry}
++	other := agentpolicy.DomainV2(arNetworkID, [32]byte{0x01}, e.chainID())
++	nonce := new(big.Int).SetUint64(e.ownerNo)
++	data, err := agentpolicy.PackSetMandateV2(agentpolicy.SetMandateV2Input{Agent: arAgent, M: v2, Nonce: nonce, Auth: e.assertion(agentpolicy.SetMandateV2Challenge(other, arAgent, v2, nonce))})
++	require.NoError(t, err)
++	r := e.good(10, e.relayerCall(data, 1_000_000))
++	require.Equal(t, types.ReceiptStatusFailed, r[0].Status)
++	got, _ := e.mandate()
++	require.Empty(t, got.Payees)
++}
++
++// A freeze proof signed ahead of time stays valid across setMandateV2 calls; after an unfreeze
++// the old proof no longer works.
++func TestAgentPolicyV2PreSignedFreeze(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
++	preSigned := e.freezeV2Data() // epoch 0
++	m := arBigMandate()
++	v2 := agentpolicy.IAgentPolicyMandateV2{Payees: m.Payees, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap, DailyFeeCap: m.DailyCap, Expiry: m.Expiry}
++	e.good(10, e.relayerCall(e.setMandateV2Data(v2), 1_000_000))
++	e.good(10, e.relayerCall(e.setMandateV2Data(v2), 1_000_000))
++
++	r := e.good(10, e.relayerCall(preSigned, 300_000))
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	_, frozen := e.mandate()
++	require.True(t, frozen)
++	require.ErrorIs(t, e.bad(e.pay2()), ErrAgentFrozen)
++	// Freezing again with the same proof succeeds and changes nothing.
++	r = e.good(10, e.relayerCall(preSigned, 300_000))
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++
++	r = e.good(10, e.relayerCall(e.freezeData(false), 300_000)) // unfreeze: epoch 0 -> 1
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	_, frozen = e.mandate()
++	require.False(t, frozen)
++	r = e.good(10, e.relayerCall(preSigned, 300_000)) // the epoch-0 proof is dead
++	require.Equal(t, types.ReceiptStatusFailed, r[0].Status)
++	_, frozen = e.mandate()
++	require.False(t, frozen)
++	e.good(10, e.pay2())
++	e.checkInvariant()
++}
++
++// pay2 is a v2-conformant payment of 1 wei to the listed payee.
++func (e *arEnv) pay2() *types.Transaction {
++	return e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil)
++}
 diff --git a/graft/subnet-evm/core/agent_rule.go b/graft/subnet-evm/core/agent_rule.go
 new file mode 100644
-index 0000000..434ffff
+index 0000000..05a4053
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule.go
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,261 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -41,6 +183,7 @@ index 0000000..434ffff
 +	ErrAgentPayeeIsPrecompile = errors.New("agent: payee is a precompile")
 +	ErrAgentTipTooHigh        = errors.New("agent: tip too high")
 +	ErrAgentSetCodeAuthority  = errors.New("agent: set-code authority is a registered agent")
++	ErrAgentFeeBudgetExceeded = errors.New("agent: fee budget exceeded")
 +)
 +
 +// Rule v2 constants. Changing them is a new rule version.
@@ -147,6 +290,14 @@ index 0000000..434ffff
 +	return nil
 +}
 +
++// AgentMaxFee is the most the transaction can pay in fees: gasLimit * gasFeeCap.
++func AgentMaxFee(tx AgentTx) *big.Int {
++	if tx.GasFeeCap == nil {
++		return new(big.Int)
++	}
++	return new(big.Int).Mul(new(big.Int).SetUint64(tx.GasLimit), tx.GasFeeCap)
++}
++
 +// AgentCharge returns value + gasLimit * gasFeeCap, the most the transaction can take
 +// from the sender. The rule charges this amount, not the gas actually used.
 +func AgentCharge(tx AgentTx) *big.Int {
@@ -221,6 +372,15 @@ index 0000000..434ffff
 +		if err := checkAgentTxV2(tx); err != nil {
 +			return nil, true, err
 +		}
++		// The daily fee cap of a v2 mandate (a mandate set before v2 has none: only dailyCap
++		// limits fees, as in v1). The fee counts at its maximum, gas limit x fee cap.
++		if m.FeeCapSet {
++			fee := AgentMaxFee(tx)
++			spentFees := agentpolicy.FeeSpendForDay(state, tx.From, timestamp)
++			if total := new(big.Int).Add(spentFees, fee); total.Cmp(m.DailyFeeCap) > 0 {
++				return nil, true, fmt.Errorf("%w: fees today %s + fee %s above dailyFeeCap %s", ErrAgentFeeBudgetExceeded, spentFees, fee, m.DailyFeeCap)
++			}
++		}
 +	}
 +	return charge, true, nil
 +}
@@ -249,10 +409,10 @@ index 0000000..434ffff
 +}
 diff --git a/graft/subnet-evm/core/agent_rule_test.go b/graft/subnet-evm/core/agent_rule_test.go
 new file mode 100644
-index 0000000..0a4f168
+index 0000000..fdb5199
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule_test.go
-@@ -0,0 +1,655 @@
+@@ -0,0 +1,723 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -284,6 +444,8 @@ index 0000000..0a4f168
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentrulev2"
++	"github.com/ava-labs/avalanchego/ids"
++	"github.com/ava-labs/avalanchego/snow"
 +)
 +
 +// ---- fixtures ------------------------------------------------------------------
@@ -418,9 +580,28 @@ index 0000000..0a4f168
 +	return e.sign(arRelayerKey, &to, common.Big0, gas, data)
 +}
 +
++// v2At reports whether agent rule v2 applies to a block at time t on this chain.
++func (e *arEnv) v2At(t uint64) bool { return AgentRuleVersionAt(e.gspec.Config, t) == AgentRuleV2 }
++
++// nextTime is the time of the next block built with gap 10 (newArEnv's first block is at 10).
++func (e *arEnv) nextTime() uint64 {
++	if e.head == nil {
++		return 10
++	}
++	return e.head.Time() + 10
++}
++
++func (e *arEnv) domain() common.Hash {
++	return agentpolicy.DomainV2(arNetworkID, arBlockchainID, e.chainID())
++}
++
 +func (e *arEnv) registerData() []byte {
 +	x, y := [32]byte(common.BigToHash(e.owner.X)), [32]byte(common.BigToHash(e.owner.Y))
-+	sig, err := crypto.Sign(agentpolicy.RegisterDigest(e.chainID(), arAgent, x, y).Bytes(), arAgentKey)
++	digest := agentpolicy.RegisterDigest(e.chainID(), arAgent, x, y)
++	if e.v2At(e.nextTime()) {
++		digest = agentpolicy.RegisterDigestV2(e.domain(), arAgent, x, y)
++	}
++	sig, err := crypto.Sign(digest.Bytes(), arAgentKey)
 +	require.NoError(e.t, err)
 +	data, err := agentpolicy.PackRegister(agentpolicy.RegisterInput{Agent: arAgent, OwnerX: x, OwnerY: y, AgentSig: sig})
 +	require.NoError(e.t, err)
@@ -447,6 +628,12 @@ index 0000000..0a4f168
 +}
 +
 +func (e *arEnv) setMandateData(m agentpolicy.IAgentPolicyMandate) []byte {
++	if e.v2At(e.nextTime()) {
++		// Under rule v2: setMandateV2, with a fee cap equal to the daily cap (no extra limit).
++		return e.setMandateV2Data(agentpolicy.IAgentPolicyMandateV2{
++			Payees: m.Payees, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap, DailyFeeCap: m.DailyCap, Expiry: m.Expiry,
++		})
++	}
 +	nonce := new(big.Int).SetUint64(e.ownerNo)
 +	auth := e.assertion(agentpolicy.SetMandateChallenge(e.chainID(), arAgent, m, nonce))
 +	data, err := agentpolicy.PackSetMandate(agentpolicy.SetMandateInput{Agent: arAgent, M: m, Nonce: nonce, Auth: auth})
@@ -455,7 +642,40 @@ index 0000000..0a4f168
 +	return data
 +}
 +
++func (e *arEnv) setMandateV2Data(m agentpolicy.IAgentPolicyMandateV2) []byte {
++	nonce := new(big.Int).SetUint64(e.ownerNo)
++	auth := e.assertion(agentpolicy.SetMandateV2Challenge(e.domain(), arAgent, m, nonce))
++	data, err := agentpolicy.PackSetMandateV2(agentpolicy.SetMandateV2Input{Agent: arAgent, M: m, Nonce: nonce, Auth: auth})
++	require.NoError(e.t, err)
++	e.ownerNo++
++	return data
++}
++
++// freezeV2Data is a freeze proof for the agent's current freeze epoch (rule v2). It does not use
++// the owner nonce, so it can be made ahead of time.
++func (e *arEnv) freezeV2Data() []byte {
++	st, err := e.chain.State()
++	require.NoError(e.t, err)
++	epoch := new(big.Int).SetUint64(agentpolicy.FreezeEpoch(st, arAgent))
++	data, err := agentpolicy.PackFreeze(agentpolicy.FreezeInput{Agent: arAgent, Nonce: epoch, Auth: e.assertion(agentpolicy.FreezeChallengeV2(e.domain(), arAgent, epoch))})
++	require.NoError(e.t, err)
++	return data
++}
++
 +func (e *arEnv) freezeData(freeze bool) []byte {
++	if e.v2At(e.nextTime()) {
++		if freeze {
++			return e.freezeV2Data()
++		}
++		st, err := e.chain.State()
++		require.NoError(e.t, err)
++		nonce := new(big.Int).SetUint64(e.ownerNo)
++		epoch := new(big.Int).SetUint64(agentpolicy.FreezeEpoch(st, arAgent))
++		data, err := agentpolicy.PackUnfreeze(agentpolicy.UnfreezeInput{Agent: arAgent, Nonce: nonce, Auth: e.assertion(agentpolicy.UnfreezeChallengeV2(e.domain(), arAgent, nonce, epoch))})
++		require.NoError(e.t, err)
++		e.ownerNo++
++		return data
++	}
 +	nonce := new(big.Int).SetUint64(e.ownerNo)
 +	var data []byte
 +	var err error
@@ -874,9 +1094,17 @@ index 0000000..0a4f168
 +
 +// ---- rule v2 activation (agentRuleV2Config) -----------------------------------------
 +
++// The Avalanche ids the v2 signing domain uses in these tests (a node has them from its snow
++// context; without them, v2 owner proofs are refused).
++var (
++	arNetworkID    uint32 = 12345
++	arBlockchainID        = [32]byte{0x5e, 0xa1, 0xed}
++)
++
 +func arConfigV2At(t uint64) *params.ChainConfig {
 +	c := arConfig()
 +	params.GetExtra(c).GenesisPrecompiles[agentrulev2.ConfigKey] = agentrulev2.NewConfig(utils.PointerTo(t))
++	params.GetExtra(c).SnowCtx = &snow.Context{NetworkID: arNetworkID, ChainID: ids.ID(arBlockchainID)}
 +	return c
 +}
 +
@@ -910,7 +1138,7 @@ index 0000000..0a4f168
 +}
 diff --git a/graft/subnet-evm/core/agent_rule_v2_test.go b/graft/subnet-evm/core/agent_rule_v2_test.go
 new file mode 100644
-index 0000000..cf7680c
+index 0000000..f30b51c
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule_v2_test.go
 @@ -0,0 +1,196 @@
@@ -949,10 +1177,10 @@ index 0000000..cf7680c
 +// invalid, and a payment within the v2 limits goes through.
 +func TestAgentRuleV2ActivationBoundary(t *testing.T) {
 +	e := newArEnvWith(t, arBigMandate(), arConfigV2At(40), dummy.NewCoinbaseFaker())
-+	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil)) // t = 20
-+	e.good(10, e.agentTx2(&arPayee, common.Big1, 30_000, arFiveGwei, nil, nil))      // t = 30, gas 30000 too
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil))                                    // t = 20
++	e.good(10, e.agentTx2(&arPayee, common.Big1, 30_000, arFiveGwei, nil, nil))                                        // t = 30, gas 30000 too
 +	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil)), ErrAgentTipTooHigh) // t = 40
-+	receipts := e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil)) // t = 40
++	receipts := e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil))                       // t = 40
 +	require.Equal(t, types.ReceiptStatusSuccessful, receipts[0].Status)
 +	require.Equal(t, arTransfer, receipts[0].GasUsed)
 +	e.checkInvariant()
@@ -1057,8 +1285,8 @@ index 0000000..cf7680c
 +func TestAgentRuleV2GenesisReplay(t *testing.T) {
 +	cfg := arConfigV2At(40)
 +	e := newArEnvWith(t, arBigMandate(), cfg, dummy.NewCoinbaseFaker())
-+	e.good(10, e.agentTx2(&arPayee, common.Big1, 30_000, arFiveGwei, nil, nil)) // t = 20, v1 only
-+	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil)) // t = 30, v1 only
++	e.good(10, e.agentTx2(&arPayee, common.Big1, 30_000, arFiveGwei, nil, nil))      // t = 20, v1 only
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil))  // t = 30, v1 only
 +	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil)) // t = 40, v2
 +	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil)) // t = 50, v2
 +
@@ -1111,7 +1339,7 @@ index 0000000..cf7680c
 +	require.ErrorIs(t, err, ErrAgentTipTooHigh)
 +}
 diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
-index 415a986..820c494 100644
+index 415a986..7cc1514 100644
 --- a/graft/subnet-evm/core/state_transition.go
 +++ b/graft/subnet-evm/core/state_transition.go
 @@ -33,6 +33,7 @@ import (
@@ -1143,7 +1371,7 @@ index 415a986..820c494 100644
  	}
  	// If baseFee provided, set gasPrice to effectiveGasPrice.
  	if baseFee != nil {
-@@ -168,6 +176,10 @@ type StateTransition struct {
+@@ -168,6 +176,12 @@ type StateTransition struct {
  	initialGas   uint64
  	state        vm.StateDB
  	evm          *vm.EVM
@@ -1151,10 +1379,12 @@ index 415a986..820c494 100644
 +	// agentCharge is set by preCheck when the sender is a registered agent and the
 +	// transaction is inside its mandate (Sealed Arena rule).
 +	agentCharge *big.Int
++	// agentFee is set with agentCharge under rule v2: the maximum fee, for the daily fee counter.
++	agentFee *big.Int
  }
  
  // NewStateTransition initialises and returns a new state transition object.
-@@ -257,6 +269,37 @@ func (st *StateTransition) preCheck() error {
+@@ -257,6 +271,40 @@ func (st *StateTransition) preCheck() error {
  				return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, msg.From)
  			}
  		}
@@ -1187,12 +1417,15 @@ index 415a986..820c494 100644
 +			}
 +			if applies {
 +				st.agentCharge = charge
++				if v2 {
++					st.agentFee = new(big.Int).Mul(new(big.Int).SetUint64(msg.GasLimit), msg.GasFeeCap)
++				}
 +			}
 +		}
  	}
  	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
  	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
-@@ -315,7 +358,16 @@ func (st *StateTransition) preCheck() error {
+@@ -315,7 +363,21 @@ func (st *StateTransition) preCheck() error {
  			}
  		}
  	}
@@ -1204,7 +1437,12 @@ index 415a986..820c494 100644
 +	// happens only for a transaction that is valid and will be part of the block, and
 +	// it is before execution, so a later revert does not undo it.
 +	if st.agentCharge != nil {
-+		return agentpolicy.ChargeSpend(st.state, st.msg.From, st.agentCharge, st.evm.Context.Time)
++		if err := agentpolicy.ChargeSpend(st.state, st.msg.From, st.agentCharge, st.evm.Context.Time); err != nil {
++			return err
++		}
++		if st.agentFee != nil {
++			return agentpolicy.ChargeFee(st.state, st.msg.From, st.agentFee, st.evm.Context.Time)
++		}
 +	}
 +	return nil
  }
@@ -1503,10 +1741,10 @@ index 0000000..6de1051
 +}
 diff --git a/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
 new file mode 100644
-index 0000000..0d2d043
+index 0000000..a935645
 --- /dev/null
 +++ b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
-@@ -0,0 +1,460 @@
+@@ -0,0 +1,473 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package evm
@@ -1737,7 +1975,13 @@ index 0000000..0d2d043
 +	require.NoError(t, err)
 +
 +	x, y := [32]byte(common.BigToHash(e.owner.X)), [32]byte(common.BigToHash(e.owner.Y))
-+	sig, err := crypto.Sign(agentpolicy.RegisterDigest(e.chainID, e.agent, x, y).Bytes(), e.agentKey)
++	// Under rule v2 the agent and the owner sign for this chain's v2 domain (snow context ids).
++	domain := agentpolicy.DomainV2(tvm.vm.ctx.NetworkID, tvm.vm.ctx.ChainID, e.chainID)
++	digest := agentpolicy.RegisterDigest(e.chainID, e.agent, x, y)
++	if v2 {
++		digest = agentpolicy.RegisterDigestV2(domain, e.agent, x, y)
++	}
++	sig, err := crypto.Sign(digest.Bytes(), e.agentKey)
 +	require.NoError(t, err)
 +	regData, err := agentpolicy.PackRegister(agentpolicy.RegisterInput{Agent: e.agent, OwnerX: x, OwnerY: y, AgentSig: sig})
 +	require.NoError(t, err)
@@ -1747,8 +1991,15 @@ index 0000000..0d2d043
 +	m := agentpolicy.IAgentPolicyMandate{
 +		Payees: []common.Address{e.payee}, PerTxCap: daily, DailyCap: daily, Expiry: 4_102_444_800,
 +	}
-+	auth := agentAssertion(t, e.owner, agentpolicy.SetMandateChallenge(e.chainID, e.agent, m, big.NewInt(e.ownerNo)))
-+	mandateData, err := agentpolicy.PackSetMandate(agentpolicy.SetMandateInput{Agent: e.agent, M: m, Nonce: big.NewInt(e.ownerNo), Auth: auth})
++	var mandateData []byte
++	if v2 {
++		m2 := agentpolicy.IAgentPolicyMandateV2{Payees: m.Payees, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap, DailyFeeCap: m.DailyCap, Expiry: m.Expiry}
++		auth := agentAssertion(t, e.owner, agentpolicy.SetMandateV2Challenge(domain, e.agent, m2, big.NewInt(e.ownerNo)))
++		mandateData, err = agentpolicy.PackSetMandateV2(agentpolicy.SetMandateV2Input{Agent: e.agent, M: m2, Nonce: big.NewInt(e.ownerNo), Auth: auth})
++	} else {
++		auth := agentAssertion(t, e.owner, agentpolicy.SetMandateChallenge(e.chainID, e.agent, m, big.NewInt(e.ownerNo)))
++		mandateData, err = agentpolicy.PackSetMandate(agentpolicy.SetMandateInput{Agent: e.agent, M: m, Nonce: big.NewInt(e.ownerNo), Auth: auth})
++	}
 +	require.NoError(t, err)
 +	e.ownerNo++
 +	e.block(e.relayerTx(regData, 300_000), e.relayerTx(mandateData, 1_000_000))
@@ -2016,8 +2267,207 @@ index 0000000..5be8fff
 +func TestAgentPolicyIsAProtectedStateUpgradeAccount(t *testing.T) {
 +	require.Equal(t, []common.Address{ContractAddress}, extras.ProtectedStateUpgradeAccounts)
 +}
+diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/contract.abi b/graft/subnet-evm/precompile/contracts/agentpolicy/contract.abi
+index 9f5189b..e664b90 100644
+--- a/graft/subnet-evm/precompile/contracts/agentpolicy/contract.abi
++++ b/graft/subnet-evm/precompile/contracts/agentpolicy/contract.abi
+@@ -22,6 +22,49 @@
+     "outputs": [],
+     "stateMutability": "nonpayable"
+   },
++  {
++    "type": "function",
++    "name": "freezeEpoch",
++    "inputs": [
++      {
++        "name": "agent",
++        "type": "address",
++        "internalType": "address"
++      }
++    ],
++    "outputs": [
++      {
++        "name": "epoch",
++        "type": "uint256",
++        "internalType": "uint256"
++      }
++    ],
++    "stateMutability": "view"
++  },
++  {
++    "type": "function",
++    "name": "getFeeSpend",
++    "inputs": [
++      {
++        "name": "agent",
++        "type": "address",
++        "internalType": "address"
++      }
++    ],
++    "outputs": [
++      {
++        "name": "feeSpentToday",
++        "type": "uint256",
++        "internalType": "uint256"
++      },
++      {
++        "name": "dayIndex",
++        "type": "uint64",
++        "internalType": "uint64"
++      }
++    ],
++    "stateMutability": "view"
++  },
+   {
+     "type": "function",
+     "name": "getMandate",
+@@ -68,6 +111,62 @@
+     ],
+     "stateMutability": "view"
+   },
++  {
++    "type": "function",
++    "name": "getMandateV2",
++    "inputs": [
++      {
++        "name": "agent",
++        "type": "address",
++        "internalType": "address"
++      }
++    ],
++    "outputs": [
++      {
++        "name": "m",
++        "type": "tuple",
++        "internalType": "struct IAgentPolicy.MandateV2",
++        "components": [
++          {
++            "name": "payees",
++            "type": "address[]",
++            "internalType": "address[]"
++          },
++          {
++            "name": "perTxCap",
++            "type": "uint256",
++            "internalType": "uint256"
++          },
++          {
++            "name": "dailyCap",
++            "type": "uint256",
++            "internalType": "uint256"
++          },
++          {
++            "name": "dailyFeeCap",
++            "type": "uint256",
++            "internalType": "uint256"
++          },
++          {
++            "name": "expiry",
++            "type": "uint64",
++            "internalType": "uint64"
++          }
++        ]
++      },
++      {
++        "name": "feeCapSet",
++        "type": "bool",
++        "internalType": "bool"
++      },
++      {
++        "name": "frozen",
++        "type": "bool",
++        "internalType": "bool"
++      }
++    ],
++    "stateMutability": "view"
++  },
+   {
+     "type": "function",
+     "name": "getSpend",
+@@ -187,6 +286,19 @@
+     "outputs": [],
+     "stateMutability": "nonpayable"
+   },
++  {
++    "type": "function",
++    "name": "ruleVersion",
++    "inputs": [],
++    "outputs": [
++      {
++        "name": "version",
++        "type": "uint256",
++        "internalType": "uint256"
++      }
++    ],
++    "stateMutability": "view"
++  },
+   {
+     "type": "function",
+     "name": "setMandate",
+@@ -237,6 +349,61 @@
+     "outputs": [],
+     "stateMutability": "nonpayable"
+   },
++  {
++    "type": "function",
++    "name": "setMandateV2",
++    "inputs": [
++      {
++        "name": "agent",
++        "type": "address",
++        "internalType": "address"
++      },
++      {
++        "name": "m",
++        "type": "tuple",
++        "internalType": "struct IAgentPolicy.MandateV2",
++        "components": [
++          {
++            "name": "payees",
++            "type": "address[]",
++            "internalType": "address[]"
++          },
++          {
++            "name": "perTxCap",
++            "type": "uint256",
++            "internalType": "uint256"
++          },
++          {
++            "name": "dailyCap",
++            "type": "uint256",
++            "internalType": "uint256"
++          },
++          {
++            "name": "dailyFeeCap",
++            "type": "uint256",
++            "internalType": "uint256"
++          },
++          {
++            "name": "expiry",
++            "type": "uint64",
++            "internalType": "uint64"
++          }
++        ]
++      },
++      {
++        "name": "nonce",
++        "type": "uint256",
++        "internalType": "uint256"
++      },
++      {
++        "name": "auth",
++        "type": "bytes",
++        "internalType": "bytes"
++      }
++    ],
++    "outputs": [],
++    "stateMutability": "nonpayable"
++  },
+   {
+     "type": "function",
+     "name": "unfreeze",
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/contract.go b/graft/subnet-evm/precompile/contracts/agentpolicy/contract.go
-index 2d68499..ec89f9d 100644
+index 2d68499..616a034 100644
 --- a/graft/subnet-evm/precompile/contracts/agentpolicy/contract.go
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/contract.go
 @@ -66,6 +66,9 @@ type IAgentPolicyMandate struct {
@@ -2030,10 +2480,69 @@ index 2d68499..ec89f9d 100644
  type FreezeInput struct {
  	Agent common.Address
  	Nonce *big.Int
+@@ -581,6 +584,14 @@ func createAgentPolicyPrecompile() contract.StatefulPrecompiledContract {
+ 		}
+ 		functions = append(functions, contract.NewStatefulPrecompileFunction(method.ID, function))
+ 	}
++	// Sealed Arena rule v2: functions that exist only once agent rule v2 is active.
++	for name, function := range v2Functions {
++		method, ok := AgentPolicyABI.Methods[name]
++		if !ok {
++			panic(fmt.Errorf("given method (%s) does not exist in the ABI", name))
++		}
++		functions = append(functions, contract.NewStatefulPrecompileFunctionWithActivator(method.ID, function, v2Only))
++	}
+ 	// Construct the contract with no fallback function.
+ 	statefulContract, err := contract.NewStatefulPrecompileContract(nil, functions)
+ 	if err != nil {
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
-index 225e4fa..6b9a4fc 100644
+index 225e4fa..2634d01 100644
 --- a/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/contract_test.go
+@@ -42,8 +42,8 @@ func (*testState) GetPredicate(common.Address, int) (predicate.Predicate, bool)
+ 
+ type testBlock struct{ ts uint64 }
+ 
+-func (b testBlock) Number() *big.Int                                        { return big.NewInt(1) }
+-func (b testBlock) Timestamp() uint64                                       { return b.ts }
++func (b testBlock) Number() *big.Int                                       { return big.NewInt(1) }
++func (b testBlock) Timestamp() uint64                                      { return b.ts }
+ func (testBlock) GetPredicateResults(common.Hash, common.Address) set.Bits { return set.Bits{} }
+ 
+ type testEnv struct {
+@@ -52,11 +52,11 @@ type testEnv struct {
+ 	chainID *big.Int
+ }
+ 
+-func (e *testEnv) GetStateDB() contract.StateDB          { return e.db }
++func (e *testEnv) GetStateDB() contract.StateDB           { return e.db }
+ func (e *testEnv) GetBlockContext() contract.BlockContext { return testBlock{e.ts} }
+-func (*testEnv) GetSnowContext() *snow.Context           { return nil }
+-func (*testEnv) GetRules() precompileconfig.Rules        { return extras.AvalancheRules{} }
+-func (e *testEnv) EVMChainID() *big.Int                  { return e.chainID }
++func (*testEnv) GetSnowContext() *snow.Context            { return nil }
++func (*testEnv) GetRules() precompileconfig.Rules         { return extras.AvalancheRules{} }
++func (e *testEnv) EVMChainID() *big.Int                   { return e.chainID }
+ 
+ func newEnv(t *testing.T, chainID *big.Int) *testEnv {
+ 	t.Helper()
+@@ -85,11 +85,11 @@ type assertionJSON struct {
+ }
+ 
+ type vectorFile struct {
+-	ChainID    string                       `json:"chainId"`
+-	Agent      common.Address               `json:"agent"`
+-	OtherAgent common.Address               `json:"otherAgent"`
+-	Owner      struct{ X, Y string }        `json:"owner"`
+-	OtherOwner struct{ X, Y string }        `json:"otherOwner"`
++	ChainID    string                                           `json:"chainId"`
++	Agent      common.Address                                   `json:"agent"`
++	OtherAgent common.Address                                   `json:"otherAgent"`
++	Owner      struct{ X, Y string }                            `json:"owner"`
++	OtherOwner struct{ X, Y string }                            `json:"otherOwner"`
+ 	Register   struct{ Digest, AgentSig, OtherAgentSig string } `json:"register"`
+ 	Mandate    struct {
+ 		Payees   []common.Address `json:"payees"`
 @@ -694,3 +694,13 @@ func TestAgentPolicyNonCanonicalAuth(t *testing.T) {
  	require.ErrorIs(t, err, ErrBadAuthEncoding)
  	require.Equal(t, uint64(0), ownerNonceOf(t, e, v.Agent))
@@ -2048,11 +2557,139 @@ index 225e4fa..6b9a4fc 100644
 +	require.Equal(t, 0, SpendForDay(e.db, agent, 100).TotalCharged.Cmp(maxU256), "nothing written on overflow")
 +	require.ErrorIs(t, ChargeSpend(e.db, agent, big.NewInt(-1), 100), ErrCounterOverflow)
 +}
+diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/logic.go b/graft/subnet-evm/precompile/contracts/agentpolicy/logic.go
+index 716a513..4928ad0 100644
+--- a/graft/subnet-evm/precompile/contracts/agentpolicy/logic.go
++++ b/graft/subnet-evm/precompile/contracts/agentpolicy/logic.go
+@@ -68,11 +68,21 @@ func doRegister(as contract.AccessibleState, remainingGas *uint64, in RegisterIn
+ 	if !validOwnerKey(in.OwnerX, in.OwnerY) {
+ 		return ErrBadOwnerKey
+ 	}
+-	chainID, err := evmChainID(as)
+-	if err != nil {
+-		return err
++	digest := common.Hash{}
++	if isV2(st) {
++		domain, err := domainV2(as)
++		if err != nil {
++			return err
++		}
++		digest = RegisterDigestV2(domain, in.Agent, in.OwnerX, in.OwnerY)
++	} else {
++		chainID, err := evmChainID(as)
++		if err != nil {
++			return err
++		}
++		digest = RegisterDigest(chainID, in.Agent, in.OwnerX, in.OwnerY)
+ 	}
+-	if err := verifyAgentSignature(in.Agent, RegisterDigest(chainID, in.Agent, in.OwnerX, in.OwnerY), in.AgentSig); err != nil {
++	if err := verifyAgentSignature(in.Agent, digest, in.AgentSig); err != nil {
+ 		return err
+ 	}
+ 	data := AgentRegisteredEventData{OwnerX: in.OwnerX, OwnerY: in.OwnerY}
+@@ -120,6 +130,9 @@ func bumpNonce(st contract.StateDB, agent common.Address, current uint64) {
+ }
+ 
+ func doSetMandate(as contract.AccessibleState, remainingGas *uint64, in SetMandateInput) error {
++	if isV2(as.GetStateDB()) {
++		return ErrUseSetMandateV2
++	}
+ 	if len(in.M.Payees) > MaxPayees {
+ 		return ErrTooManyPayees
+ 	}
+@@ -162,6 +175,12 @@ func doSetMandate(as contract.AccessibleState, remainingGas *uint64, in SetManda
+ }
+ 
+ func doToggleFreeze(as contract.AccessibleState, remainingGas *uint64, agent common.Address, nonce *big.Int, auth []byte, freeze bool) error {
++	if isV2(as.GetStateDB()) {
++		if freeze {
++			return doFreezeV2(as, remainingGas, agent, nonce, auth) // the uint256 is the freeze epoch
++		}
++		return doUnfreezeV2(as, remainingGas, agent, nonce, auth)
++	}
+ 	chainID, err := evmChainID(as)
+ 	if err != nil {
+ 		return err
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
-index 8ac7ba6..d0a2acb 100644
+index 8ac7ba6..23a886e 100644
 --- a/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
 +++ b/graft/subnet-evm/precompile/contracts/agentpolicy/storage.go
-@@ -180,9 +180,35 @@ func SpendForDay(s contract.StateReader, agent common.Address, timestamp uint64)
+@@ -29,11 +29,18 @@ const (
+ 	fieldDayIndex     byte = 10
+ 	fieldTotalCharged byte = 11
+ 	fieldPayee        byte = 12 // followed by a 1-byte index
++
++	// Rule v2 (agent rule v2 active).
++	fieldDailyFeeCap   byte = 13
++	fieldFeeSpentToday byte = 14
++	fieldFeeDayIndex   byte = 15
++	fieldFreezeEpoch   byte = 16
+ )
+ 
+ const (
+ 	flagRegistered uint64 = 1 << 0
+ 	flagFrozen     uint64 = 1 << 1
++	flagFeeCapSet  uint64 = 1 << 3 // the mandate was set with setMandateV2 (it has a daily fee cap)
+ 
+ 	// MaxPayees is the largest payee list a mandate may hold.
+ 	MaxPayees = 16
+@@ -87,6 +94,38 @@ type Mandate struct {
+ 	PerTxCap *big.Int
+ 	DailyCap *big.Int
+ 	Expiry   uint64
++
++	// Rule v2: a daily cap on the fees the agent may pay, counted at the maximum
++	// (gas limit x fee cap). FeeCapSet is false for a mandate set before rule v2
++	// (setMandate); then only DailyCap limits fees, as in v1.
++	DailyFeeCap *big.Int
++	FeeCapSet   bool
++}
++
++// FeeSpendForDay returns the fees counted for the agent on the UTC day of `timestamp`
++// (zero on a new day).
++func FeeSpendForDay(s contract.StateReader, agent common.Address, timestamp uint64) *big.Int {
++	if getUint64(s, agent, fieldFeeDayIndex) != timestamp/86400 {
++		return new(big.Int)
++	}
++	return getBig(s, agent, fieldFeeSpentToday)
++}
++
++// ChargeFee adds `fee` to the agent's fee counter for the UTC day of `timestamp` (rule v2).
++func ChargeFee(s StateReadWriter, agent common.Address, fee *big.Int, timestamp uint64) error {
++	spent := new(big.Int).Add(FeeSpendForDay(s, agent, timestamp), fee)
++	if fee.Sign() < 0 || spent.BitLen() > 256 {
++		return ErrCounterOverflow
++	}
++	setBig(s, agent, fieldFeeSpentToday, spent)
++	setUint64(s, agent, fieldFeeDayIndex, timestamp/86400)
++	return nil
++}
++
++// FreezeEpoch returns the agent's freeze epoch (rule v2): a freeze proof is for one epoch, and
++// each unfreeze moves to the next.
++func FreezeEpoch(s contract.StateReader, agent common.Address) uint64 {
++	return getUint64(s, agent, fieldFreezeEpoch)
+ }
+ 
+ // Spend is the spend counter of one agent.
+@@ -124,10 +163,12 @@ func readMandate(s contract.StateReader, agent common.Address) Mandate {
+ 		payees[i] = common.BytesToAddress(getWord(s, agent, fieldPayee, byte(i)).Bytes())
+ 	}
+ 	return Mandate{
+-		Payees:   payees,
+-		PerTxCap: getBig(s, agent, fieldPerTxCap),
+-		DailyCap: getBig(s, agent, fieldDailyCap),
+-		Expiry:   getUint64(s, agent, fieldExpiry),
++		DailyFeeCap: getBig(s, agent, fieldDailyFeeCap),
++		FeeCapSet:   getUint64(s, agent, fieldFlags)&flagFeeCapSet != 0,
++		Payees:      payees,
++		PerTxCap:    getBig(s, agent, fieldPerTxCap),
++		DailyCap:    getBig(s, agent, fieldDailyCap),
++		Expiry:      getUint64(s, agent, fieldExpiry),
+ 	}
+ }
+ 
+@@ -180,9 +221,41 @@ func SpendForDay(s contract.StateReader, agent common.Address, timestamp uint64)
  // ChargeSpend adds `charge` to the agent's spend counters at `timestamp`
  // (spentToday resets when the UTC day changes; totalCharged never resets).
  // Callers must check the mandate first; this function only records.
@@ -2090,7 +2727,470 @@ index 8ac7ba6..d0a2acb 100644
 +// SetRuleVersion writes the rule version (called at rule v2 activation only).
 +func SetRuleVersion(s contract.StateDB, v uint64) {
 +	s.SetState(ContractAddress, ruleVersionKey, common.BigToHash(new(big.Int).SetUint64(v)))
++}
++
++// writeFeeCap records the daily fee cap of a v2 mandate (setMandateV2).
++func writeFeeCap(s StateReadWriter, agent common.Address, feeCap *big.Int) {
++	setBig(s, agent, fieldDailyFeeCap, feeCap)
++	setFlag(s, agent, flagFeeCapSet, true)
  }
+diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/v2.go b/graft/subnet-evm/precompile/contracts/agentpolicy/v2.go
+new file mode 100644
+index 0000000..7d5c5da
+--- /dev/null
++++ b/graft/subnet-evm/precompile/contracts/agentpolicy/v2.go
+@@ -0,0 +1,369 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package agentpolicy
++
++import (
++	"errors"
++	"math/big"
++
++	"github.com/ava-labs/libevm/accounts/abi"
++	"github.com/ava-labs/libevm/common"
++	"github.com/ava-labs/libevm/core/vm"
++	"github.com/ava-labs/libevm/crypto"
++
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
++)
++
++// Rule v2 (activated by agentRuleV2Config): owner proofs are bound to this chain's Avalanche
++// network and blockchain ids, mandates carry a daily fee cap, and freeze proofs are for a freeze
++// epoch so the owner can sign one ahead of time.
++
++var (
++	ErrNoBlockchainID   = errors.New("agentpolicy: blockchain id unavailable")
++	ErrUseSetMandateV2  = errors.New("agentpolicy: setMandate is replaced by setMandateV2 under rule v2")
++	ErrBadFreezeEpoch   = errors.New("agentpolicy: freeze epoch does not match")
++	ErrEpochExhausted   = errors.New("agentpolicy: freeze epoch exhausted")
++	ErrFeeCapAboveDaily = errors.New("agentpolicy: dailyFeeCap greater than dailyCap")
++)
++
++const (
++	SetMandateV2GasCost uint64 = 500000
++	GetMandateV2GasCost uint64 = 30000
++	GetFeeSpendGasCost  uint64 = 5000
++	FreezeEpochGasCost  uint64 = 2000
++	RuleVersionGasCost  uint64 = 2000
++)
++
++// IAgentPolicyMandateV2 is the mandate of rule v2.
++type IAgentPolicyMandateV2 struct {
++	Payees      []common.Address
++	PerTxCap    *big.Int
++	DailyCap    *big.Int
++	DailyFeeCap *big.Int
++	Expiry      uint64
++}
++
++type SetMandateV2Input struct {
++	Agent common.Address
++	M     IAgentPolicyMandateV2
++	Nonce *big.Int
++	Auth  []byte
++}
++
++type GetMandateV2Output struct {
++	M         IAgentPolicyMandateV2
++	FeeCapSet bool
++	Frozen    bool
++}
++
++type GetFeeSpendOutput struct {
++	FeeSpentToday *big.Int
++	DayIndex      uint64
++}
++
++var tMandateV2, _ = abi.NewType("tuple", "", []abi.ArgumentMarshaling{
++	{Name: "payees", Type: "address[]"},
++	{Name: "perTxCap", Type: "uint256"},
++	{Name: "dailyCap", Type: "uint256"},
++	{Name: "dailyFeeCap", Type: "uint256"},
++	{Name: "expiry", Type: "uint64"},
++})
++
++// isV2 reports whether rule v2 is active (the marker agentrulev2 writes at activation).
++func isV2(s contract.StateReader) bool { return RuleVersion(s) >= 2 }
++
++// v2Only activates the v2 functions; before rule v2 their selectors behave as unknown ones.
++func v2Only(as contract.AccessibleState) bool { return isV2(as.GetStateDB()) }
++
++// snowIDsProvider lets tests supply the Avalanche ids without a snow context.
++type snowIDsProvider interface {
++	SnowIDs() (networkID uint32, blockchainID [32]byte)
++}
++
++// DomainV2 binds owner proofs to one chain: keccak256(abi.encode("SealedArena.AgentPolicy.v2",
++// networkID, blockchainID, evmChainID, AgentPolicy address)). The local network and the Sealed L1
++// on Fuji share the EVM chain id but not the blockchain id.
++func DomainV2(networkID uint32, blockchainID [32]byte, evmChainID *big.Int) common.Hash {
++	return crypto.Keccak256Hash(mustPack(
++		abi.Arguments{{Type: tString}, {Type: tUint256}, {Type: tBytes32}, {Type: tUint256}, {Type: tAddress}},
++		"SealedArena.AgentPolicy.v2", new(big.Int).SetUint64(uint64(networkID)), blockchainID, evmChainID, ContractAddress,
++	))
++}
++
++func domainV2(as contract.AccessibleState) (common.Hash, error) {
++	chainID, err := evmChainID(as)
++	if err != nil {
++		return common.Hash{}, err
++	}
++	if p, ok := as.(snowIDsProvider); ok {
++		n, id := p.SnowIDs()
++		return DomainV2(n, id, chainID), nil
++	}
++	ctx := as.GetSnowContext()
++	if ctx == nil || ctx.ChainID == ([32]byte{}) {
++		return common.Hash{}, ErrNoBlockchainID // fail closed
++	}
++	return DomainV2(ctx.NetworkID, ctx.ChainID, chainID), nil
++}
++
++// RegisterDigestV2 is what the agent key signs to register under rule v2.
++func RegisterDigestV2(domain common.Hash, agent common.Address, ownerX, ownerY [32]byte) common.Hash {
++	return crypto.Keccak256Hash(mustPack(
++		abi.Arguments{{Type: tString}, {Type: tBytes32}, {Type: tAddress}, {Type: tBytes32}, {Type: tBytes32}},
++		"SealedArena:register", [32]byte(domain), agent, ownerX, ownerY,
++	))
++}
++
++// MandateV2Hash is keccak256(abi.encode(m)).
++func MandateV2Hash(m IAgentPolicyMandateV2) common.Hash {
++	return crypto.Keccak256Hash(mustPack(abi.Arguments{{Type: tMandateV2}}, m))
++}
++
++// SetMandateV2Challenge is what the owner signs to set a v2 mandate.
++func SetMandateV2Challenge(domain common.Hash, agent common.Address, m IAgentPolicyMandateV2, nonce *big.Int) common.Hash {
++	return crypto.Keccak256Hash(mustPack(
++		abi.Arguments{{Type: tString}, {Type: tBytes32}, {Type: tAddress}, {Type: tBytes32}, {Type: tUint256}},
++		"SealedArena:setMandate", [32]byte(domain), agent, [32]byte(MandateV2Hash(m)), nonce,
++	))
++}
++
++// FreezeChallengeV2 is what the owner signs to freeze the agent during `epoch`. It does not
++// involve the owner nonce, so it can be signed ahead of time and stays valid until an unfreeze.
++func FreezeChallengeV2(domain common.Hash, agent common.Address, epoch *big.Int) common.Hash {
++	return crypto.Keccak256Hash(mustPack(
++		abi.Arguments{{Type: tString}, {Type: tBytes32}, {Type: tAddress}, {Type: tUint256}},
++		"SealedArena:freeze", [32]byte(domain), agent, epoch,
++	))
++}
++
++// UnfreezeChallengeV2 is what the owner signs to unfreeze; it uses the owner nonce and the epoch.
++func UnfreezeChallengeV2(domain common.Hash, agent common.Address, nonce, epoch *big.Int) common.Hash {
++	return crypto.Keccak256Hash(mustPack(
++		abi.Arguments{{Type: tString}, {Type: tBytes32}, {Type: tAddress}, {Type: tUint256}, {Type: tUint256}},
++		"SealedArena:unfreeze", [32]byte(domain), agent, nonce, epoch,
++	))
++}
++
++func doSetMandateV2(as contract.AccessibleState, remainingGas *uint64, in SetMandateV2Input) error {
++	if len(in.M.Payees) > MaxPayees {
++		return ErrTooManyPayees
++	}
++	if in.M.PerTxCap == nil || in.M.DailyCap == nil || in.M.DailyFeeCap == nil || in.M.PerTxCap.Cmp(in.M.DailyCap) > 0 {
++		return ErrPerTxAboveDaily
++	}
++	if in.M.DailyFeeCap.Cmp(in.M.DailyCap) > 0 {
++		return ErrFeeCapAboveDaily
++	}
++	domain, err := domainV2(as)
++	if err != nil {
++		return err
++	}
++	st := as.GetStateDB()
++	current, err := checkOwner(st, in.Agent, in.Nonce, in.Auth, SetMandateV2Challenge(domain, in.Agent, in.M, in.Nonce))
++	if err != nil {
++		return err
++	}
++	data := MandateSetEventData{
++		PerTxCap:   in.M.PerTxCap,
++		DailyCap:   in.M.DailyCap,
++		Expiry:     in.M.Expiry,
++		PayeeCount: big.NewInt(int64(len(in.M.Payees))),
++	}
++	topics, packed, err := PackMandateSetEvent(in.Agent, data)
++	if err != nil {
++		return err
++	}
++	ev := event{GetMandateSetEventGasCost(data), topics, packed}
++	if err := chargeEvent(remainingGas, ev); err != nil {
++		return err
++	}
++
++	bumpNonce(st, in.Agent, current)
++	writeMandate(st, in.Agent, Mandate{Payees: in.M.Payees, PerTxCap: in.M.PerTxCap, DailyCap: in.M.DailyCap, Expiry: in.M.Expiry})
++	writeFeeCap(st, in.Agent, in.M.DailyFeeCap)
++	addLog(as, ev)
++	return nil
++}
++
++// doFreezeV2: valid iff `epoch` is the agent's current freeze epoch and the owner signed it. It
++// does not use or change the owner nonce. Freezing a frozen agent succeeds without a change.
++func doFreezeV2(as contract.AccessibleState, remainingGas *uint64, agent common.Address, epoch *big.Int, auth []byte) error {
++	domain, err := domainV2(as)
++	if err != nil {
++		return err
++	}
++	st := as.GetStateDB()
++	if !isRegistered(st, agent) {
++		return ErrNotRegistered
++	}
++	if epoch == nil || !epoch.IsUint64() || epoch.Uint64() != FreezeEpoch(st, agent) {
++		return ErrBadFreezeEpoch
++	}
++	x := [32]byte(getWord(st, agent, fieldOwnerX))
++	y := [32]byte(getWord(st, agent, fieldOwnerY))
++	if err := VerifyWebAuthn(auth, FreezeChallengeV2(domain, agent, epoch), x, y); err != nil {
++		return err
++	}
++	if isFrozen(st, agent) {
++		return nil
++	}
++	topics, packed, err := PackFrozenEvent(agent)
++	if err != nil {
++		return err
++	}
++	ev := event{GetFrozenEventGasCost(), topics, packed}
++	if err := chargeEvent(remainingGas, ev); err != nil {
++		return err
++	}
++	setFlag(st, agent, flagFrozen, true)
++	addLog(as, ev)
++	return nil
++}
++
++// doUnfreezeV2 checks the owner nonce and the epoch, then moves both on, so an earlier freeze
++// proof cannot be replayed after the owner unfreezes.
++func doUnfreezeV2(as contract.AccessibleState, remainingGas *uint64, agent common.Address, nonce *big.Int, auth []byte) error {
++	domain, err := domainV2(as)
++	if err != nil {
++		return err
++	}
++	st := as.GetStateDB()
++	epoch := FreezeEpoch(st, agent)
++	if epoch == ^uint64(0) {
++		return ErrEpochExhausted
++	}
++	current, err := checkOwner(st, agent, nonce, auth, UnfreezeChallengeV2(domain, agent, nonce, new(big.Int).SetUint64(epoch)))
++	if err != nil {
++		return err
++	}
++	topics, packed, err := PackUnfrozenEvent(agent)
++	if err != nil {
++		return err
++	}
++	ev := event{GetUnfrozenEventGasCost(), topics, packed}
++	if err := chargeEvent(remainingGas, ev); err != nil {
++		return err
++	}
++	bumpNonce(st, agent, current)
++	setUint64(st, agent, fieldFreezeEpoch, epoch+1)
++	setFlag(st, agent, flagFrozen, false)
++	addLog(as, ev)
++	return nil
++}
++
++// ---- ABI functions ----------------------------------------------------------------------
++
++func PackSetMandateV2(in SetMandateV2Input) ([]byte, error) {
++	return AgentPolicyABI.Pack("setMandateV2", in.Agent, in.M, in.Nonce, in.Auth)
++}
++
++func UnpackSetMandateV2Input(input []byte) (SetMandateV2Input, error) {
++	in := SetMandateV2Input{}
++	err := AgentPolicyABI.UnpackInputIntoInterface(&in, "setMandateV2", input)
++	return in, err
++}
++
++func setMandateV2(as contract.AccessibleState, _ common.Address, _ common.Address, input []byte, suppliedGas uint64, readOnly bool) ([]byte, uint64, error) {
++	remainingGas, err := contract.DeductGas(suppliedGas, SetMandateV2GasCost)
++	if err != nil {
++		return nil, 0, err
++	}
++	if readOnly {
++		return nil, remainingGas, vm.ErrWriteProtection
++	}
++	in, err := UnpackSetMandateV2Input(input)
++	if err != nil {
++		return nil, remainingGas, err
++	}
++	if err := doSetMandateV2(as, &remainingGas, in); err != nil {
++		return nil, remainingGas, err
++	}
++	return []byte{}, remainingGas, nil
++}
++
++func PackGetMandateV2(agent common.Address) ([]byte, error) {
++	return AgentPolicyABI.Pack("getMandateV2", agent)
++}
++
++func UnpackGetMandateV2Output(output []byte) (GetMandateV2Output, error) {
++	out := GetMandateV2Output{}
++	err := AgentPolicyABI.UnpackIntoInterface(&out, "getMandateV2", output)
++	return out, err
++}
++
++func getMandateV2(as contract.AccessibleState, _ common.Address, _ common.Address, input []byte, suppliedGas uint64, _ bool) ([]byte, uint64, error) {
++	remainingGas, err := contract.DeductGas(suppliedGas, GetMandateV2GasCost)
++	if err != nil {
++		return nil, 0, err
++	}
++	agent, err := UnpackGetMandateInput(input)
++	if err != nil {
++		return nil, remainingGas, err
++	}
++	registered, m, frozen, _ := GetMandateForRule(as.GetStateDB(), agent)
++	out := GetMandateV2Output{M: IAgentPolicyMandateV2{Payees: []common.Address{}, PerTxCap: new(big.Int), DailyCap: new(big.Int), DailyFeeCap: new(big.Int)}}
++	if registered {
++		out = GetMandateV2Output{
++			M:         IAgentPolicyMandateV2{Payees: m.Payees, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap, DailyFeeCap: m.DailyFeeCap, Expiry: m.Expiry},
++			FeeCapSet: m.FeeCapSet,
++			Frozen:    frozen,
++		}
++	}
++	packed, err := AgentPolicyABI.PackOutput("getMandateV2", out.M, out.FeeCapSet, out.Frozen)
++	return packed, remainingGas, err
++}
++
++func PackGetFeeSpend(agent common.Address) ([]byte, error) {
++	return AgentPolicyABI.Pack("getFeeSpend", agent)
++}
++
++func getFeeSpend(as contract.AccessibleState, _ common.Address, _ common.Address, input []byte, suppliedGas uint64, _ bool) ([]byte, uint64, error) {
++	remainingGas, err := contract.DeductGas(suppliedGas, GetFeeSpendGasCost)
++	if err != nil {
++		return nil, 0, err
++	}
++	agent, err := UnpackGetMandateInput(input)
++	if err != nil {
++		return nil, remainingGas, err
++	}
++	ts := as.GetBlockContext().Timestamp()
++	packed, err := AgentPolicyABI.PackOutput("getFeeSpend", FeeSpendForDay(as.GetStateDB(), agent, ts), ts/86400)
++	return packed, remainingGas, err
++}
++
++func PackFreezeEpoch(agent common.Address) ([]byte, error) {
++	return AgentPolicyABI.Pack("freezeEpoch", agent)
++}
++
++func freezeEpoch(as contract.AccessibleState, _ common.Address, _ common.Address, input []byte, suppliedGas uint64, _ bool) ([]byte, uint64, error) {
++	remainingGas, err := contract.DeductGas(suppliedGas, FreezeEpochGasCost)
++	if err != nil {
++		return nil, 0, err
++	}
++	agent, err := UnpackGetMandateInput(input)
++	if err != nil {
++		return nil, remainingGas, err
++	}
++	packed, err := AgentPolicyABI.PackOutput("freezeEpoch", new(big.Int).SetUint64(FreezeEpoch(as.GetStateDB(), agent)))
++	return packed, remainingGas, err
++}
++
++func PackRuleVersion() ([]byte, error) { return AgentPolicyABI.Pack("ruleVersion") }
++
++func ruleVersion(as contract.AccessibleState, _ common.Address, _ common.Address, _ []byte, suppliedGas uint64, _ bool) ([]byte, uint64, error) {
++	remainingGas, err := contract.DeductGas(suppliedGas, RuleVersionGasCost)
++	if err != nil {
++		return nil, 0, err
++	}
++	packed, err := AgentPolicyABI.PackOutput("ruleVersion", new(big.Int).SetUint64(RuleVersion(as.GetStateDB())))
++	return packed, remainingGas, err
++}
++
++// v2Functions are added to the precompile, active only under rule v2.
++var v2Functions = map[string]contract.RunStatefulPrecompileFunc{
++	"setMandateV2": setMandateV2,
++	"getMandateV2": getMandateV2,
++	"getFeeSpend":  getFeeSpend,
++	"freezeEpoch":  freezeEpoch,
++	"ruleVersion":  ruleVersion,
++}
+diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/v2_vectors_test.go b/graft/subnet-evm/precompile/contracts/agentpolicy/v2_vectors_test.go
+new file mode 100644
+index 0000000..77fcb9e
+--- /dev/null
++++ b/graft/subnet-evm/precompile/contracts/agentpolicy/v2_vectors_test.go
+@@ -0,0 +1,76 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package agentpolicy
++
++import (
++	"encoding/json"
++	"math/big"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/ava-labs/libevm/common"
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/ids"
++)
++
++// The rule v2 digests computed here match those computed by packages/shared (TypeScript) for the
++// same inputs (chain/testvectors/agentpolicy-v2.json), so the console and the precompile agree.
++func TestAgentPolicyV2DigestsMatchTypeScript(t *testing.T) {
++	path := os.Getenv("SEALED_TESTVECTORS")
++	require.NotEmpty(t, path, "chain/scripts/test.sh sets SEALED_TESTVECTORS")
++	raw, err := os.ReadFile(filepath.Join(filepath.Dir(path), "agentpolicy-v2.json"))
++	require.NoError(t, err)
++	var v struct {
++		Input struct {
++			NetworkID    uint32 `json:"networkId"`
++			BlockchainID string `json:"blockchainId"`
++			ChainID      string `json:"chainId"`
++			Agent        string `json:"agent"`
++			OwnerX       string `json:"ownerX"`
++			OwnerY       string `json:"ownerY"`
++			Mandate      struct {
++				Payees      []string `json:"payees"`
++				PerTxCap    string   `json:"perTxCap"`
++				DailyCap    string   `json:"dailyCap"`
++				DailyFeeCap string   `json:"dailyFeeCap"`
++				Expiry      string   `json:"expiry"`
++			} `json:"mandate"`
++			Nonce string `json:"nonce"`
++			Epoch string `json:"epoch"`
++		} `json:"input"`
++		Domain, Register, MandateHash, SetMandate, Freeze, Unfreeze string
++		Cb58                                                        struct {
++			ID  string `json:"id"`
++			Hex string `json:"hex"`
++		} `json:"cb58"`
++	}
++	require.NoError(t, json.Unmarshal(raw, &v))
++	n := func(s string) *big.Int {
++		x, ok := new(big.Int).SetString(s, 10)
++		require.True(t, ok, s)
++		return x
++	}
++	in := v.Input
++	chainID := n(in.ChainID)
++	agent := common.HexToAddress(in.Agent)
++	m := IAgentPolicyMandateV2{
++		PerTxCap: n(in.Mandate.PerTxCap), DailyCap: n(in.Mandate.DailyCap),
++		DailyFeeCap: n(in.Mandate.DailyFeeCap), Expiry: n(in.Mandate.Expiry).Uint64(),
++	}
++	for _, p := range in.Mandate.Payees {
++		m.Payees = append(m.Payees, common.HexToAddress(p))
++	}
++	domain := DomainV2(in.NetworkID, [32]byte(common.HexToHash(in.BlockchainID)), chainID)
++	require.Equal(t, v.Domain, domain.Hex())
++	require.Equal(t, v.Register, RegisterDigestV2(domain, agent, [32]byte(common.HexToHash(in.OwnerX)), [32]byte(common.HexToHash(in.OwnerY))).Hex())
++	require.Equal(t, v.MandateHash, MandateV2Hash(m).Hex())
++	require.Equal(t, v.SetMandate, SetMandateV2Challenge(domain, agent, m, n(in.Nonce)).Hex())
++	require.Equal(t, v.Freeze, FreezeChallengeV2(domain, agent, n(in.Epoch)).Hex())
++	require.Equal(t, v.Unfreeze, UnfreezeChallengeV2(domain, agent, n(in.Nonce), n(in.Epoch)).Hex())
++
++	id, err := ids.FromString(v.Cb58.ID)
++	require.NoError(t, err)
++	require.Equal(t, v.Cb58.Hex, common.Hash(id).Hex())
++}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go b/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
 index 95a5767..a939043 100644
 --- a/graft/subnet-evm/precompile/contracts/agentpolicy/webauthn.go
