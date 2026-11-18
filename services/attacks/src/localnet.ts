@@ -207,10 +207,11 @@ export async function registerAgent(n: Node, agent: PrivateKeyAccount): Promise<
   });
 }
 
-export async function setMandate(n: Node, agent: Address, m: Mandate): Promise<void> {
+/** Sets the agent's mandate with the owner key; returns the transaction hash. */
+export async function setMandate(n: Node, agent: Address, m: Mandate): Promise<Hex> {
   const nonce = await readPolicy.ownerNonce(n, agent);
   const auth = ownerProof(setMandateChallenge(BigInt(CHAIN_ID), agent, m, nonce));
-  await sendAndWait(n, accounts.relayer, {
+  return sendAndWait(n, accounts.relayer, {
     to: AGENT_POLICY_ADDRESS,
     data: encodeFunctionData({
       abi: agentPolicyAbi,

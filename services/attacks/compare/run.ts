@@ -361,7 +361,7 @@ async function cleanUp(
   waiting: Hex[],
 ) {
   const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600);
-  await sealed.setMandate(n, agent.address, {
+  const widenTx = await sealed.setMandate(n, agent.address, {
     payees: [SELLER],
     perTxCap: parseEther("100"),
     dailyCap: parseEther("100"),
@@ -389,7 +389,7 @@ async function cleanUp(
   }
   return {
     note: "After the measurement the run cleaned up: the suite owner key widened the mandate, so the payments still waiting in the pool were included, and the rest of the balance went back to the same team-held seller. The numbers above are from before the mandate was widened.",
-    mandateWidened: { block: widenedAt, tx: null },
+    mandateWidened: { block: widenedAt, tx: widenTx },
     waitingIncluded: {
       block: included[0] ? Number(included[0].blockNumber) : null,
       count: included.length,
@@ -398,6 +398,27 @@ async function cleanUp(
     },
     leftoverReturned: leftover,
   };
+}
+
+/**
+ * Appends a new agent key to COMPARE_AGENT_KEYS_FILE, or to the repository's .env (git-ignored),
+ * as its own variable with the time and address in its name and a comment.
+ */
+function keepAgentKey(key: Hex) {
+  const file = process.env.COMPARE_AGENT_KEYS_FILE || resolve(ROOT, ".env");
+  if (!existsSync(file)) {
+    console.log("compare: no .env to keep the agent key in; its test USDC cannot be recovered");
+    return;
+  }
+  const at = new Date()
+    .toISOString()
+    .replace(/[-:.TZ]/g, "")
+    .slice(0, 14);
+  const address = privateKeyToAccount(key).address;
+  appendFileSync(
+    file,
+    `\n# compare run-s agent ${address} (${new Date().toISOString()})\nFUJI_COMPARE_S_AGENT_${at}_PRIVATE_KEY=${key}\n`,
+  );
 }
 
 /** S: a fresh agent on the Sealed L1 (not the challenge agent); same caps, same payment burst. */
@@ -410,15 +431,10 @@ async function runS() {
   // that pool check accepts payments the cap later keeps out of blocks; there the balance has to
   // cover all 20, or the pool refuses for insufficient funds and the run measures the balance.)
   const funding = parseEther(CAPS.daily) * 2n;
-  // The key is kept outside the repository (the team's local notes), so the test USDC on this
-  // agent can be recovered if the run stops before its clean-up.
+  // The key is kept with the other keys (.env, not in git; or COMPARE_AGENT_KEYS_FILE), so the
+  // test USDC on this agent can be recovered if the run stops before its clean-up.
   const key = generatePrivateKey();
-  const keep = resolve(ROOT, "../docs-noi-bo/local-runs");
-  if (existsSync(keep))
-    appendFileSync(
-      resolve(keep, "compare-agents.jsonl"),
-      `${JSON.stringify({ at: new Date().toISOString(), agent: privateKeyToAccount(key).address, key })}\n`,
-    );
+  keepAgentKey(key);
   const agent = await sealed.freshAgent(n, [SELLER], {
     key,
     funding,
