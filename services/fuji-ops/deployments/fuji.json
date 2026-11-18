@@ -22,7 +22,8 @@
   "validators": [
     {
       "nodeID": "NodeID-6TgSfU7azciZHPtkWZ6qnc8wsqMHyTTGL",
-      "initialBalanceAVAX": 0.4
+      "initialBalanceAVAX": 0.4,
+      "validationID": "sNeqRRGjkY5QxSTLirWdbH5ZwR477soccLgefMrvLUS8PVmLY"
     }
   ],
   "genesisSha256": "8682a20af59549e4813014369eb163eb8e9b200830f204c67f6bd1cf40fc5a00",
@@ -74,7 +75,8 @@
   },
   "demoManager": {
     "address": "0x225e93A231eD527B6C898197d10B8922A0f46668",
-    "managerTx": "0x37b4333d453bda7d1b0d8444557fb5daf53b9c61ed9328b0c17c43415ee7fdf5",
-    "lastFundTx": "0x9ef3aba1d639410377c5dbd958829c9a1c616a5f6f887db5833db21448b433dd"
+    "managerTx": "0x320b6e6ac0520b89e1b960eb72976ce7a515d27270e3bd64be8f42bb47cbc179",
+    "lastFundTx": "0x9ef3aba1d639410377c5dbd958829c9a1c616a5f6f887db5833db21448b433dd",
+    "revokeTx": "0x444d95107b6858496c20b226ebb2ccc7de120fe0e08b818cddd3b0b7ded421ec"
   }
 }

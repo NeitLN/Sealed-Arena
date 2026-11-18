@@ -9,7 +9,8 @@
     "test": "vitest run",
     "ictt": "tsx src/ictt.ts",
     "reputation": "tsx src/reputation.ts",
-    "demo-manager": "tsx src/demo-manager.ts"
+    "demo-manager": "tsx src/demo-manager.ts",
+    "health": "tsx src/health.ts"
   },
   "dependencies": {
     "@sealed-arena/shared": "workspace:*",
