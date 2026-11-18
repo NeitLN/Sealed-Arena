@@ -1,0 +1,11 @@
+# Overlay for chain/tests/byzantine: node 3 (by default) runs a Subnet-EVM plugin built without
+# the agent rule (chain/tests/byzantine/build-norule.sh). Used with SEALED_BYZANTINE=1.
+services:
+  node:
+    environment:
+      SEALED_NORULE_NODES: ${SEALED_NORULE_NODES:-3}
+      SEALED_NORULE_PLUGIN_DIR: /norule/plugins
+      # Debug logs show which node proposed which block and why the others rejected it.
+      SEALED_LOG_LEVEL: debug
+    volumes:
+      - ../../chain/build/norule-plugins:/norule/plugins:ro

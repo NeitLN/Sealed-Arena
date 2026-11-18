@@ -11,7 +11,8 @@
       "!contracts/lib",
       "!docs",
       "!chain/genesis/sealed-fuji.json",
-      "!services/attacks/suite/results"
+      "!services/attacks/suite/results",
+      "!chain/tests/byzantine/results"
     ]
   },
   "formatter": {
