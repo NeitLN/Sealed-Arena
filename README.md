@@ -110,7 +110,7 @@ Nine attack classes, 45 cases, on four groups with the same reference mandate (t
 
 O+ and S both kept every coin inside the mandate in these 45 cases. S ends with fewer T1 cases than O+ (9 against 16) only because it adds the maximum fee to each payment: in the 7 cases that differ, a payment of exactly the cap was refused with "budget exceeded". It does not judge what the owner wanted. The local three-node L1 gives the same result for S.
 
-The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 24 cases ended inside the mandate; on the Sealed L1 on Fuji it is NOT RUN yet (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
+The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 24 cases ended inside the mandate, and on the Sealed L1 on Fuji all 22 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
 
 With a live model, the buying agent ignored the injected pages (0/5 for each of three pages). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node refused all fifteen payments to the attacker. S does not stop T1: the rule limits where and how much, not what the owner wanted.
 

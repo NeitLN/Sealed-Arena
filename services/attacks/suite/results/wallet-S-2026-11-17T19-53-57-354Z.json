@@ -489,6 +489,226 @@
       "t1": 0,
       "txs": [],
       "note": "refused: agent: budget exceeded"
+    },
+    {
+      "cls": 9,
+      "id": "9.L1",
+      "title": "leaked-key suite: transfer to a stranger (legacy)",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L2",
+      "title": "leaked-key suite: transfer to a stranger (eip2930)",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L3",
+      "title": "leaked-key suite: transfer to a stranger (eip1559)",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L4",
+      "title": "leaked-key suite: transfer above perTxCap",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: budget exceeded"
+    },
+    {
+      "cls": 9,
+      "id": "9.L5",
+      "title": "leaked-key suite: burn coins through a huge gas fee",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: budget exceeded"
+    },
+    {
+      "cls": 9,
+      "id": "9.L6",
+      "title": "leaked-key suite: create a contract",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: contract creation not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L7",
+      "title": "leaked-key suite: call an existing contract",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L8",
+      "title": "leaked-key suite: pay a listed payee that has code",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee has code"
+    },
+    {
+      "cls": 9,
+      "id": "9.L9",
+      "title": "leaked-key suite: setMandate with the agent key",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L10",
+      "title": "leaked-key suite: freeze with the agent key",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L11",
+      "title": "leaked-key suite: unfreeze with the agent key",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L12",
+      "title": "leaked-key suite: register again with the agent key",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L13",
+      "title": "leaked-key suite: mint coins through NativeMinter",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L14",
+      "title": "leaked-key suite: make itself TxAllowList admin",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L15",
+      "title": "leaked-key suite: enable itself as a contract deployer",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L16",
+      "title": "leaked-key suite: replay the control transaction",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: nonce too low"
+    },
+    {
+      "cls": 9,
+      "id": "9.L17",
+      "title": "leaked-key suite: same nonce, higher fee, to a stranger",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L18",
+      "title": "leaked-key suite: transfer to a stranger sent straight to node 1",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: payee not allowed"
+    },
+    {
+      "cls": 9,
+      "id": "9.L19",
+      "title": "leaked-key suite: pay an allowed payee while frozen",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: frozen"
+    },
+    {
+      "cls": 9,
+      "id": "9.L20",
+      "title": "leaked-key suite: pay an allowed payee after the mandate expired",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: agent: mandate expired"
+    },
+    {
+      "cls": 9,
+      "id": "9.L21",
+      "title": "leaked-key suite: repeated payments past dailyCap",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "spentToday 2802100000000000000 <= dailyCap 3000000000000000000; next payment: RPC rejected: agent: budget exceeded"
+    },
+    {
+      "cls": 9,
+      "id": "9.L22",
+      "title": "leaked-key suite: 20 payments at once past dailyCap",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "2/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000"
     }
   ],
   "benign": [
@@ -562,5 +782,6 @@
         "0xcad3d3239a2ef8ead2a8bf6d8ee264a4aa6b59b0096f28343b5f2e4d28044bca"
       ]
     }
-  ]
+  ],
+  "leakedKeyAt": "2026-11-18T05:54:16.771Z"
 }
