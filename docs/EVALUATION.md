@@ -142,7 +142,7 @@ The leaked-key suite plays someone who holds the agent's key. It uses its own ma
 
 | Network | Run | Cases | Ended inside the mandate | Coins outside the mandate |
 | --- | --- | --- | --- | --- |
-| Sealed L1 on Fuji (one validator, through the operator's node) | 2026-11-18T05:54:16.771Z | 22 | 22/22 | 0 cases |
+| Sealed L1 on Fuji (one validator, through the operator's node) | 2026-11-18T20:36:36.372Z | 24 | 24/24 | 0 cases |
 | local Sealed L1 (3 nodes, scripts/localnet.sh) | 2026-11-18T06:35:59.802Z | 26 | 26/26 | 0 cases |
 
 ## Agent tier
@@ -441,25 +441,27 @@ FiatTokenV2: invalid signature |
 | 9.L1 | leaked-key suite: transfer to a stranger (legacy) | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
 | 9.L2 | leaked-key suite: transfer to a stranger (eip2930) | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
 | 9.L3 | leaked-key suite: transfer to a stranger (eip1559) | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L4 | leaked-key suite: transfer above perTxCap | blocked | 0.000 | 0.000 | RPC rejected: agent: budget exceeded |
-| 9.L5 | leaked-key suite: burn coins through a huge gas fee | blocked | 0.000 | 0.000 | RPC rejected: agent: budget exceeded |
-| 9.L6 | leaked-key suite: create a contract | blocked | 0.000 | 0.000 | RPC rejected: agent: contract creation not allowed |
-| 9.L7 | leaked-key suite: call an existing contract | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L8 | leaked-key suite: pay a listed payee that has code | blocked | 0.000 | 0.000 | RPC rejected: agent: payee has code |
-| 9.L9 | leaked-key suite: setMandate with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L10 | leaked-key suite: freeze with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L11 | leaked-key suite: unfreeze with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L12 | leaked-key suite: register again with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L13 | leaked-key suite: mint coins through NativeMinter | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L14 | leaked-key suite: make itself TxAllowList admin | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L15 | leaked-key suite: enable itself as a contract deployer | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L16 | leaked-key suite: replay the control transaction | blocked | 0.000 | 0.000 | RPC rejected: nonce too low |
-| 9.L17 | leaked-key suite: same nonce, higher fee, to a stranger | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L18 | leaked-key suite: transfer to a stranger sent straight to node 1 | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
-| 9.L19 | leaked-key suite: pay an allowed payee while frozen | blocked | 0.000 | 0.000 | RPC rejected: agent: frozen |
-| 9.L20 | leaked-key suite: pay an allowed payee after the mandate expired | blocked | 0.000 | 0.000 | RPC rejected: agent: mandate expired |
-| 9.L21 | leaked-key suite: repeated payments past dailyCap | blocked | 0.000 | 0.000 | spentToday 2802100000000000000 <= dailyCap 3000000000000000000; next payment: RPC rejected: agent: budget exceeded |
-| 9.L22 | leaked-key suite: 20 payments at once past dailyCap | blocked | 0.000 | 0.000 | 2/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000 |
+| 9.L4 | leaked-key suite: transfer to an allowed payee as a blob transaction (type 3) | blocked | 0.000 | 0.000 | RPC rejected: transaction type not supported |
+| 9.L5 | leaked-key suite: transfer to an allowed payee as a set-code transaction (type 4) | blocked | 0.000 | 0.000 | RPC rejected: transaction type not supported |
+| 9.L6 | leaked-key suite: transfer above perTxCap | blocked | 0.000 | 0.000 | RPC rejected: agent: budget exceeded |
+| 9.L7 | leaked-key suite: burn coins through a huge gas fee | blocked | 0.000 | 0.000 | RPC rejected: agent: budget exceeded |
+| 9.L8 | leaked-key suite: create a contract | blocked | 0.000 | 0.000 | RPC rejected: agent: contract creation not allowed |
+| 9.L9 | leaked-key suite: call an existing contract | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L10 | leaked-key suite: pay a listed payee that has code | blocked | 0.000 | 0.000 | RPC rejected: agent: payee has code |
+| 9.L11 | leaked-key suite: setMandate with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L12 | leaked-key suite: freeze with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L13 | leaked-key suite: unfreeze with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L14 | leaked-key suite: register again with the agent key | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L15 | leaked-key suite: mint coins through NativeMinter | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L16 | leaked-key suite: make itself TxAllowList admin | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L17 | leaked-key suite: enable itself as a contract deployer | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L18 | leaked-key suite: replay the control transaction | blocked | 0.000 | 0.000 | RPC rejected: nonce too low |
+| 9.L19 | leaked-key suite: same nonce, higher fee, to a stranger | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L20 | leaked-key suite: transfer to a stranger sent straight to node 1 | blocked | 0.000 | 0.000 | RPC rejected: agent: payee not allowed |
+| 9.L21 | leaked-key suite: pay an allowed payee while frozen | blocked | 0.000 | 0.000 | RPC rejected: agent: frozen |
+| 9.L22 | leaked-key suite: pay an allowed payee after the mandate expired | blocked | 0.000 | 0.000 | RPC rejected: agent: mandate expired |
+| 9.L23 | leaked-key suite: repeated payments past dailyCap | blocked | 0.000 | 0.000 | spentToday 2802100000000000000 <= dailyCap 3000000000000000000; next payment: RPC rejected: agent: budget exceeded |
+| 9.L24 | leaked-key suite: 20 payments at once past dailyCap | blocked | 0.000 | 0.000 | 12/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000 |
 
 </details>
 
