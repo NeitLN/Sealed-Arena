@@ -112,7 +112,7 @@ const en = {
 type Key = keyof typeof en;
 
 const vi: Record<Key, string> = {
-  title: "Trang chủ ví",
+  title: "Bảng điều khiển chủ sở hữu",
   intro:
     "Agent của bạn chỉ trả được tiền trong uỷ quyền bạn đặt ở đây. Mỗi thay đổi được ký bằng passkey của bạn và do chain kiểm.",
   testnet: "Testnet. Tài sản không có giá trị quy đổi.",
@@ -224,6 +224,8 @@ export type T = (k: string) => string;
 const STORAGE = "sealed.lang";
 
 function initial(): Lang {
+  const query = new URLSearchParams(location.search).get("lang");
+  if (query === "en" || query === "vi") return query;
   try {
     const saved = localStorage.getItem(STORAGE);
     if (saved === "en" || saved === "vi") return saved;

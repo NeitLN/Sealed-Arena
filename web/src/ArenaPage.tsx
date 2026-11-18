@@ -24,7 +24,9 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
 import { useI18n } from "./i18n.js";
-import { survivalHours } from "./LandingPage.js";
+
+const survivalHours = (score: bigint) => Number(score / 10n ** 15n) / 1000 / 3600;
+
 import { RELAYER_URL } from "./owner.js";
 import { SiteShell } from "./SiteShell.js";
 import { TryPayment } from "./TryPayment.js";

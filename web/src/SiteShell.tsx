@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
 import { BrandMark } from "./BrandMark.js";
+import { designText } from "./designText.js";
 import type { Lang } from "./i18n.js";
 import { LandingIcon } from "./LandingVisual.js";
 import { landingText } from "./landingText.js";
@@ -12,7 +13,7 @@ export function SiteShell({
   lang,
   setLang,
   current,
-  maxWidth = 1120,
+  maxWidth: _maxWidth = 1120,
   children,
 }: {
   lang: Lang;
@@ -24,17 +25,26 @@ export function SiteShell({
   const menu = useRef<HTMLDetailsElement>(null);
   const t = landingText(lang);
   const a = arenaText(lang);
+  const d = designText(lang);
+  const labels = {
+    home: "Sealed Arena",
+    arena: d.arena,
+    rules: d.rules,
+    compare: d.compare,
+    business: d.business,
+    owner: d.console,
+  };
   const path = location.pathname.replace(/\/+$/, "") || "/";
   const nav = [
     ["/arena", a.navArena],
-    ["/compare", a.navCompare],
+    ["/compare", lang === "vi" ? "Bằng chứng" : "Evidence"],
     ["/#how-it-works", t.navHow],
-    ["/business", t.navBusiness],
-    ["/arena/rules", a.navRules],
+    ["/business", d.business],
   ];
   useEffect(() => {
     document.documentElement.lang = lang;
-  }, [lang]);
+    document.title = `${labels[current]} · Sealed Arena`;
+  }, [lang, current, labels[current]]);
   return (
     <>
       <div className="landing site-header">
@@ -112,10 +122,17 @@ export function SiteShell({
       </div>
       <main
         id="site-main"
-        className={current === "home" ? undefined : "site-content"}
-        style={current === "home" ? undefined : { maxWidth }}
+        className={current === "home" ? "landing-main" : `site-content page-${current}`}
       >
-        {current !== "home" && <p className="page-eyebrow">{t.footerNetwork}</p>}
+        {current !== "home" && (
+          <div className="page-context">
+            <p className="page-eyebrow">{labels[current]}</p>
+            <p className="trust-note">
+              <span className="network-dot" />
+              {d.trust}
+            </p>
+          </div>
+        )}
         {children}
       </main>
       <div className="landing">
@@ -138,6 +155,7 @@ export function SiteShell({
           </div>
           <div className="footer-bottom">
             <span>{a.testnet}</span>
+            <span>{d.footer}</span>
             <span>{t.footerNetwork}</span>
           </div>
         </footer>
