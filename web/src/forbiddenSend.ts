@@ -1,7 +1,7 @@
 // "Try a forbidden payment" on /arena: sign a real transaction with the public challenge key in the
 // browser and send it to the Sealed L1 through the public RPC, then show what the node answered.
 import { CHAIN_ID } from "@sealed-arena/shared";
-import type { Address, Hex, PublicClient } from "viem";
+import { type Address, type Hex, keccak256, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 export type SendOutcome =
@@ -34,8 +34,10 @@ export async function sendAsAgent(
   key: Hex,
   to: Address,
   value: bigint,
-): Promise<SendOutcome> {
+): Promise<SendOutcome & { signed?: Hex }> {
   const account = privateKeyToAccount(key);
+  // The hash of the signed bytes, known before the node answers: anyone can look it up afterwards.
+  let signed: Hex | undefined;
   try {
     const [nonce, fees] = await Promise.all([
       client.getTransactionCount({ address: account.address, blockTag: "pending" }),
@@ -51,9 +53,10 @@ export async function sendAsAgent(
       to,
       value,
     });
+    signed = keccak256(raw);
     const hash = await client.request({ method: "eth_sendRawTransaction", params: [raw] });
-    return classifySend({ hash: hash as string });
+    return { ...classifySend({ hash: hash as string }), signed };
   } catch (error) {
-    return classifySend({ error });
+    return { ...classifySend({ error }), ...(signed ? { signed } : {}) };
   }
 }
