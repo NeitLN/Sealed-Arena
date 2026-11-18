@@ -113,7 +113,7 @@ With a live model, the buying agent ignored the injected pages (0/5 for each of 
 
 - RPC: `https://sealed-arena.duckdns.org/rpc` (chain id `261126`, native coin: USDC bridged from Fuji with ICTT)
 - Overview with live numbers: https://sealed-arena.vercel.app
-- Owner console (passkey): https://sealed-arena.vercel.app/console
+- Owner console (passkey): https://sealed-arena.vercel.app/console. "Get a demo agent" gives a visitor a new agent on the Sealed L1, linked to their passkey before it may send, with 0.05 test USDC; then set a mandate and try a payment and a freeze
 - Open red-team challenge: https://sealed-arena.vercel.app/arena (rules: [/arena/rules](https://sealed-arena.vercel.app/arena/rules))
 - Comparison of P, O and S: https://sealed-arena.vercel.app/compare
 - Who it is for and the business model (hypothesis): https://sealed-arena.vercel.app/business
@@ -210,6 +210,7 @@ What it does not give, stated plainly:
 10. **Owner passkey proofs are bound to the chain id and the agent, not to one deployment.** The challenge covers the chain id (`261126`), the agent and a nonce. The local network and the L1 on Fuji share that chain id, so each deployment must register its agents under its own owner key; the Fuji challenge agent does. Binding proofs to the blockchain ID is planned.
 11. **The precompile checks less of WebAuthn than a full relying party.** It verifies the P-256 signature, the challenge and the User Present flag. It does not check `rpIdHash` or the origin, and it does not require User Verification (the owner console asks for it as `preferred`). A page that tricks the owner into signing its challenge produces a valid proof.
 12. **Waiting payments are not re-checked.** Payments the pool accepted but the block builder left out (over the day's budget) stay in the pool and are not checked again while they wait. On a later day they can enter a block within that day's cap, until the owner freezes the agent or the mandate expires.
+13. **The relayer host can allow senders.** For demo agents the relayer holds a second key with the TxAllowList manager role. It registers each demo agent to the visitor's passkey before allowing it, but whoever takes over the host could allow any address to send, outside any mandate. The admin can remove the role (`setNone`).
 
 Found a problem? See [SECURITY.md](SECURITY.md).
 

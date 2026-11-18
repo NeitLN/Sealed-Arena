@@ -1,5 +1,10 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { AGENT_POLICY_ADDRESS, agentPolicyAbi, arenaRecorderAbi } from "@sealed-arena/shared";
+import {
+  AGENT_POLICY_ADDRESS,
+  agentPolicyAbi,
+  arenaRecorderAbi,
+  registerDigest,
+} from "@sealed-arena/shared";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
@@ -10,7 +15,9 @@ import {
   type Hex,
   isAddress,
   isHex,
+  parseEther,
 } from "viem";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 /** The owner actions the relayer sends. Each carries the owner's passkey proof, checked by the precompile. */
 export const RELAYED = new Set(["register", "setMandate", "freeze", "unfreeze"]);
@@ -25,6 +32,17 @@ export type RelayChain = {
   canSend(agent: Address): Promise<boolean>;
   /** Sends the action from the relayer and waits for the receipt. */
   send(data: Hex, to?: Address): Promise<{ transaction: Hex; status: "success" | "reverted" }>;
+};
+
+/**
+ * Gives a demo agent its right to send and its coins, from a key that holds the TxAllowList
+ * manager role (never the admin role). Used only after the agent is registered.
+ */
+export type DemoIssuer = {
+  /** TxAllowList.setEnabled(agent); resolves with the transaction once it is in a block. */
+  enable(agent: Address): Promise<Hex>;
+  /** Sends `wei` of the native coin to the agent; resolves once it is in a block. */
+  fund(agent: Address, wei: bigint): Promise<Hex>;
 };
 
 export type RelayerOptions = {
@@ -43,6 +61,16 @@ export type RelayerOptions = {
   now?: () => number;
   /** Allowed browser origins (CORS). Default: any. */
   origins?: string[];
+  /** Enables POST /demo/claim: a new agent for a visitor's passkey (see createRelayerApp). */
+  demo?: {
+    issuer: DemoIssuer;
+    /** Coins given to each demo agent (default 0.05). */
+    funding?: bigint;
+    /** Agents per client address: one per this many ms (default 10 minutes). */
+    perClientMs?: number;
+    /** Agents per UTC day in total (default 40). */
+    perDay?: number;
+  };
 };
 
 /** The text the node gave for a revert, without viem's wrapping. */
@@ -204,6 +232,85 @@ export function createRelayerApp(o: RelayerOptions) {
       // Nothing was mined, so the next request for this agent may try again.
       if (lastSent.get(key) === mark) lastSent.delete(key);
       return c.json({ ok: false, error: "send_failed", reason: revertReason(e) }, 502);
+    }
+  });
+
+  // Demo agents for visitors to the owner console. The relayer makes a new key, registers the agent
+  // to the visitor's passkey FIRST (from then on the rule binds it: no mandate, nothing allowed),
+  // and only then allows it to send and funds it. A key that may send but is bound by nothing never
+  // exists. The key goes back to this visitor only and is not kept.
+  const demoLast = new Map<string, number>();
+  const demoDays = new Map<number, number>();
+  app.post("/demo/claim", async (c) => {
+    const demo = o.demo;
+    if (!demo) return c.json({ ok: false, error: "no_demo" }, 404);
+    const body = (await c.req.json().catch(() => undefined)) as
+      | { ownerX?: unknown; ownerY?: unknown }
+      | undefined;
+    const x = body?.ownerX;
+    const y = body?.ownerY;
+    const word = (v: unknown): v is Hex => isHex(v) && v.length === 66;
+    if (!word(x) || !word(y)) return c.json({ ok: false, error: "passkey_invalid" }, 400);
+
+    const ip = client(c);
+    const now = clock();
+    const day = Math.floor(now / 86_400_000);
+    const last = demoLast.get(ip);
+    if (last !== undefined && now - last < (demo.perClientMs ?? 10 * 60_000))
+      return c.json({ ok: false, error: "rate_limited" }, 429);
+    if ((demoDays.get(day) ?? 0) >= (demo.perDay ?? 40))
+      return c.json({ ok: false, error: "demo_cap" }, 429);
+    demoLast.set(ip, now);
+    demoDays.set(day, (demoDays.get(day) ?? 0) + 1);
+
+    const privateKey = generatePrivateKey();
+    const agent = privateKeyToAccount(privateKey);
+    const sig = await agent.sign({
+      hash: registerDigest(BigInt(o.chain.chainId), agent.address, x, y),
+    });
+    const data = encodeFunctionData({
+      abi: agentPolicyAbi,
+      functionName: "register",
+      args: [agent.address, x, y, sig],
+    });
+    try {
+      await o.chain.simulate(data);
+    } catch (e) {
+      return c.json(
+        { ok: false, error: "reverted", function: "register", reason: revertReason(e) },
+        422,
+      );
+    }
+    let register: Hex;
+    try {
+      const r = await send(data);
+      if (r.status !== "success")
+        return c.json(
+          { ok: false, error: "reverted", function: "register", transaction: r.transaction },
+          422,
+        );
+      register = r.transaction;
+    } catch (e) {
+      return c.json(
+        { ok: false, error: "send_failed", function: "register", reason: revertReason(e) },
+        502,
+      );
+    }
+    try {
+      const enable = await demo.issuer.enable(agent.address);
+      const fund = await demo.issuer.fund(agent.address, demo.funding ?? parseEther("0.05"));
+      return c.json({
+        ok: true,
+        agent: agent.address,
+        privateKey,
+        transactions: { register, enable, fund },
+      });
+    } catch (e) {
+      // Registered but not (yet) allowed: it can send nothing, which is safe.
+      return c.json(
+        { ok: false, error: "issue_failed", agent: agent.address, reason: revertReason(e) },
+        502,
+      );
     }
   });
 

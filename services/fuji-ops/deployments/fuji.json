@@ -70,5 +70,10 @@
     "oFunded": "3",
     "sink": "0x851b1924b0af889d7e4956ce5c9fa33ffda70ece",
     "suiteO": "0xbb1fe13f1d5c93adfc1e1275f691afa3380f9e81"
+  },
+  "demoManager": {
+    "address": "0x225e93A231eD527B6C898197d10B8922A0f46668",
+    "managerTx": "0x37b4333d453bda7d1b0d8444557fb5daf53b9c61ed9328b0c17c43415ee7fdf5",
+    "lastFundTx": "0x9ef3aba1d639410377c5dbd958829c9a1c616a5f6f887db5833db21448b433dd"
   }
 }

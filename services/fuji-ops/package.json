@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run",
     "ictt": "tsx src/ictt.ts",
-    "reputation": "tsx src/reputation.ts"
+    "reputation": "tsx src/reputation.ts",
+    "demo-manager": "tsx src/demo-manager.ts"
   },
   "dependencies": {
     "@sealed-arena/shared": "workspace:*",

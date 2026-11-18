@@ -109,6 +109,7 @@ pnpm --filter rpc-gateway localnet-check        # trên mạng local: giao dịc
 - Trên Fuji: Caddy chuyển `POST /rpc` vào cổng, mở `GET /attempts/summary` và `/attempts/recent`.
 - Mở thử thách (chạy lại được): `pnpm --filter attacks arena-open` với `SEALED_*` của mạng đích, `SEALED_OWNER_P256_KEY` (bí mật), `ARENA_RECORDER`, `ARENA_PAYEES`, `ARENA_FUNDING`, `ARENA_EXPIRY`. Script từ chối chạy nếu thiếu khoá chủ ví bí mật.
 - Trang: `/arena`, `/arena/rules`. Relayer cần `RELAYER_ARENA_RECORDER` để bật `/arena`. Mỗi hành động (`checkpoint`, `reportBreach`) cho một agent được gửi tối đa một lần mỗi 60 giây, bất kể ai gọi (429 `cooldown`). Cổng RPC tính mỗi lệnh trong một batch là một lượt khi giới hạn tần suất.
+- Agent demo cho trang chủ ví: relayer bật `POST /demo/claim` khi có `RELAYER_DEMO_MANAGER_KEY`. Mỗi lần: tạo key mới, đăng ký agent với passkey của khách **trước**, rồi key quản lý (vai trò manager của TxAllowList, không phải admin) mới cho phép gửi và nạp 0,05 USDC thử; key trả về cho người nhận, relayer không giữ. Mỗi IP 1 agent mỗi 10 phút, tối đa 40 agent mỗi ngày (`RELAYER_DEMO_PER_DAY`). Key quản lý: `pnpm --filter fuji-ops demo-manager grant`, nạp `demo-manager fund <coin>`, xem `demo-manager status`.
 - So sánh P, O, S trên Fuji (tiêu USDC thử): `pnpm --filter attacks compare setup` rồi `compare run`; kết quả ở `services/attacks/compare/results/` và trang `/compare` (`services/attacks/compare/README.md`).
 
 ## 9. Bản ghi sống sót sang ERC-8004
