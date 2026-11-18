@@ -1,0 +1,47 @@
+[
+  {
+    "group": "P",
+    "network": "Fuji C-Chain (Circle test USDC)",
+    "cases": 45,
+    "t0": 36,
+    "t1": 9,
+    "benignDone": 10,
+    "benign": 10
+  },
+  {
+    "group": "O",
+    "network": "Fuji C-Chain (Circle test USDC, CapWalletO)",
+    "cases": 45,
+    "t0": 16,
+    "t1": 16,
+    "benignDone": 10,
+    "benign": 10
+  },
+  {
+    "group": "O+",
+    "network": "Fuji C-Chain (Circle test USDC, CapWalletOPlus: caps and a payee list)",
+    "cases": 45,
+    "t0": 0,
+    "t1": 16,
+    "benignDone": 10,
+    "benign": 10
+  },
+  {
+    "group": "S",
+    "network": "Sealed L1 on Fuji (one validator, through the operator's node)",
+    "cases": 45,
+    "t0": 0,
+    "t1": 9,
+    "benignDone": 10,
+    "benign": 10
+  },
+  {
+    "group": "S",
+    "network": "local Sealed L1 (3 nodes, scripts/localnet.sh)",
+    "cases": 45,
+    "t0": 0,
+    "t1": 9,
+    "benignDone": 10,
+    "benign": 10
+  }
+]

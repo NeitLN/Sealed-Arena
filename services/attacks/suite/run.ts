@@ -44,6 +44,7 @@ import {
   type Group,
   type RunFile,
   render,
+  summaryRows,
   type WalletRun,
 } from "./report.js";
 
@@ -678,7 +679,10 @@ function report() {
     : [];
   const out = resolve(ROOT, "docs/EVALUATION.md");
   writeFileSync(out, render(annotate(files, readCalls)));
-  console.log(`report: ${out} (${files.length} result files)`);
+  // The web pages read the same numbers (the /compare page), never typed by hand.
+  const summary = resolve(ROOT, "web/src/evalSummary.json");
+  writeFileSync(summary, `${JSON.stringify(summaryRows(files), null, 2)}\n`);
+  console.log(`report: ${out} and ${summary} (${files.length} result files)`);
 }
 
 const [cmd, arg] = process.argv.slice(2);
