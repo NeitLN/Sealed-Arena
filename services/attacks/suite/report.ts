@@ -309,8 +309,17 @@ export function render(files: RunFile[]): string {
         (c) => c.outcome === "T1" && byId.get(c.id)?.outcome === "blocked",
       );
       const fee = diff.filter((c) => byId.get(c.id)?.note?.includes("budget exceeded")).length;
+      // Say "only" when the whole gap is the fee: every case that differs was refused for the
+      // budget, and no case is T1 for S alone.
+      const oPlusT1 = new Set(
+        walletCases(oPlus)
+          .filter((c) => c.outcome === "T1")
+          .map((c) => c.id),
+      );
+      const sOnly = cs.filter((c) => c.outcome === "T1" && !oPlusT1.has(c.id)).length;
+      const why = fee === diff.length && sOnly === 0 ? "only" : "partly";
       line(
-        `- ${diff.length} cases end as T1 for O+ and as blocked for S on ${s.network}; in ${fee} of them S refused with "budget exceeded" because it adds the maximum fee to the payment. S ends with fewer T1 cases partly for this reason, not because it judges what the owner wanted.`,
+        `- ${diff.length} cases end as T1 for O+ and as blocked for S on ${s.network}; in ${fee} of them S refused with "budget exceeded" because it adds the maximum fee to the payment. S ends with fewer T1 cases ${why} for this reason, not because it judges what the owner wanted.`,
       );
     }
   }

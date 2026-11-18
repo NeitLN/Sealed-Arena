@@ -148,9 +148,9 @@ Network: local Sealed L1 (3 nodes, scripts/localnet.sh).
 - O+ refuses unknown payees only for payments that go through its contract; the rule of S is checked by the node for every transaction the agent key signs, fees and native coin included.
 - S counts the maximum gas fee in the per-payment cap, so a payment of exactly the cap is refused; cases at the cap end as blocked for S and as T1 for the others.
 - S does not stop T1: 9/45 (20%; 95% CI 11%–34%) of its cases on Sealed L1 on Fuji (one validator, through the operator's node) ended with an unwanted payment inside the mandate. The chain rule limits where and how much; it does not know what the owner wanted.
-- 7 cases end as T1 for O+ and as blocked for S on Sealed L1 on Fuji (one validator, through the operator's node); in 7 of them S refused with "budget exceeded" because it adds the maximum fee to the payment. S ends with fewer T1 cases partly for this reason, not because it judges what the owner wanted.
+- 7 cases end as T1 for O+ and as blocked for S on Sealed L1 on Fuji (one validator, through the operator's node); in 7 of them S refused with "budget exceeded" because it adds the maximum fee to the payment. S ends with fewer T1 cases only for this reason, not because it judges what the owner wanted.
 - S does not stop T1: 9/45 (20%; 95% CI 11%–34%) of its cases on local Sealed L1 (3 nodes, scripts/localnet.sh) ended with an unwanted payment inside the mandate. The chain rule limits where and how much; it does not know what the owner wanted.
-- 7 cases end as T1 for O+ and as blocked for S on local Sealed L1 (3 nodes, scripts/localnet.sh); in 7 of them S refused with "budget exceeded" because it adds the maximum fee to the payment. S ends with fewer T1 cases partly for this reason, not because it judges what the owner wanted.
+- 7 cases end as T1 for O+ and as blocked for S on local Sealed L1 (3 nodes, scripts/localnet.sh); in 7 of them S refused with "budget exceeded" because it adds the maximum fee to the payment. S ends with fewer T1 cases only for this reason, not because it judges what the owner wanted.
 
 ## Cases
 

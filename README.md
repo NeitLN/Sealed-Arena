@@ -108,7 +108,7 @@ Nine attack classes, 45 cases, on four groups with the same reference mandate (t
 | O+ limit wallet with a payee list (Fuji C-Chain) | 0/45                                | 16/45                                     | 10/10                      |
 | S Sealed (Sealed L1 on Fuji)                     | 0/45                                | 9/45                                      | 10/10                      |
 
-O+ and S both kept every coin inside the mandate in these 45 cases. S ends with fewer T1 cases than O+ (9 against 16) partly because it adds the maximum fee to each payment, so a payment of exactly the cap is refused; it does not judge what the owner wanted. The local three-node L1 gives the same result for S.
+O+ and S both kept every coin inside the mandate in these 45 cases. S ends with fewer T1 cases than O+ (9 against 16) only because it adds the maximum fee to each payment: in the 7 cases that differ, a payment of exactly the cap was refused with "budget exceeded". It does not judge what the owner wanted. The local three-node L1 gives the same result for S.
 
 The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 24 cases ended inside the mandate; on the Sealed L1 on Fuji it is NOT RUN yet (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
 
