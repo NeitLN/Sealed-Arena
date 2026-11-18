@@ -27,7 +27,7 @@ const en = {
   funded: "Funded through the recorder",
   required: "Must hold at least",
   score: "Survival score (coin·seconds)",
-  intact: "No breach",
+  intact: "No breach recorded",
   breached: "BREACHED",
   mandateTitle: "Mandate",
   payees: "Allowed payees",
@@ -44,7 +44,7 @@ const en = {
     "Counted by the RPC gateway, off chain: a refused transaction is not included in a block, so the chain keeps no record of it. Visitors are counted by a salted hash of their IP, so everyone behind one network counts once; no IP is stored.",
   total: "Attempts",
   refused: "Refused",
-  accepted: "Accepted",
+  accepted: "Accepted by the node",
   senders: "Distinct visitors (salted IP hash)",
   recent: "Recent attempts",
   none: "No attempts yet.",
@@ -93,6 +93,41 @@ const en = {
   reportTitle: "Found something?",
   report:
     'A T0 breach of the challenge agent: press "Report breach", then open a public issue on GitHub with the transaction hash. Anything else (the precompile, the contracts, the services): report privately, see SECURITY.md.',
+  tryAllowed: "Pay an allowed seller 0.01 USDC (control)",
+  tryLoading: "Reading the mandate from the chain… the two seller buttons need it.",
+  trySlow: "No answer from the public RPC within 10 seconds. Try again.",
+  expectAccepted: "accepted, then in a block (inside the mandate)",
+  tryAllowedRefused: "Refused by the node, although the payment is to an allowed seller",
+  tryAllowedOk: "Accepted by the node: this payment is inside the mandate, as expected",
+  whyPayee: "{to} is not on the mandate's payee list.",
+  whyBudget:
+    "The amount plus the maximum fee is above the cap per payment, or today's spending (UTC) would go past the daily cap. Visitors share this key, so the daily cap can be used up already.",
+  whyFrozen: "The owner has frozen this agent: nothing it signs is accepted.",
+  whyExpired: "The mandate has expired.",
+  openIssue: "Open a public issue",
+  verifyAllowedInBlock: "In block {block}: the control payment went through, inside the mandate.",
+  verifyAllowedPending:
+    "The control payment is waiting in the node's pool. Press Check again in a few seconds.",
+  verifyAllowedMissing:
+    "The node accepted the control payment but the chain does not show it yet. Press Check again.",
+  verifyOk:
+    "The chain has no transaction with this hash, and the agent's nonce and balance did not change: the payment never reached a block.",
+  verifyOkHashOnly:
+    "The chain has no transaction with this hash. (The account was not read before sending, so only the hash lookup is shown.)",
+  atStake: "Balance at stake",
+  breaches: "Breaches recorded on chain (T0)",
+  lowBalance:
+    'The challenge agent\'s balance is low. The node may answer "insufficient funds" before the mandate rule; the team tops it up.',
+  relayerDown: "Could not reach the relayer. Nothing was sent.",
+  beforeTitle: "Before you start",
+  beforeItems: [
+    "Only addresses on the L1's allow-list can send. The challenge agent's key is one of them; your own address is not.",
+    "The node's pool takes transaction types 0, 1 and 2 from an agent. A block also refuses an agent transaction that carries blob hashes.",
+    "The fee counts toward the caps: the charge is value + gas limit × max fee per gas.",
+    "The public RPC limits each IP to 600 calls a minute. Refused transactions are counted off chain by the gateway.",
+    "Payees with code (contracts and the precompiles) are refused, and so is contract creation.",
+  ],
+  beforeCommand: "Send from a terminal (Foundry's cast)",
   tryTitle: "Try a forbidden payment",
   tryIntro:
     "Each button signs a real transaction with the public agent key, here in your browser, and sends it to the Sealed L1 on Fuji through the public RPC. The answer below is what the node sent back; the attempt is also added to the list further down. Test USDC only, and a refused transaction costs nothing.",
@@ -105,7 +140,7 @@ const en = {
   tryExpected: "Expected answer",
   tryRefused: "Refused by the node",
   tryAccepted:
-    'Accepted by the node. A payment outside the mandate should not be accepted: use "Report breach" below and tell the team.',
+    "Accepted by the node. A payment outside the mandate should not be accepted: report it below.",
   tryBusy: "The public RPC is busy (rate limited). Try again in a minute.",
   tryError: "Could not reach the node",
   tryNode: "The node answered with an error that is not the mandate rule",
@@ -128,7 +163,7 @@ const en = {
   verifyPendingShort: "waiting in the node's pool, not in a block",
   verifyInBlockShort: "in a block",
   verifyFound:
-    'The chain has this transaction. A payment outside the mandate should not be there: use "Report breach" below.',
+    "The chain has this transaction. A payment outside the mandate should not be there: report it below.",
   verifyCurl: "Run it yourself",
   verifyAgain: "Check again",
   verifyWaiting: "Reading the chain again in a few seconds…",
@@ -164,7 +199,7 @@ const vi: Text = {
   funded: "Đã nạp qua recorder",
   required: "Phải giữ tối thiểu",
   score: "Điểm sống sót (coin·giây)",
-  intact: "Chưa vi phạm",
+  intact: "Chưa ghi nhận vi phạm",
   breached: "ĐÃ VI PHẠM",
   mandateTitle: "Uỷ quyền",
   payees: "Người nhận được phép",
@@ -181,7 +216,7 @@ const vi: Text = {
     "Do cổng RPC đếm, ngoài chain: giao dịch bị từ chối không được đưa vào block nên chain không lưu dấu vết. Khách được đếm theo hash có muối của IP, nên mọi người chung một mạng tính là một; không lưu IP.",
   total: "Lượt thử",
   refused: "Bị từ chối",
-  accepted: "Được nhận",
+  accepted: "Node đã nhận",
   senders: "Khách khác nhau (theo hash IP có muối)",
   recent: "Lượt thử gần nhất",
   none: "Chưa có lượt thử.",
@@ -229,6 +264,39 @@ const vi: Text = {
   reportTitle: "Tìm ra điều gì?",
   report:
     'Vi phạm T0 của agent thử thách: bấm "Báo vi phạm" rồi mở issue công khai trên GitHub kèm hash giao dịch. Vấn đề khác (precompile, contract, dịch vụ): báo riêng, xem SECURITY.md.',
+  tryAllowed: "Trả người bán được phép 0,01 USDC (đối chứng)",
+  tryLoading: "Đang đọc uỷ quyền từ chain… hai nút người bán cần số liệu này.",
+  trySlow: "RPC công khai không trả lời trong 10 giây. Hãy thử lại.",
+  expectAccepted: "được nhận, rồi vào block (trong uỷ quyền)",
+  tryAllowedRefused: "Node từ chối, dù khoản này trả cho người bán được phép",
+  tryAllowedOk: "Node nhận: khoản này nằm trong uỷ quyền, đúng như mong đợi",
+  whyPayee: "{to} không có trong danh sách người nhận của uỷ quyền.",
+  whyBudget:
+    "Số tiền cộng phí tối đa vượt hạn mức mỗi lần, hoặc tổng chi hôm nay (theo UTC) sẽ vượt hạn mức ngày. Khách dùng chung khoá này nên hạn mức ngày có thể đã hết.",
+  whyFrozen: "Chủ ví đã đóng băng agent này: mọi giao dịch nó ký đều bị từ chối.",
+  whyExpired: "Uỷ quyền đã hết hạn.",
+  openIssue: "Mở issue công khai",
+  verifyAllowedInBlock: "Đã vào block {block}: khoản đối chứng đi qua, trong uỷ quyền.",
+  verifyAllowedPending: "Khoản đối chứng đang chờ trong pool của node. Vài giây nữa bấm Kiểm lại.",
+  verifyAllowedMissing: "Node đã nhận khoản đối chứng nhưng chain chưa có. Bấm Kiểm lại.",
+  verifyOk:
+    "Chain không có giao dịch nào mang hash này, và nonce cùng số dư của agent không đổi: khoản trả chưa từng vào block.",
+  verifyOkHashOnly:
+    "Chain không có giao dịch nào mang hash này. (Trang chưa đọc được tài khoản trước khi gửi, nên chỉ hiện kết quả tra hash.)",
+  atStake: "Số dư đang đặt cược",
+  breaches: "Vi phạm đã ghi trên chain (T0)",
+  lowBalance:
+    'Số dư của agent thử thách đang thấp. Node có thể trả "insufficient funds" trước khi tới quy tắc uỷ quyền; đội sẽ nạp thêm.',
+  relayerDown: "Không gọi được relayer. Chưa có gì được gửi.",
+  beforeTitle: "Trước khi bắt đầu",
+  beforeItems: [
+    "Chỉ địa chỉ trong allow-list của L1 mới gửi được. Khoá của agent thử thách có trong đó; địa chỉ riêng của bạn thì không.",
+    "Pool của node nhận giao dịch loại 0, 1 và 2 từ agent. Block cũng từ chối giao dịch của agent có blob hash.",
+    "Phí tính vào hạn mức: số bị tính là value + gas limit × max fee per gas.",
+    "RPC công khai giới hạn mỗi IP 600 lệnh mỗi phút. Giao dịch bị từ chối do cổng RPC đếm, ngoài chain.",
+    "Người nhận có code (contract và các precompile) bị từ chối, tạo contract cũng vậy.",
+  ],
+  beforeCommand: "Gửi từ terminal (cast của Foundry)",
   tryTitle: "Thử một khoản trả bị cấm",
   tryIntro:
     "Mỗi nút ký một giao dịch thật bằng key công khai của agent, ngay trong trình duyệt của bạn, rồi gửi tới Sealed L1 trên Fuji qua RPC công khai. Câu trả lời bên dưới là đúng những gì node gửi về; lượt thử cũng được thêm vào danh sách phía dưới. Chỉ dùng USDC thử, và giao dịch bị từ chối không tốn gì.",
@@ -241,7 +309,7 @@ const vi: Text = {
   tryExpected: "Câu trả lời dự kiến",
   tryRefused: "Node từ chối",
   tryAccepted:
-    'Node đã nhận. Khoản trả ngoài uỷ quyền không được phép được nhận: hãy bấm "Báo vi phạm" bên dưới và báo cho đội.',
+    "Node đã nhận. Khoản trả ngoài uỷ quyền không được phép được nhận: hãy báo ngay bên dưới.",
   tryBusy: "RPC công khai đang bận (giới hạn tần suất). Thử lại sau một phút.",
   tryError: "Không gọi được tới node",
   tryNode: "Node trả lỗi, nhưng không phải lỗi của quy tắc uỷ quyền",
@@ -264,7 +332,7 @@ const vi: Text = {
   verifyPendingShort: "đang chờ trong pool của node, chưa vào block",
   verifyInBlockShort: "đã vào block",
   verifyFound:
-    'Chain có giao dịch này. Khoản trả ngoài uỷ quyền không được phép có mặt: bấm "Báo vi phạm" bên dưới.',
+    "Chain có giao dịch này. Khoản trả ngoài uỷ quyền không được phép có mặt: hãy báo ngay bên dưới.",
   verifyCurl: "Tự chạy lệnh",
   verifyAgain: "Kiểm lại",
   verifyWaiting: "Đang đọc lại chain sau vài giây…",

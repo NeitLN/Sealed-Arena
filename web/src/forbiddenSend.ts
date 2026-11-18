@@ -33,7 +33,11 @@ export function classifySend(r: { hash?: string; error?: unknown }): SendOutcome
     .split("\n")[0]
     ?.trim();
   // A JSON-RPC error code means the node answered; without one, the request did not get through.
-  const answered = typeof e?.code === "number" || typeof e?.cause?.code === "number";
+  let answered = false;
+  for (let x: unknown = e, depth = 0; x && depth < 6; depth++) {
+    if (typeof (x as { code?: unknown }).code === "number") answered = true;
+    x = (x as { cause?: unknown }).cause;
+  }
   return { kind: answered ? "node" : "error", message: first || "unknown error" };
 }
 

@@ -111,10 +111,13 @@ export default function ArenaPage() {
       setOutcome(
         body.ok
           ? { ok: true, text: `${t.done}: ${body.transaction ?? ""}` }
-          : { ok: false, text: `${t.failed}: ${body.reason ?? body.error ?? res.status}` },
+          : body.reason
+            ? { ok: false, text: `${t.failed}: ${body.reason}` }
+            : { ok: false, text: `${body.error ?? res.status}` },
       );
     } catch {
-      setOutcome({ ok: false, text: t.failed });
+      // No answer is not a refusal.
+      setOutcome({ ok: false, text: t.relayerDown });
     } finally {
       setBusy(undefined);
       void live.refreshChain();
@@ -158,6 +161,21 @@ export default function ArenaPage() {
           />
         </HStack>
         {walletMsg ? <Banner status="info" title={walletMsg} /> : null}
+        <Divider />
+        <Heading level={3}>{t.beforeTitle}</Heading>
+        <VStack gap={1}>
+          {t.beforeItems.map((x) => (
+            <Text key={x} type="supporting">
+              {`• ${x}`}
+            </Text>
+          ))}
+        </VStack>
+        <CodeBlock
+          title={t.beforeCommand}
+          code={`cast send --rpc-url ${RPC} \\\n  --private-key ${ARENA.agentPrivateKey} \\\n  0x000000000000000000000000000000000000dEaD --value 0.01ether`}
+          isWrapped
+          size="sm"
+        />
       </VStack>
     </Card>
   );
@@ -235,9 +253,6 @@ export default function ArenaPage() {
               />
               <InfoTip content={t.actionHelp} />
             </HStack>
-            {outcome ? (
-              <Banner status={outcome.ok ? "success" : "error"} title={outcome.text} />
-            ) : null}
           </VStack>
         </Collapsible>
       </VStack>
@@ -290,12 +305,14 @@ export default function ArenaPage() {
               {
                 key: "result",
                 header: t.result,
-                renderCell: (a) => (
-                  <Badge
-                    variant={a.result === "accepted" ? "success" : "error"}
-                    label={a.result === "accepted" ? t.accepted : t.refused}
-                  />
-                ),
+                renderCell: (a) =>
+                  a.result === "accepted" ? (
+                    <Badge variant="info" label={t.accepted} />
+                  ) : (
+                    <Text type="supporting" color="secondary">
+                      {t.refused}
+                    </Text>
+                  ),
               },
               // On a phone the reasons are already shown as tokens above the table.
               ...(isMobile
@@ -339,9 +356,33 @@ export default function ArenaPage() {
           </Text>
         </VStack>
 
-        <TryPayment t={t} view={view} onSent={() => void live.refreshChain()} />
+        <TryPayment
+          t={t}
+          view={view}
+          onSent={() => void live.refreshChain()}
+          onReportBreach={() => void act("reportBreach")}
+        />
+        {outcome ? (
+          <Banner status={outcome.ok ? "success" : "warning"} title={outcome.text} />
+        ) : null}
+        {view && view.balance < view.mandate.perTxCap + 2n * 10n ** 16n ? (
+          <Banner status="warning" title={t.lowBalance} />
+        ) : null}
 
-        <Grid columns={{ minWidth: 160, max: 4 }} gap={4}>
+        <Grid columns={{ minWidth: 160, max: 3 }} gap={4}>
+          <Tile label={t.atStake}>
+            {view ? (
+              <HStack gap={2} vAlign="end">
+                <Text type="display-3">{usdc(view.balance)}</Text>
+                <Text type="supporting" color="secondary">
+                  USDC
+                </Text>
+              </HStack>
+            ) : (
+              <Skeleton width={72} height={36} />
+            )}
+          </Tile>
+          <Tile label={t.breaches}>{big(rec ? (rec.breached ? 1 : 0) : undefined)}</Tile>
           <Tile
             label={
               <HStack gap={1} vAlign="center">
