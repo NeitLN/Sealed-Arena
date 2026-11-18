@@ -45,6 +45,15 @@ describe("classifySend", () => {
     });
   });
 
+  it("finds the node's error code deeper in the cause chain", () => {
+    const inner = Object.assign(new Error("inner"), { code: -32000 });
+    const e = Object.assign(new Error("outer"), {
+      details: "nonce too low",
+      cause: Object.assign(new Error("middle"), { cause: inner }),
+    });
+    expect(classifySend({ error: e }).kind).toBe("node");
+  });
+
   it("the rule's reason keeps digits and hyphens", () => {
     const e = Object.assign(new Error("x"), {
       code: -32000,
