@@ -142,3 +142,5 @@ docker exec sealed-node sh -c 'ls /data/networks/*/NodeID-*/logs/'            # 
 | Cổng 9650 bị chiếm | Tắt tiến trình đang dùng cổng, hoặc chạy `down` nếu là container cũ |
 | `$'\r': command not found` khi chạy script | File bị chuyển CRLF. Repo có `.gitattributes` ép LF; chạy `git add --renormalize .` hoặc clone lại |
 | `fetch: tag ... resolves to ...` | Tag upstream đã bị đổi. Không sửa `chain/UPSTREAM` để lách; báo người review |
+
+Run `pnpm --filter web e2e:landing` to check the built site in bundled Chromium at desktop and mobile widths (no localnet required).
