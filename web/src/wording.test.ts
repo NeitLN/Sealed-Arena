@@ -51,6 +51,21 @@ describe("page wording", () => {
       for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
   });
 
+  it.each(["en", "vi"] as const)(
+    "challenge, business and comparison pages (%s) speak of one validator and block inclusion",
+    (lang) => {
+      const OVERCLAIM =
+        /validators (refuse|check)|refused by the validators|all validators|never enters? a block|never (reach|in) a block|standard EVM RPC|common style|RPC EVM chuẩn|kiểu phổ biến|toàn bộ validator/i;
+      const pages = [
+        arenaText(lang),
+        businessText(lang),
+        compareText(lang, result as unknown as Result),
+      ];
+      for (const s of pages.flatMap(allText))
+        expect(s, `overclaim in: ${s}`).not.toMatch(OVERCLAIM);
+    },
+  );
+
   it.each(["en", "vi"] as const)("business page (%s) contains no forbidden claim", (lang) => {
     for (const s of allText(businessText(lang)))
       for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
@@ -63,7 +78,7 @@ describe("page wording", () => {
     expect(businessText("vi").useTitle).toMatch(/chưa thử/);
     for (const lang of ["en", "vi"] as const) {
       const t = businessText(lang);
-      expect(t.not).toHaveLength(3);
+      expect(t.not).toHaveLength(5);
       expect(t.who.length + t.use.length + t.money.length + t.check.length).toBe(12);
     }
     // No price, customer count or traction figure anywhere on the page.

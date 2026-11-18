@@ -16,18 +16,18 @@ const en = {
   who: [
     [
       "Agent platforms",
-      "Platforms that hold wallets for many agents. Each agent gets its own mandate; a payment outside it is refused by the validators and never enters a block.",
+      "Platforms that hold wallets for many agents. Each agent gets its own mandate; a payment outside it is refused by the chain's validator (one today, run by the team) and is not included in a block.",
     ],
     [
       "Developers",
-      "A standard EVM RPC (chain id 261126) with USDC bridged from the Fuji C-Chain as the native coin. The team adds the agent's address to the allow-list; then the owner registers it, sets its mandate with a passkey, and it pays with x402.",
+      "An EVM JSON-RPC endpoint (chain id 261126) with USDC bridged from the Fuji C-Chain as the native coin. Sending is allow-listed: the team adds the agent's address first; then the owner registers it, sets its mandate with a passkey, and it pays with our x402 method.",
     ],
   ],
   useTitle: "Use cases we expect (not tested with customers)",
   use: [
     [
       "Buying data and API calls",
-      "The agent pays with x402, and only the sellers on its list can receive money.",
+      "The agent pays with x402 (our signed-native-tx method), and only the sellers on its list can receive money.",
     ],
     [
       "A daily budget",
@@ -55,6 +55,8 @@ const en = {
     "It does not know what the owner wanted: an inflated price from an allowed seller, inside the caps, still goes through.",
     "Today the Sealed L1 on Fuji has one validator, run by the team.",
     "Testnet only: every coin here, including the test USDC, has no monetary value.",
+    "Sellers cannot take these payments with a standard x402 client or facilitator: they must add the network eip155:261126 and our payment method.",
+    "The agent pays only the L1's native coin (bridged test USDC) to plain addresses: no tokens, no contract calls.",
   ],
   checkTitle: "Check it yourself",
   check: [
@@ -85,18 +87,18 @@ const vi: BusinessText = {
   who: [
     [
       "Nền tảng agent",
-      "Nền tảng giữ ví cho nhiều agent. Mỗi agent có uỷ quyền riêng; khoản trả ngoài uỷ quyền bị validator từ chối và không vào block.",
+      "Nền tảng giữ ví cho nhiều agent. Mỗi agent có uỷ quyền riêng; khoản trả ngoài uỷ quyền bị validator của chain từ chối (hiện có một validator, do đội vận hành) và không được đưa vào block.",
     ],
     [
       "Lập trình viên",
-      "RPC EVM chuẩn (chain id 261126), coin gốc là USDC chuyển từ Fuji C-Chain qua cầu nối. Đội thêm địa chỉ agent vào danh sách được phép gửi; sau đó chủ đăng ký agent, đặt uỷ quyền bằng passkey, và agent trả tiền bằng x402.",
+      "Endpoint EVM JSON-RPC (chain id 261126), coin gốc là USDC chuyển từ Fuji C-Chain qua cầu nối. Việc gửi tiền theo danh sách được phép: đội thêm địa chỉ agent trước; sau đó chủ đăng ký agent, đặt uỷ quyền bằng passkey, và agent trả tiền bằng phương thức x402 của dự án.",
     ],
   ],
   useTitle: "Tình huống dùng dự kiến (chưa thử với khách hàng)",
   use: [
     [
       "Mua dữ liệu và lượt gọi API",
-      "Agent trả bằng x402, và chỉ người bán trong danh sách mới nhận được tiền.",
+      "Agent trả bằng x402 (phương thức ký giao dịch coin gốc của dự án), và chỉ người bán trong danh sách mới nhận được tiền.",
     ],
     [
       "Ngân sách theo ngày",
@@ -124,6 +126,8 @@ const vi: BusinessText = {
     "Nó không biết chủ thật sự muốn gì: người bán được phép đòi giá cao hơn mà vẫn trong hạn mức thì khoản trả vẫn qua.",
     "Hiện Sealed L1 trên Fuji có một validator, do đội vận hành.",
     "Chỉ là testnet: mọi coin ở đây, kể cả USDC thử, không có giá trị tiền.",
+    "Người bán không nhận được các khoản này bằng client hay facilitator x402 chuẩn: phải thêm mạng eip155:261126 và phương thức thanh toán của dự án.",
+    "Agent chỉ trả coin gốc của L1 (USDC thử đã bắc cầu) cho địa chỉ thường: không token, không gọi contract.",
   ],
   checkTitle: "Tự kiểm",
   check: [
