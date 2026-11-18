@@ -155,6 +155,22 @@ async function setup() {
       .contractAddress as string;
     save();
   }
+  // Group O+ for the suite: the same wallet with a payee list (the suite's sellers A and B).
+  if (!state.suiteOPlus) {
+    const plus = JSON.parse(
+      readFileSync(resolve(ROOT, "contracts/out/CapWalletOPlus.sol/CapWalletOPlus.json"), "utf8"),
+    ) as { abi: readonly unknown[]; bytecode: { object: Hex } };
+    const payees = [env("FUJI_ARENA_PAYEE_1_ADDRESS"), env("FUJI_ARENA_PAYEE_2_ADDRESS")];
+    const hash = await cWallet().deployContract({
+      abi: plus.abi as never,
+      bytecode: plus.bytecode.object,
+      args: [USDC, oAgent.address, parseUnits("0.02", 6), parseUnits("0.05", 6), payees] as never,
+    });
+    state.suiteOPlus = (
+      await waitC(hash, "suite O+: deploy CapWalletOPlus (0.02 / 0.05, sellers A and B)")
+    ).contractAddress as string;
+    save();
+  }
   console.log(JSON.stringify(state, null, 2));
 }
 

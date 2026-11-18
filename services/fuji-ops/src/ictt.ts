@@ -180,7 +180,9 @@ function relayerConfig() {
       {
         "subnet-id": FUJI.primarySubnetID,
         "blockchain-id": FUJI.cChainID,
-        "rpc-endpoint": { "base-url": "https://api.avax-test.network/ext/bc/C/rpc" },
+        // The relayer reads logs 200 blocks at a time and has no setting for it; api.avax-test.network
+        // allows at most 100, so after any gap the relayer exits in a loop. publicnode allows 200.
+        "rpc-endpoint": { "base-url": "https://avalanche-fuji-c-chain-rpc.publicnode.com" },
         "ws-endpoint": { "base-url": "wss://api.avax-test.network/ext/bc/C/ws" },
         "message-contracts": {
           [FUJI.teleporterMessenger]: {

@@ -99,7 +99,8 @@ pnpm --filter fuji-ops ictt send <USDC> <địa chỉ trên L1>
 ```
 - Genesis local đặt Warp từ 2020; trên Fuji như vậy chain không khởi động ("warp cannot be activated before Durango"). `make-fuji.mjs` đặt Warp từ 1709740800 và tự kiểm.
 - Số dư validator giảm khoảng 0,044 AVAX/ngày; nạp thêm: `platform l1 increase-validator-balance --validation-id <id> --balance <AVAX>`.
-- Chạy các bộ kiểm trên Fuji: đặt `SEALED_NODE_URLS`, `SEALED_RPC_PATH`, `SEALED_ADMIN_KEY`, `SEALED_RELAYER_KEY`, `SEALED_DEPLOYER_KEY`, `SEALED_AGENT_KEY`, `SEALED_SEED_FUNDING` rồi `pnpm --filter attacks seed` và `leaked-key`. Trang đã triển khai: `pnpm --filter web e2e:live`.
+- Relayer ICM đọc log C-Chain 200 khối một lần và không có tham số đổi số này; `api.avax-test.network` chỉ cho tối đa 100, nên sau mỗi lần bị trễ relayer thoát rồi khởi động lại liên tục và không chuyển gì. `relayer-config` vì vậy đọc C-Chain qua `avalanche-fuji-c-chain-rpc.publicnode.com` (cho 200). Kiểm: `docker inspect -f '{{.RestartCount}}' icm-relayer` phải đứng yên. Đây không phải thay đổi về tin cậy: relayer chỉ lấy log từ nguồn đó; chain đích vẫn kiểm chữ ký Warp của validator nguồn trước khi nhận một thông điệp.
+- Chạy các bộ kiểm trên Fuji: đặt `SEALED_NODE_URLS`, `SEALED_RPC_PATH`, `SEALED_ADMIN_KEY`, `SEALED_RELAYER_KEY`, `SEALED_DEPLOYER_KEY`, `SEALED_AGENT_KEY`, `SEALED_SEED_FUNDING` rồi `pnpm --filter attacks seed` và `leaked-key`. Cách gọn: `pnpm --filter attacks suite leaked-key --fuji` và `suite wallet S --fuji` (đọc `.env`, cần đường hầm tới node ở `127.0.0.1:19650`). `leaked-key` cần agent chưa tiêu gì trong ngày UTC; nếu đã tiêu, nó dừng với `NOT RUN`. Trang đã triển khai: `pnpm --filter web e2e:live`.
 
 ## 8. Cổng RPC và thử thách mở
 ```bash

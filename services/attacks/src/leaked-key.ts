@@ -184,6 +184,17 @@ async function run(): Promise<CaseResult[]> {
   const forbidden = async (name: string, a: Attempt, n: Node = N0) =>
     add(name, "blocked", await attempt(n, await signAgent(n, a)));
 
+  // The daily cases assume a fresh day: spending left from an earlier run the same UTC day would
+  // make the control and the dailyCap case wrong, not the rule. Stop instead of reporting them.
+  // getSpend returns the stored counter and the day it belongs to; the rule starts a new count
+  // on the first payment of a new day, so an old day's counter is not today's spending.
+  const [spentBefore, spendDay] = await readPolicy.spend(N0, agent.address);
+  const today = (await N0.client.getBlock()).timestamp / 86_400n;
+  if (spentBefore > 0n && spendDay === today)
+    throw new Error(
+      `NOT RUN: the agent already spent ${spentBefore} wei today; run again after 00:00 UTC`,
+    );
+
   // 0. Positive control: inside the mandate.
   const controlRaw = await signAgent(N0, { to: PAYEE, value: coin(1) / 10n });
   add(
@@ -437,6 +448,7 @@ async function main(): Promise<void> {
       process.env.LEAKED_KEY_JSON,
       `${JSON.stringify(
         {
+          at: new Date().toISOString(),
           results,
           invariant,
           strangerBalance: strangerBalance.toString(),
