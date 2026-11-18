@@ -73,20 +73,20 @@ We have no customers yet; this is a hypothesis we have not tested.
 
 ## Status
 
-| Component                                                                                                       | Status |
-| --------------------------------------------------------------------------------------------------------------- | ------ |
-| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                    | Done   |
-| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters    | Done   |
-| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)            | Done   |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite                                               | Done   |
-| x402 payments with a signed native transaction: facilitator, sample seller, client                              | Done   |
-| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                    | Done   |
-| Buying agent driven by an LLM; prompt-injection scenarios with recorded transcripts and replay                  | Done   |
-| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese   | Done   |
-| Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel | Done   |
-| Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain              | Done   |
-| Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages    | Done   |
-| Comparison on Fuji with a plain wallet (P) and a spending-limit contract wallet built by the team (O)           | Done   |
+| Component                                                                                                                                    | Status |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                                                 | Done   |
+| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters                                 | Done   |
+| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)                                         | Done   |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                                                            | Done   |
+| x402 payments with a signed native transaction: facilitator, sample seller, client                                                           | Done   |
+| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                                                 | Done   |
+| Buying agent driven by an LLM; prompt-injection scenarios with recorded transcripts and replay                                               | Done   |
+| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese                                | Done   |
+| Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel                              | Done   |
+| Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain                                           | Done   |
+| Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages                                 | Done   |
+| Comparison on Fuji with a plain wallet (P) and two minimal spending-limit contract wallets written by the team (O, and O+ with a payee list) | Done   |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
@@ -99,15 +99,18 @@ Each design decision is recorded with its evidence (source lines, commands, resu
 
 ## Evaluation
 
-Nine attack classes on three groups with the same reference mandate (two sellers, 0.02 USDC per payment, 0.05 per day): **P** a plain wallet, **O** a spending-limit contract wallet the team built, with caps only and no payee list, **S** Sealed. Full report with 95% Wilson intervals, every case and its limits: [`docs/EVALUATION.md`](docs/EVALUATION.md), generated from the raw results.
+Nine attack classes, 45 cases, on four groups with the same reference mandate (two sellers, 0.02 USDC per payment, 0.05 per day): **P** a plain wallet; **O** a minimal spending-limit contract wallet written by the team for this comparison, caps only; **O+** the same wallet with a payee list; **S** Sealed. O and O+ are not representative of audited wallet products. Full report with 95% Wilson intervals, every case and its limits: [`docs/EVALUATION.md`](docs/EVALUATION.md), generated from the raw results.
 
-| Group                                           | Coins left outside the mandate (T0) | Unwanted payments inside the mandate (T1) | Benign purchases completed |
-| ----------------------------------------------- | ----------------------------------- | ----------------------------------------- | -------------------------- |
-| P plain wallet (Fuji)                           | 36/45 cases                         | 9/45                                      | 10/10                      |
-| O limit wallet, caps only, no payee list (Fuji) | 16/45                               | 16/45                                     | 10/10                      |
-| S Sealed (local L1)                             | 0/69                                | 9/69                                      | 10/10                      |
+| Group                                            | Coins left outside the mandate (T0) | Unwanted payments inside the mandate (T1) | Benign purchases completed |
+| ------------------------------------------------ | ----------------------------------- | ----------------------------------------- | -------------------------- |
+| P plain wallet (Fuji C-Chain)                    | 36/45                               | 9/45                                      | 10/10                      |
+| O limit wallet, caps only (Fuji C-Chain)         | 16/45                               | 16/45                                     | 10/10                      |
+| O+ limit wallet with a payee list (Fuji C-Chain) | 0/45                                | 16/45                                     | 10/10                      |
+| S Sealed (Sealed L1 on Fuji)                     | 0/45                                | 9/45                                      | 10/10                      |
 
-Cases that pay an unknown address succeed against O, because it has no payee list: only its caps limit them.
+O+ and S both kept every coin inside the mandate in these 45 cases. S ends with fewer T1 cases than O+ (9 against 16) partly because it adds the maximum fee to each payment, so a payment of exactly the cap is refused; it does not judge what the owner wanted. The local three-node L1 gives the same result for S.
+
+The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 24 cases ended inside the mandate; on the Sealed L1 on Fuji it is NOT RUN yet (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
 
 With a live model, the buying agent ignored the injected pages (0/5 for each of three pages). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node refused all fifteen payments to the attacker. S does not stop T1: the rule limits where and how much, not what the owner wanted.
 
