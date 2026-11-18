@@ -152,6 +152,13 @@ describe("page wording", () => {
     }
   });
 
+  it("says the injected-page runs used two models on the local network, in both languages", () => {
+    expect(designText("en").pages).toMatch(/two models/);
+    expect(designText("en").pages).toMatch(/local network/);
+    expect(designText("vi").pages).toMatch(/hai model/);
+    expect(designText("vi").pages).toMatch(/mạng cục bộ/);
+  });
+
   it("says the P column is a hand-written transcript, in both languages", () => {
     expect(compareText("en", result as unknown as Result).notes[0]).toMatch(/hand-written/);
     expect(compareText("vi", result as unknown as Result).notes[0]).toMatch(/dựng tay/);

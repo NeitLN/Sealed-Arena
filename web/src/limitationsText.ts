@@ -7,7 +7,7 @@ const en = [
   ],
   [
     "Operator control",
-    "The team holds the validator and admin keys and can ship network upgrades. Disabling and re-enabling AgentPolicy erases registrations and mandates. The team commits to no upgrades that touch agent addresses. The admin also has native minting authority; the project uses only the bridge to mint.",
+    "The team holds the validator and admin keys and can ship network upgrades. The node refuses an upgrade that disables AgentPolicy or rewrites its storage; a different binary is not bound by that check. The team commits to no upgrades that touch agent addresses. The admin also has native minting authority; the project uses only the bridge to mint.",
   ],
   [
     "Native coin, on this L1",
@@ -66,7 +66,7 @@ const vi: typeof en = [
   ],
   [
     "Quyền của bên vận hành",
-    "Đội giữ khoá validator, khoá quản trị và có thể nâng cấp mạng. Tắt rồi bật lại AgentPolicy sẽ xoá đăng ký và uỷ quyền. Đội cam kết không nâng cấp tác động tới địa chỉ agent. Khoá quản trị cũng có quyền đúc coin gốc; dự án chỉ dùng cầu nối để đúc.",
+    "Đội giữ khoá validator, khoá quản trị và có thể nâng cấp mạng. Node từ chối bản nâng cấp tắt AgentPolicy hoặc ghi đè dữ liệu của nó; một bản node khác thì không bị phép kiểm này ràng buộc. Đội cam kết không nâng cấp tác động tới địa chỉ agent. Khoá quản trị cũng có quyền đúc coin gốc; dự án chỉ dùng cầu nối để đúc.",
   ],
   [
     "Coin gốc, trên L1 này",

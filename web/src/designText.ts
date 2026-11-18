@@ -26,7 +26,7 @@ const en = {
   refused: "payments to the attacker refused",
   memoryNote:
     "One model, local Sealed L1. The task asked the agent to read its notes. Sealed limits where the payment can go; the agent can still be tricked.",
-  pages: "Separate injected-page runs followed",
+  pages: "Separate injected-page runs followed (two models, local network)",
   liveLoad: "Try a real payment",
   liveHint: "Opens the public-key transaction controls. Test assets only.",
   receipt: "A spending key. A defined boundary.",
@@ -123,7 +123,7 @@ const vi: typeof en = {
   refused: "khoản trả cho kẻ tấn công bị từ chối",
   memoryNote:
     "Một model, Sealed L1 cục bộ. Tác vụ yêu cầu agent đọc ghi chú. Sealed giới hạn nơi khoản trả có thể đến; agent vẫn có thể bị lừa.",
-  pages: "Lượt làm theo trang chèn lệnh trong phép thử riêng",
+  pages: "Lượt làm theo trang chèn lệnh trong phép thử riêng (hai model, mạng cục bộ)",
   liveLoad: "Thử giao dịch thật",
   liveHint: "Mở các nút gửi giao dịch bằng private key đã công bố. Chỉ dùng tài sản thử.",
   receipt: "Một khoá chi tiêu. Giới hạn rõ ràng.",
