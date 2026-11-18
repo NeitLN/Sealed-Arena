@@ -8,7 +8,7 @@ import { Link } from "@astryxdesign/core/Link";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { formatUsdc } from "@sealed-arena/shared";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { type Address, formatEther, type Hex, parseEther } from "viem";
 import { ARENA } from "./arena.config.js";
 import type { arenaText } from "./arenaText.js";
@@ -25,7 +25,7 @@ type Attempt = { to: Address; value: bigint; expected: string };
 type Check =
   | { state: "waiting" }
   | { state: "busy" }
-  | { state: "done"; before: Account; after: Account; found: boolean; verdict: Verdict };
+  | { state: "done"; before: Account; after: Account; verdict: Verdict };
 
 /** Seconds to wait after the node's answer before reading the chain again. */
 const RECHECK_MS = 8_000;
@@ -50,23 +50,22 @@ export function TryPayment(o: {
   const [check, setCheck] = useState<Check>();
 
   /** The second read: the account again and the hash lookup. */
+  // The hash a check belongs to: a timer started for an earlier send must not show its answer
+  // under a newer hash.
+  const current = useRef<Hex | undefined>(undefined);
   const recheck = async (h: Hex, b: Account | undefined) => {
+    if (current.current !== h) return;
     setCheck({ state: "waiting" });
     try {
       const [after, look] = await Promise.all([
         readAccount(client, ARENA.agent),
         lookUp(client, h),
       ]);
+      if (current.current !== h) return;
       if (!b) return setCheck({ state: "busy" });
-      setCheck({
-        state: "done",
-        before: b,
-        after,
-        found: look.found,
-        verdict: verdict(b, after, look.found),
-      });
+      setCheck({ state: "done", before: b, after, verdict: verdict(b, after, look) });
     } catch {
-      setCheck({ state: "busy" });
+      if (current.current === h) setCheck({ state: "busy" });
     }
   };
 
@@ -91,6 +90,7 @@ export function TryPayment(o: {
     setResult(undefined);
     setHash(undefined);
     setCheck(undefined);
+    current.current = undefined;
     const b = await readAccount(client, ARENA.agent).catch(() => undefined);
     setBefore(b);
     const r = await sendAsAgent(client, ARENA.agentPrivateKey, a.to, a.value);
@@ -100,6 +100,7 @@ export function TryPayment(o: {
     // Verify only an answer that came from the node (refused or accepted), not a busy RPC.
     if (r.signed && (r.kind === "refused" || r.kind === "accepted")) {
       setHash(r.signed);
+      current.current = r.signed;
       setCheck({ state: "waiting" });
       const h = r.signed;
       setTimeout(() => void recheck(h, b), RECHECK_MS);
@@ -171,7 +172,11 @@ export function TryPayment(o: {
               {check.state === "done" ? (
                 <>
                   <MetadataListItem label="eth_getTransactionByHash">
-                    {check.found ? <Code>found</Code> : t.verifyNull}
+                    {check.verdict === "inBlock"
+                      ? t.verifyInBlockShort
+                      : check.verdict === "pending"
+                        ? t.verifyPendingShort
+                        : t.verifyNull}
                   </MetadataListItem>
                   <MetadataListItem label={t.verifyNonce}>
                     {change(check.before.nonce, check.after.nonce, t.verifyUnchanged)}
@@ -195,8 +200,10 @@ export function TryPayment(o: {
               </Text>
             ) : check.state === "busy" ? (
               <Banner status="warning" title={t.tryBusy} />
-            ) : check.verdict === "found" ? (
+            ) : check.verdict === "inBlock" ? (
               <Banner status="error" title={t.verifyFound} />
+            ) : check.verdict === "pending" ? (
+              <Banner status="warning" title={t.verifyPending} />
             ) : check.verdict === "changedOther" ? (
               <Banner status="info" title={t.verifyChangedOther} />
             ) : null}

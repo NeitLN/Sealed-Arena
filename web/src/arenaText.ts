@@ -120,7 +120,11 @@ const en = {
   verifyBlock: "Block number",
   verifyUnchanged: "unchanged",
   verifyChangedOther:
-    "Changed, but not by this transaction: the key is public, and someone else's payment inside the mandate was included meanwhile. The hash lookup above is the check that counts.",
+    "The account changed meanwhile, but not through this transaction: the chain does not have it. The key is public, so another payment or a top-up can change the nonce or the balance. The hash lookup above is the check that counts.",
+  verifyPending:
+    "The node holds this transaction in its pool; it is not in a block. Press Check again: if it enters a block, report it as a breach.",
+  verifyPendingShort: "waiting in the node's pool, not in a block",
+  verifyInBlockShort: "in a block",
   verifyFound:
     'The chain has this transaction. A payment outside the mandate should not be there: use "Report breach" below.',
   verifyCurl: "Run it yourself",
@@ -249,7 +253,11 @@ const vi: Text = {
   verifyBlock: "Số block",
   verifyUnchanged: "không đổi",
   verifyChangedOther:
-    "Có đổi, nhưng không phải do giao dịch này: khoá công khai, và một khoản trả trong uỷ quyền của người khác vừa vào block. Phép tra hash ở trên mới là phép kiểm quyết định.",
+    "Tài khoản có đổi trong lúc chờ, nhưng không phải do giao dịch này: chain không có nó. Khoá công khai, nên một khoản trả khác hoặc một lần nạp tiền có thể làm đổi nonce hay số dư. Phép tra hash ở trên mới là phép kiểm quyết định.",
+  verifyPending:
+    "Node đang giữ giao dịch này trong pool; nó chưa vào block. Bấm Kiểm lại: nếu nó vào block, hãy báo là vi phạm.",
+  verifyPendingShort: "đang chờ trong pool của node, chưa vào block",
+  verifyInBlockShort: "đã vào block",
   verifyFound:
     'Chain có giao dịch này. Khoản trả ngoài uỷ quyền không được phép có mặt: bấm "Báo vi phạm" bên dưới.',
   verifyCurl: "Tự chạy lệnh",

@@ -14,23 +14,31 @@ export async function readAccount(c: PublicClient, agent: Address): Promise<Acco
   return { nonce, balance, block };
 }
 
-/** eth_getTransactionByHash and eth_getTransactionReceipt, raw: null means the chain has no such transaction. */
-export async function lookUp(c: PublicClient, hash: Hex | string) {
-  const [tx, receipt] = await Promise.all([
-    c.request({ method: "eth_getTransactionByHash", params: [hash as Hex] }),
-    c.request({ method: "eth_getTransactionReceipt", params: [hash as Hex] }),
-  ]);
-  return { tx, receipt, found: tx != null || receipt != null };
-}
-
-export type Verdict = "unchanged" | "changedOther" | "found";
+export type Lookup = { inBlock: boolean; pending: boolean };
 
 /**
- * The hash lookup decides. The key is public, so another visitor's payment inside the mandate can
- * move the nonce and balance meanwhile; that is reported as such, not as this transaction.
+ * eth_getTransactionByHash and eth_getTransactionReceipt. A transaction with a receipt or a block
+ * number is in a block; one the node returns without either is waiting in its pool; null for both
+ * means the node does not know it.
  */
-export function verdict(before: Account, after: Account, found: boolean): Verdict {
-  if (found) return "found";
+export async function lookUp(c: PublicClient, hash: Hex | string) {
+  const [tx, receipt] = (await Promise.all([
+    c.request({ method: "eth_getTransactionByHash", params: [hash as Hex] }),
+    c.request({ method: "eth_getTransactionReceipt", params: [hash as Hex] }),
+  ])) as [{ blockNumber?: string | null } | null, unknown];
+  const inBlock = receipt != null || (tx != null && tx.blockNumber != null);
+  return { tx, receipt, inBlock, pending: !inBlock && tx != null };
+}
+
+export type Verdict = "unchanged" | "changedOther" | "pending" | "inBlock";
+
+/**
+ * The hash lookup decides. The key is public, so the account can change meanwhile for other
+ * reasons (someone else's payment, a top-up); that is reported as a change, not as this transaction.
+ */
+export function verdict(before: Account, after: Account, look: Lookup): Verdict {
+  if (look.inBlock) return "inBlock";
+  if (look.pending) return "pending";
   return before.nonce === after.nonce && before.balance === after.balance
     ? "unchanged"
     : "changedOther";
