@@ -167,12 +167,33 @@ export async function readAgent(c: PublicClient, agent: Address): Promise<AgentV
   };
 }
 
-/** Lower-case addresses among `list` that have code on chain. */
-export async function withCode(c: PublicClient, list: Address[]): Promise<Set<string>> {
+/**
+ * Lower-case addresses among `list` that have code on chain, and the addresses that could not be
+ * checked (the read failed): those are reported, not treated as having no code.
+ */
+export async function withCode(
+  c: PublicClient,
+  list: Address[],
+): Promise<{ withCode: Set<string>; unchecked: Address[] }> {
   const codes = await Promise.all(
-    list.map((a) => c.getCode({ address: a }).catch(() => undefined)),
+    list.map((a) =>
+      c.getCode({ address: a }).then(
+        (code) => ({ ok: true as const, code }),
+        () => ({ ok: false as const }),
+      ),
+    ),
   );
-  return new Set(list.filter((_, i) => codes[i] && codes[i] !== "0x").map((a) => a.toLowerCase()));
+  return {
+    withCode: new Set(
+      list
+        .filter((_, i) => {
+          const r = codes[i];
+          return r?.ok && r.code && r.code !== "0x";
+        })
+        .map((a) => a.toLowerCase()),
+    ),
+    unchecked: list.filter((_, i) => !codes[i]?.ok),
+  };
 }
 
 // ---- relayer ------------------------------------------------------------------------

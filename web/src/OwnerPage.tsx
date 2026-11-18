@@ -22,7 +22,7 @@ import {
   setMandateChallenge,
   unfreezeChallenge,
 } from "@sealed-arena/shared";
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Address,
   encodeFunctionData,
@@ -33,17 +33,16 @@ import {
   type PublicClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { useAgentView } from "./agentView.js";
 import { DemoAgents } from "./DemoAgents.js";
 import { useI18n } from "./i18n.js";
 import {
-  type AgentView,
   chainClient,
   createPasskey,
   isLocalRpc,
   loadSaved,
   type Passkey,
   type RelayResult,
-  readAgent,
   relay,
   relayerInfo,
   save,
@@ -51,6 +50,7 @@ import {
   withCode,
 } from "./owner.js";
 import { SiteShell } from "./SiteShell.js";
+import { RPC } from "./useArenaLive.js";
 
 // Layout from the Astryx payment-form template: form column and a sticky summary column.
 const formColBasis: CSSProperties = { flexBasis: 0 };
@@ -82,26 +82,46 @@ function nextReset(): string {
   return d.toLocaleString();
 }
 
-type Outcome = { kind: "ok" | "error"; text: string; tx?: Hex | undefined } | undefined;
+/**
+ * What happened to an action. `refused`: the chain (or the precompile) said no, with its reason.
+ * `cancelled`: the owner closed the passkey prompt. `error`: the action did not get through.
+ */
+type Outcome =
+  | { kind: "ok" | "refused" | "cancelled" | "error"; text: string; tx?: Hex | undefined }
+  | undefined;
+
+/** The browser's WebAuthn errors when the prompt is closed or times out. */
+const isCancel = (e: unknown) =>
+  (e instanceof Error && e.message === "passkey_cancelled") ||
+  (typeof DOMException !== "undefined" &&
+    e instanceof DOMException &&
+    (e.name === "NotAllowedError" || e.name === "AbortError"));
+
+/** Mandate form defaults: small enough for a demo agent's 0.05 USDC, so "budget exceeded" shows. */
+const DEFAULTS = { perTx: "0.02", daily: "0.03", days: "7" };
 
 export default function OwnerPage() {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const { lang, setLang, t } = useI18n();
   const [saved, setSaved] = useState(loadSaved);
-  const [client, setClient] = useState<PublicClient>();
+  // Reads go to the public RPC known at build time, so the page shows the chain even when the
+  // relayer is down; the relayer's /info can point to another RPC (the local network).
+  const [client, setClient] = useState<PublicClient>(() => chainClient(RPC, { live: true }));
   const [local, setLocal] = useState(false);
   const [boot, setBoot] = useState<string>();
 
   const [agentInput, setAgentInput] = useState(saved.agent ?? "");
   const agent = isAddress(agentInput) ? (getAddress(agentInput) as Address) : undefined;
-  const [view, setView] = useState<AgentView>();
+  const { view, failedSince, refresh } = useAgentView(client, agent);
 
   const [agentSig, setAgentSig] = useState("");
   const [agentKey, setAgentKey] = useState("");
   const [payeesText, setPayeesText] = useState("");
-  const [perTx, setPerTx] = useState("1");
-  const [daily, setDaily] = useState("3");
-  const [days, setDays] = useState("7");
+  const [perTx, setPerTx] = useState(DEFAULTS.perTx);
+  const [daily, setDaily] = useState(DEFAULTS.daily);
+  const [days, setDays] = useState(DEFAULTS.days);
+  const [unchecked, setUnchecked] = useState<string[]>([]);
+  const outcomeRef = useRef<HTMLDivElement>(null);
   const [warnings, setWarnings] = useState<PayeeWarning[]>();
   const [busy, setBusy] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -109,29 +129,36 @@ export default function OwnerPage() {
   useEffect(() => {
     relayerInfo()
       .then((info) => {
-        setClient(chainClient(info.rpc));
+        if (info.chainId !== CHAIN_ID) return setBoot("chain_mismatch");
+        if (info.rpc !== RPC) setClient(chainClient(info.rpc, { live: true }));
         setLocal(isLocalRpc(info.rpc));
       })
       .catch(() => setBoot("relayer_down"));
   }, []);
 
-  const refresh = useCallback(async () => {
-    if (!client || !agent) return setView(undefined);
-    try {
-      const v = await readAgent(client, agent);
-      setView(v);
-      if (v.mandate.payees.length > 0 && payeesText === "")
-        setPayeesText(v.mandate.payees.join("\n"));
-    } catch {
-      setView(undefined);
+  // The form starts from the mandate on chain, once per agent; later reads never overwrite typing.
+  const prefilledFor = useRef<Address | undefined>(undefined);
+  useEffect(() => {
+    if (!agent || !view || prefilledFor.current === agent) return;
+    prefilledFor.current = agent;
+    const m = view.mandate;
+    if (m.payees.length > 0) {
+      setPayeesText(m.payees.join("\n"));
+      setPerTx(formatUsdc(m.perTxCap));
+      setDaily(formatUsdc(m.dailyCap));
+      const left = Math.ceil((Number(m.expiry) - Date.now() / 1000) / 86_400);
+      setDays(String(Math.min(365, Math.max(1, left))));
+    } else {
+      setPayeesText("");
+      setPerTx(DEFAULTS.perTx);
+      setDaily(DEFAULTS.daily);
+      setDays(DEFAULTS.days);
     }
-  }, [client, agent, payeesText]);
+  }, [agent, view]);
 
   useEffect(() => {
-    void refresh();
-    const id = setInterval(() => void refresh(), 5000);
-    return () => clearInterval(id);
-  }, [refresh]);
+    if (outcome) outcomeRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [outcome]);
 
   const remember = (s: typeof saved) => {
     setSaved(s);
@@ -151,13 +178,15 @@ export default function OwnerPage() {
     try {
       const r: RelayResult = await relay(await build());
       if (r.ok) setOutcome({ kind: "ok", text: t("done"), tx: r.transaction });
-      else setOutcome({ kind: "error", text: r.reason ?? t(r.error), tx: r.transaction });
+      else if (r.reason) setOutcome({ kind: "refused", text: r.reason, tx: r.transaction });
+      else setOutcome({ kind: "error", text: t(r.error), tx: r.transaction });
     } catch (e) {
-      const m = e instanceof Error ? e.message : String(e);
-      setOutcome({ kind: "error", text: t(m) });
+      if (isCancel(e)) setOutcome({ kind: "cancelled", text: t("passkey_cancelled") });
+      else setOutcome({ kind: "error", text: t(e instanceof Error ? e.message : String(e)) });
     } finally {
+      // The next action signs the nonce on chain: read it before the buttons come back.
+      await refresh();
       setBusy(undefined);
-      void refresh();
     }
   };
 
@@ -176,10 +205,11 @@ export default function OwnerPage() {
         const passkey: Passkey = await createPasskey();
         remember({ ...saved, passkey });
       } catch (e) {
-        setOutcome({
-          kind: "error",
-          text: t(e instanceof Error ? e.message : "passkey_unsupported"),
-        });
+        setOutcome(
+          isCancel(e)
+            ? { kind: "cancelled", text: t("passkey_cancelled") }
+            : { kind: "error", text: t(e instanceof Error ? e.message : "passkey_unsupported") },
+        );
       }
     })();
 
@@ -235,10 +265,13 @@ export default function OwnerPage() {
     void (async () => {
       if (typeof draft === "string" || !agent || !saved.passkey || !client || !view) return;
       if (!warnings) {
-        const found = checkPayees(draft.payees, await withCode(client, [...draft.payees])).warnings;
-        if (found.length > 0) return setWarnings(found);
+        const codes = await withCode(client, [...draft.payees]);
+        const found = checkPayees(draft.payees, codes.withCode).warnings;
+        setUnchecked(codes.unchecked);
+        if (found.length > 0 || codes.unchecked.length > 0) return setWarnings(found);
       }
       setWarnings(undefined);
+      setUnchecked([]);
       const passkey = saved.passkey;
       await act("setMandate", async () => {
         const nonce = view.nonce;
@@ -371,16 +404,76 @@ export default function OwnerPage() {
         </Text>
 
         {boot ? <Banner status="error" title={t(boot)} /> : null}
-        {outcome ? (
+        <div ref={outcomeRef}>
+          {outcome ? (
+            <Banner
+              status={
+                outcome.kind === "ok"
+                  ? "success"
+                  : outcome.kind === "cancelled"
+                    ? "info"
+                    : outcome.kind === "refused"
+                      ? "warning"
+                      : "error"
+              }
+              title={
+                outcome.kind === "ok"
+                  ? t("done")
+                  : outcome.kind === "refused"
+                    ? `${t("failed")}: ${outcome.text}`
+                    : outcome.text
+              }
+              description={outcome.tx ? `${t("tx")} ${outcome.tx}` : undefined}
+              isDismissable
+              onDismiss={() => setOutcome(undefined)}
+            />
+          ) : null}
+        </div>
+        {failedSince && view ? (
           <Banner
-            status={outcome.kind === "ok" ? "success" : "error"}
-            title={outcome.kind === "ok" ? t("done") : `${t("failed")}: ${outcome.text}`}
-            description={outcome.tx ? `${t("tx")} ${outcome.tx}` : undefined}
-            isDismissable
-            onDismiss={() => setOutcome(undefined)}
+            status="warning"
+            title={t("staleView").replace("{time}", new Date(failedSince).toLocaleTimeString())}
           />
         ) : null}
         {busy ? <Banner status="info" title={t("working")} /> : null}
+
+        {/* 1. Passkey: needed for everything below, the demo agent included */}
+        <VStack gap={3}>
+          <Text type="large" weight="bold">
+            {t("passkeySection")}
+          </Text>
+          <Text type="supporting" color="secondary">
+            {t("passkeyHelp")}
+          </Text>
+          {saved.passkey ? (
+            <VStack gap={2}>
+              <HStack gap={2} vAlign="center">
+                <Badge variant="success" label={t("passkeyReady")} />
+                <Text type="supporting" color="secondary" style={mono}>
+                  {t("publicKey")} {short(saved.passkey.x)}
+                </Text>
+              </HStack>
+              <HStack gap={2}>
+                <Button
+                  label={t("forgetPasskey")}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm(t("forgetConfirm")))
+                      remember({ ...(saved.agent ? { agent: saved.agent } : {}) });
+                  }}
+                />
+              </HStack>
+            </VStack>
+          ) : (
+            <HStack gap={3} vAlign="center" wrap="wrap">
+              <Button label={t("createPasskey")} variant="primary" onClick={onCreatePasskey} />
+              <Text type="supporting" color="secondary">
+                {t("passkeyMissing")}
+              </Text>
+            </HStack>
+          )}
+        </VStack>
 
         <DemoAgents
           t={t}
@@ -388,7 +481,7 @@ export default function OwnerPage() {
           passkey={saved.passkey}
           current={agent}
           ownedByMe={ownedByMe}
-          payee={ownedByMe ? (view?.mandate.payees[0] as Address | undefined) : undefined}
+          payee={view?.mandate.payees[0] as Address | undefined}
           onClaimed={(a) => {
             setAgentInput(a);
             remember({ ...saved, agent: a });
@@ -399,45 +492,6 @@ export default function OwnerPage() {
         <Stack direction={isMobile ? "vertical" : "horizontal"} gap={8} vAlign="start">
           <StackItem size="fill" style={isMobile ? undefined : formColBasis}>
             <VStack gap={8}>
-              {/* 1. Passkey */}
-              <VStack gap={3}>
-                <Text type="large" weight="bold">
-                  {t("passkeySection")}
-                </Text>
-                <Text type="supporting" color="secondary">
-                  {t("passkeyHelp")}
-                </Text>
-                {saved.passkey ? (
-                  <VStack gap={2}>
-                    <HStack gap={2} vAlign="center">
-                      <Badge variant="success" label={t("passkeyReady")} />
-                      <Text type="supporting" color="secondary" style={mono}>
-                        {t("publicKey")} {short(saved.passkey.x)}
-                      </Text>
-                    </HStack>
-                    <HStack gap={2}>
-                      <Button
-                        label={t("forgetPasskey")}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remember({ ...(saved.agent ? { agent: saved.agent } : {}) })}
-                      />
-                    </HStack>
-                  </VStack>
-                ) : (
-                  <HStack gap={3} vAlign="center" wrap="wrap">
-                    <Button
-                      label={t("createPasskey")}
-                      variant="primary"
-                      onClick={onCreatePasskey}
-                    />
-                    <Text type="supporting" color="secondary">
-                      {t("passkeyMissing")}
-                    </Text>
-                  </HStack>
-                )}
-              </VStack>
-
               {/* 2. Agent */}
               <VStack gap={3}>
                 <HStack gap={2} hAlign="between" vAlign="center">
@@ -526,7 +580,7 @@ export default function OwnerPage() {
                   />
                   <Grid columns={isMobile ? 1 : 3} gap={3}>
                     <TextInput
-                      label={t("perTxCap")}
+                      label={t("perTxCapFee")}
                       value={perTx}
                       onChange={setPerTx}
                       inputMode="decimal"
@@ -550,6 +604,9 @@ export default function OwnerPage() {
                   {typeof draft !== "string" && draft.perTxCap > draft.dailyCap ? (
                     <Banner status="warning" title={t("capWarning")} />
                   ) : null}
+                  {unchecked.map((a) => (
+                    <Banner key={`u-${a}`} status="warning" title={`${a} ${t("code_unchecked")}`} />
+                  ))}
                   {warnings?.map((w) => (
                     <Banner
                       key={w.address}
@@ -559,7 +616,7 @@ export default function OwnerPage() {
                   ))}
                   <HStack gap={2}>
                     <Button
-                      label={warnings ? t("signAnyway") : t("signMandate")}
+                      label={warnings || unchecked.length > 0 ? t("signAnyway") : t("signMandate")}
                       variant="primary"
                       isLoading={busy === "setMandate"}
                       isDisabled={!!busy || !!draftError}

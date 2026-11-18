@@ -52,11 +52,13 @@ export function DemoAgents(o: {
   const [claimError, setClaimError] = useState<string>();
   const [trying, setTrying] = useState<"stranger" | "payee">();
   const [tried, setTried] = useState<{ to: "stranger" | "payee"; out: SendOutcome }>();
-  const myKey = o.ownedByMe && o.current ? storedKeys()[o.current.toLowerCase()] : undefined;
+  // The key this browser was given for the agent on screen. It does not wait for the next chain
+  // read, so the "Get a demo agent" button cannot come back (and spend a second claim) meanwhile.
+  const myKey = o.current ? storedKeys()[o.current.toLowerCase()] : undefined;
   const out = tried?.out;
 
   const claim = async () => {
-    if (!o.passkey) return;
+    if (!o.passkey || claiming) return;
     setClaiming(true);
     setClaimError(undefined);
     try {
@@ -161,6 +163,8 @@ export function DemoAgents(o: {
           <Banner status="error" title={t("demoAccepted")} description={<Code>{out.hash}</Code>} />
         ) : out?.kind === "busy" ? (
           <Banner status="warning" title={t("demoBusy")} />
+        ) : out?.kind === "node" ? (
+          <Banner status="warning" title={t("demoNode")} description={<Code>{out.message}</Code>} />
         ) : out?.kind === "error" ? (
           <Banner status="warning" title={t("demoError")} description={out.message} />
         ) : null}
