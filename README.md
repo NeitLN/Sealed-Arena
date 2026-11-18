@@ -110,7 +110,7 @@ Nine attack classes, 45 cases, on four groups with the same reference mandate (t
 
 O+ and S both kept every coin inside the mandate in these 45 cases. S ends with fewer T1 cases than O+ (9 against 16) only because it adds the maximum fee to each payment: in the 7 cases that differ, a payment of exactly the cap was refused with "budget exceeded". It does not judge what the owner wanted. The local three-node L1 gives the same result for S.
 
-The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 24 cases ended inside the mandate, and on the Sealed L1 on Fuji all 22 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
+The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 26 cases ended inside the mandate, and on the Sealed L1 on Fuji all 22 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)).
 
 With a live model, the buying agent ignored the injected pages (0/5 for each of three pages). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node refused all fifteen payments to the attacker. S does not stop T1: the rule limits where and how much, not what the owner wanted.
 
@@ -218,7 +218,7 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 - The x402 suite (`services/attacks/src/x402.ts`) starts the facilitator and two sample sellers, buys one dataset end to end, then sends each payment that must be refused (wrong payee, price, resource, chain id, signer, reused request id, already broadcast, seller outside the mandate) and checks the agent's balance and nonce do not move.
 - `ArenaRecorder` has Foundry tests for the score, the invariant, breaches and direct deposits (with a fuzz test), and `services/attacks/src/arena.ts` runs the leaked-key suite against an agent funded only through the recorder, then checks that a checkpoint finds no breach.
 - `web/e2e/owner.e2e.ts` drives the owner console in Chromium with a virtual passkey on the local network: link an agent, set a mandate, freeze and unfreeze (the agent's payment is refused while frozen), and checks that a different passkey cannot freeze the agent.
-- The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 24 ways out (transaction types 0, 1 and 2, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
+- The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 26 ways out (transaction types 0, 1 and 2, a blob and a set-code transaction to an allowed payee, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
 
 ## Security model and limitations
 

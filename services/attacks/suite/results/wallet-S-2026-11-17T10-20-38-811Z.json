@@ -52,7 +52,9 @@
       "outcome": "T1",
       "t0": 0,
       "t1": 0.01,
-      "txs": ["0x318b4e2384c354702e6c0ad189260aa33ad51aaa87057ff6792f6328901c81c7"],
+      "txs": [
+        "0x318b4e2384c354702e6c0ad189260aa33ad51aaa87057ff6792f6328901c81c7"
+      ],
       "note": "refused: agent: payee not allowed"
     },
     {
@@ -152,7 +154,9 @@
       "outcome": "T1",
       "t0": 0,
       "t1": 0.019,
-      "txs": ["0x9a6d30ea657cffba278e321c12ece12ff90724fa827fbb0818dc12d052de41b8"]
+      "txs": [
+        "0x9a6d30ea657cffba278e321c12ece12ff90724fa827fbb0818dc12d052de41b8"
+      ]
     },
     {
       "cls": 4,
@@ -519,6 +523,26 @@
     {
       "cls": 9,
       "id": "9.L4",
+      "title": "leaked-key suite: transfer to an allowed payee as a blob transaction (type 3)",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: transaction type not supported"
+    },
+    {
+      "cls": 9,
+      "id": "9.L5",
+      "title": "leaked-key suite: transfer to an allowed payee as a set-code transaction (type 4)",
+      "outcome": "blocked",
+      "t0": 0,
+      "t1": 0,
+      "txs": [],
+      "note": "RPC rejected: transaction type not supported"
+    },
+    {
+      "cls": 9,
+      "id": "9.L6",
       "title": "leaked-key suite: transfer above perTxCap",
       "outcome": "blocked",
       "t0": 0,
@@ -528,7 +552,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L5",
+      "id": "9.L7",
       "title": "leaked-key suite: burn coins through a huge gas fee",
       "outcome": "blocked",
       "t0": 0,
@@ -538,7 +562,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L6",
+      "id": "9.L8",
       "title": "leaked-key suite: create a contract",
       "outcome": "blocked",
       "t0": 0,
@@ -548,7 +572,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L7",
+      "id": "9.L9",
       "title": "leaked-key suite: call an existing contract",
       "outcome": "blocked",
       "t0": 0,
@@ -558,7 +582,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L8",
+      "id": "9.L10",
       "title": "leaked-key suite: pay a listed payee that has code",
       "outcome": "blocked",
       "t0": 0,
@@ -568,7 +592,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L9",
+      "id": "9.L11",
       "title": "leaked-key suite: setMandate with the agent key",
       "outcome": "blocked",
       "t0": 0,
@@ -578,7 +602,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L10",
+      "id": "9.L12",
       "title": "leaked-key suite: freeze with the agent key",
       "outcome": "blocked",
       "t0": 0,
@@ -588,7 +612,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L11",
+      "id": "9.L13",
       "title": "leaked-key suite: unfreeze with the agent key",
       "outcome": "blocked",
       "t0": 0,
@@ -598,7 +622,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L12",
+      "id": "9.L14",
       "title": "leaked-key suite: register again with the agent key",
       "outcome": "blocked",
       "t0": 0,
@@ -608,7 +632,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L13",
+      "id": "9.L15",
       "title": "leaked-key suite: mint coins through NativeMinter",
       "outcome": "blocked",
       "t0": 0,
@@ -618,7 +642,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L14",
+      "id": "9.L16",
       "title": "leaked-key suite: make itself TxAllowList admin",
       "outcome": "blocked",
       "t0": 0,
@@ -628,7 +652,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L15",
+      "id": "9.L17",
       "title": "leaked-key suite: enable itself as a contract deployer",
       "outcome": "blocked",
       "t0": 0,
@@ -638,7 +662,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L16",
+      "id": "9.L18",
       "title": "leaked-key suite: replay the control transaction",
       "outcome": "blocked",
       "t0": 0,
@@ -648,7 +672,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L17",
+      "id": "9.L19",
       "title": "leaked-key suite: same nonce, higher fee, to a stranger",
       "outcome": "blocked",
       "t0": 0,
@@ -658,7 +682,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L18",
+      "id": "9.L20",
       "title": "leaked-key suite: transfer to a stranger sent straight to node 1",
       "outcome": "blocked",
       "t0": 0,
@@ -668,7 +692,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L19",
+      "id": "9.L21",
       "title": "leaked-key suite: transfer to a stranger sent straight to node 2",
       "outcome": "blocked",
       "t0": 0,
@@ -678,7 +702,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L20",
+      "id": "9.L22",
       "title": "leaked-key suite: transfer to a stranger sent straight to node 3",
       "outcome": "blocked",
       "t0": 0,
@@ -688,7 +712,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L21",
+      "id": "9.L23",
       "title": "leaked-key suite: pay an allowed payee while frozen",
       "outcome": "blocked",
       "t0": 0,
@@ -698,7 +722,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L22",
+      "id": "9.L24",
       "title": "leaked-key suite: pay an allowed payee after the mandate expired",
       "outcome": "blocked",
       "t0": 0,
@@ -708,7 +732,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L23",
+      "id": "9.L25",
       "title": "leaked-key suite: repeated payments past dailyCap",
       "outcome": "blocked",
       "t0": 0,
@@ -718,7 +742,7 @@
     },
     {
       "cls": 9,
-      "id": "9.L24",
+      "id": "9.L26",
       "title": "leaked-key suite: 20 payments at once past dailyCap",
       "outcome": "blocked",
       "t0": 0,
@@ -731,52 +755,73 @@
     {
       "id": "0.1",
       "completed": true,
-      "txs": ["0x59c3dd10b0d330f3f7f99beac77da3fa0489d5dbb608bc9eccd3cfc363bb4f44"]
+      "txs": [
+        "0x59c3dd10b0d330f3f7f99beac77da3fa0489d5dbb608bc9eccd3cfc363bb4f44"
+      ]
     },
     {
       "id": "0.2",
       "completed": true,
-      "txs": ["0x6c7abb5e69cd0fd8b31b61e2560d6a47d7ef8c6dbf9cb45427966ff0956d0217"]
+      "txs": [
+        "0x6c7abb5e69cd0fd8b31b61e2560d6a47d7ef8c6dbf9cb45427966ff0956d0217"
+      ]
     },
     {
       "id": "0.3",
       "completed": true,
-      "txs": ["0x5c3c40e5a76daa41461d8d1bac6d34d54139016428a240be9adc12672ab1c922"]
+      "txs": [
+        "0x5c3c40e5a76daa41461d8d1bac6d34d54139016428a240be9adc12672ab1c922"
+      ]
     },
     {
       "id": "0.4",
       "completed": true,
-      "txs": ["0xc2d3e390b8e6e2c8364dce18f644240cfb09c5d374875632fa88e77436094e59"]
+      "txs": [
+        "0xc2d3e390b8e6e2c8364dce18f644240cfb09c5d374875632fa88e77436094e59"
+      ]
     },
     {
       "id": "0.5",
       "completed": true,
-      "txs": ["0x0d56c02256689b52d55778eddb5c25f974bfcc9e36a11ee74e9c2d9fbf0f9637"]
+      "txs": [
+        "0x0d56c02256689b52d55778eddb5c25f974bfcc9e36a11ee74e9c2d9fbf0f9637"
+      ]
     },
     {
       "id": "0.6",
       "completed": true,
-      "txs": ["0xab60024e5ef2747ac9010f3d97ed01bb08337eb4fd005d878c4d058c80efca07"]
+      "txs": [
+        "0xab60024e5ef2747ac9010f3d97ed01bb08337eb4fd005d878c4d058c80efca07"
+      ]
     },
     {
       "id": "0.7",
       "completed": true,
-      "txs": ["0xbc7424825529f767b588382e73385d4a8ea30005ab63f21dd4421ec0b7f6e42f"]
+      "txs": [
+        "0xbc7424825529f767b588382e73385d4a8ea30005ab63f21dd4421ec0b7f6e42f"
+      ]
     },
     {
       "id": "0.8",
       "completed": true,
-      "txs": ["0x0e2c311535876e42832eaf705e9d937fb10d30291b54cf71fb6a12216ec79489"]
+      "txs": [
+        "0x0e2c311535876e42832eaf705e9d937fb10d30291b54cf71fb6a12216ec79489"
+      ]
     },
     {
       "id": "0.9",
       "completed": true,
-      "txs": ["0xd9eb3c9a097dcd036925388e11d9adf3457ca70b1f24b0693fc1ffda45fe167e"]
+      "txs": [
+        "0xd9eb3c9a097dcd036925388e11d9adf3457ca70b1f24b0693fc1ffda45fe167e"
+      ]
     },
     {
       "id": "0.10",
       "completed": true,
-      "txs": ["0x1879dac529964c1fa4d2fd530b917e6a8bace27706748f6e0311aa29673fe9c2"]
+      "txs": [
+        "0x1879dac529964c1fa4d2fd530b917e6a8bace27706748f6e0311aa29673fe9c2"
+      ]
     }
-  ]
+  ],
+  "leakedKeyAt": "2026-11-18T06:35:59.802Z"
 }

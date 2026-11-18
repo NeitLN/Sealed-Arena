@@ -74,7 +74,7 @@ const N0 = ALL[0] as Node;
 const stranger = privateKeyToAccount(generatePrivateKey()).address;
 const [PAYEE] = LOCAL_PAYEES;
 
-type TxKind = "legacy" | "eip2930" | "eip1559";
+type TxKind = "legacy" | "eip2930" | "eip1559" | "eip4844" | "eip7702";
 type Attempt = {
   to?: Address;
   value?: bigint;
@@ -103,6 +103,32 @@ async function signAgent(n: Node, a: Attempt): Promise<Hex> {
       return agent.signTransaction({ ...base, type: "legacy", gasPrice: fee });
     case "eip2930":
       return agent.signTransaction({ ...base, type: "eip2930", gasPrice: fee, accessList: [] });
+    case "eip4844":
+      // A blob transaction without its sidecar: the version hash is made up, no KZG is needed.
+      return agent.signTransaction({
+        ...base,
+        to: a.to ?? PAYEE,
+        type: "eip4844",
+        maxFeePerGas: fee,
+        maxPriorityFeePerGas: TIP,
+        maxFeePerBlobGas: 1n,
+        blobVersionedHashes: [`0x01${"00".repeat(31)}`],
+      });
+    case "eip7702": {
+      // A set-code transaction: the agent authorises code for its own account.
+      const authorization = await agent.signAuthorization({
+        address: a.to ?? PAYEE,
+        chainId: CHAIN_ID,
+        nonce: nonce + 1,
+      });
+      return agent.signTransaction({
+        ...base,
+        type: "eip7702",
+        maxFeePerGas: fee,
+        maxPriorityFeePerGas: TIP,
+        authorizationList: [authorization],
+      });
+    }
     default:
       return agent.signTransaction({
         ...base,
@@ -123,6 +149,8 @@ const reasonOf = (err: unknown): string => {
     text.match(
       /(nonce too low|already known|replacement transaction underpriced|[a-z ]*not allowed[a-z ]*)/i,
     )?.[0] ??
+    // The node's own words (viem keeps them in `details`) rather than viem's summary.
+    (err as { details?: string }).details?.split("\n")[0]?.slice(0, 120) ??
     text.split("\n")[0]?.slice(0, 90) ??
     "rejected"
   );
@@ -207,6 +235,19 @@ async function run(): Promise<CaseResult[]> {
   for (const kind of ["legacy", "eip2930", "eip1559"] as const) {
     await forbidden(`transfer to a stranger (${kind})`, {
       to: stranger,
+      value: coin(1) / 10n,
+      kind,
+    });
+  }
+
+  // 1b. An allowed payee inside the caps, as a blob (type 3) or set-code (type 4) transaction: only a
+  // gate on the transaction type can refuse these. The reason is recorded as the node gave it.
+  for (const [kind, label] of [
+    ["eip4844", "a blob transaction (type 3)"],
+    ["eip7702", "a set-code transaction (type 4)"],
+  ] as const) {
+    await forbidden(`transfer to an allowed payee as ${label}`, {
+      to: PAYEE as Address,
       value: coin(1) / 10n,
       kind,
     });
