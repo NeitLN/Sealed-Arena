@@ -23,14 +23,14 @@ Ngoài chain: facilitator x402, người bán mẫu, agent mua hàng, cổng RPC
 | Thư mục | Chứa gì | Công cụ |
 |---|---|---|
 | `chain/` | Bản vá lên avalanchego, precompile AgentPolicy, genesis, Dockerfile build node | Go, chạy trong Docker |
-| `contracts/` | ArenaRecorder, ReputationReceiver, PolicyWallet (bậc 2), ví đối chứng O | Solidity, Foundry trong Docker |
+| `contracts/` | ArenaRecorder, ReputationReceiver, PolicyWallet (bậc 2), ví đối chứng O và O+ | Solidity, Foundry trong Docker |
 | `services/facilitator/` | Facilitator x402 cho phương thức `signed-native-tx` | TypeScript |
 | `services/seller/` | Người bán mẫu trả 402 | TypeScript |
 | `services/agent/` | Agent mua hàng (vòng lặp LLM gọi công cụ) | TypeScript |
 | `services/rpc-gateway/` | Cổng RPC công khai: lọc phương thức, giới hạn tốc độ, ghi lượt thử | TypeScript |
 | `services/attacks/` | Bộ tấn công và trình chạy đánh giá | TypeScript |
 | `packages/shared/` | ABI, địa chỉ, kiểu dữ liệu, hàm mã hoá dùng chung | TypeScript |
-| `web/` | Dashboard chủ ví, trang thử thách, trang so sánh | Next.js |
+| `web/` | Dashboard chủ ví, trang thử thách, trang so sánh | Vite, React |
 | `infra/` | docker-compose, cấu hình relayer, reverse proxy | |
 | `scripts/` | `check.sh` (bộ kiểm nhanh), script dựng mạng local | bash |
 
@@ -44,7 +44,7 @@ Quy tắc ranh giới:
 - Nền: avalanchego tag `v1.15.3`, VM là `graft/subnet-evm` trong chính repo đó (kho `precompile-evm` đã bị lưu trữ, không dùng).
 - Chain id: `261126`. Tên: `Sealed`. Ký hiệu coin gốc: `USDC` (18 chữ số thập phân ở tầng EVM).
 - Precompile bật từ genesis: TxAllowList, ContractDeployerAllowList, NativeMinter, Warp, AgentPolicy. secp256r1 (ACP-204, `0x100`) có sẵn trên Subnet-EVM ở tag này từ nâng cấp Granite: đã kiểm ở T04 bằng `eth_call` trên mạng local (`docs/decisions/D4.md`). AgentPolicy không gọi sang `0x100`; nó kiểm P-256 bằng thư viện chuẩn của Go.
-- TxAllowList: chỉ các địa chỉ sau được gửi giao dịch: admin, người triển khai contract, relayer (gửi hộ thao tác passkey của chủ ví), facilitator, relayer ICM, và mỗi địa chỉ agent đã đăng ký.
+- TxAllowList: chỉ các địa chỉ sau được gửi giao dịch: admin, người triển khai contract, relayer (gửi hộ thao tác passkey của chủ ví), relayer ICM, và mỗi địa chỉ agent được admin bật. Genesis local có thêm một địa chỉ dành sẵn cho facilitator (khoá dev); genesis Fuji không có: dịch vụ facilitator không giữ và không dùng khoá nào, nó chỉ gọi `eth_sendRawTransaction` với giao dịch agent đã ký. Khoá quản lý demo (vai manager của TxAllowList, trên máy relayer) bật quyền gửi cho từng agent demo sau khi agent đã đăng ký với passkey của khách (README, giới hạn 13).
 - ContractDeployerAllowList: chỉ admin và người triển khai. Agent không bao giờ có trong danh sách này.
 - Phí: phí cơ sở tối thiểu đặt thấp. Người gửi trả gas bằng coin gốc.
 - Không bật bất kỳ cơ chế uỷ quyền tài khoản nào (không EIP-7702).
@@ -200,7 +200,7 @@ Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. R
 
 ## 6. Cổng RPC
 
-- Là điểm duy nhất người ngoài chạm vào L1. Node RPC đứng sau nó, không phải validator.
+- Là điểm duy nhất người ngoài chạm vào L1. Trên Fuji hiện chỉ có một node và node đó là validator; cổng RPC chuyển tiếp vào chính node này qua `127.0.0.1`, cổng RPC của node không mở ra Internet (Caddy chỉ mở `/rpc`, `/attempts/*` và `/relayer/*`). Tách một node RPC riêng chưa làm.
 - Chỉ cho: `eth_chainId`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionCount`, `eth_getTransactionByHash`, `eth_getTransactionReceipt`, `eth_getBlockByNumber`, `eth_call`, `eth_estimateGas`, `eth_gasPrice`, `eth_maxPriorityFeePerGas`, `eth_feeHistory`, `eth_getCode`, `eth_getLogs` (giới hạn dải block), `eth_sendRawTransaction`, `net_version`.
 - Với `eth_sendRawTransaction`: giải mã người gửi; ghi một dòng `{thời điểm, from, to, value, kết quả, lý do}` vào kho lượt thử. Không ghi IP dạng rõ.
 - Giới hạn tốc độ theo IP.
@@ -217,7 +217,8 @@ Trang `/arena` và `/arena/rules` (web). Người chơi không có trong TxAllow
 | Admin L1 | `.env` trên máy vận hành | Quản lý allow-list, enroll agent |
 | Người triển khai | `.env` | Triển khai contract |
 | Relayer | `.env` của `services/relayer` (`RELAYER_PRIVATE_KEY`; trên mạng local mặc định là khoá dev) | Gửi hộ thao tác passkey của chủ ví |
-| Facilitator | `.env` của facilitator | Phát giao dịch đã ký của agent (không cần tiền nếu chỉ `sendRawTransaction`) |
+| Facilitator | không có khoá (local: một địa chỉ dành sẵn trong genesis, chưa dùng) | Facilitator chỉ phát giao dịch agent đã ký bằng `eth_sendRawTransaction` |
+| Quản lý demo | `.env` của `services/relayer` (`RELAYER_DEMO_MANAGER_KEY`) | Vai manager của TxAllowList: cho phép agent demo gửi giao dịch sau khi đã đăng ký với passkey của khách |
 | Relayer ICM | cấu hình relayer | Chuyển tin ICM |
 | Agent thử thách | **công khai có chủ đích** trên trang thử thách | Bị tấn công |
 | Agent demo riêng | `.env` | Demo luồng mua hàng bình thường |
