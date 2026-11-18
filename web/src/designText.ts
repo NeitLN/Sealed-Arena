@@ -57,7 +57,7 @@ const en = {
   business: "For builders",
   console: "Owner console",
   arena: "Open challenge",
-  workflow: ["Passkey", "Agent & mandate", "Try a payment", "Inspect the key"],
+  workflow: ["Passkey", "Link agent", "Set limits", "Try a payment"],
   next: "Your next step",
   emptyAgent:
     "Your agent’s spending card will appear here. Create a passkey, then get a demo agent or link your own.",
@@ -65,9 +65,11 @@ const en = {
   previewNote:
     "Review these limits here. The device’s passkey prompt does not display the mandate.",
   capRisk:
-    "If this key leaks: up to {cap} USDC per UTC day, fees included, to {payees} allowed payees, until you freeze it or {expiry}.",
+    "If this key leaks: up to {cap} USDC per UTC day, fees included, to the allowed payees ({payees}), until you freeze it or {expiry}.",
   pendingMandate:
     "Once your agent is linked, set its payees, limits and expiry here. Then try an allowed and a refused payment.",
+  ownKeyHint:
+    "Using your own agent? Send a payment with your own client. These test buttons become available when this browser holds a demo agent key.",
   privateDemo: "Inspect the demo private key",
   privateDemoNote:
     "This is a testnet key provided by the relayer and stored in this browser. It is separate from your owner passkey. Never fund it on another chain.",
@@ -84,7 +86,7 @@ const en = {
   compareTitle: "Same attacks. Different boundaries.",
   burst: "Where a payment stops matters.",
   burstIntro:
-    "Secondary experiment: simultaneous payments. Reverted means included in a block, then failed. Waiting means not yet included; it may enter a later block.",
+    "Secondary experiment: simultaneous payments. Reverted means included in a block, then failed. Refused on arrival means the node did not admit the payment to its transaction pool.",
   settled: "In blocks",
   pending: "Waiting in the pool",
   poolRefused: "Refused on arrival",
@@ -152,7 +154,7 @@ const vi: typeof en = {
   business: "Dành cho nhà phát triển",
   console: "Bảng điều khiển chủ sở hữu",
   arena: "Thử thách mở",
-  workflow: ["Passkey", "Agent & uỷ quyền", "Thử thanh toán", "Xem private key"],
+  workflow: ["Passkey", "Liên kết agent", "Đặt giới hạn", "Thử thanh toán"],
   next: "Bước tiếp theo",
   emptyAgent:
     "Thẻ chi tiêu của agent sẽ hiện ở đây. Tạo passkey, rồi lấy agent demo hoặc liên kết agent của bạn.",
@@ -163,6 +165,8 @@ const vi: typeof en = {
     "Nếu khoá này bị lộ: tối đa {cap} USDC mỗi ngày UTC, đã gồm phí, cho {payees} người nhận được phép, đến khi bạn đóng băng hoặc tới {expiry}.",
   pendingMandate:
     "Sau khi liên kết agent, đặt người nhận, hạn mức và thời hạn tại đây. Sau đó thử khoản trả được phép và khoản bị từ chối.",
+  ownKeyHint:
+    "Bạn dùng agent riêng? Hãy gửi khoản trả bằng client của bạn. Các nút thử ở đây dùng khi trình duyệt giữ private key của agent demo.",
   privateDemo: "Xem private key của agent demo",
   privateDemoNote:
     "Đây là khoá testnet do relayer cung cấp và lưu trong trình duyệt, tách biệt với passkey của chủ sở hữu. Không nạp tài sản cho khoá này trên chain khác.",
@@ -179,7 +183,7 @@ const vi: typeof en = {
   compareTitle: "Cùng tấn công. Khác ranh giới.",
   burst: "Nơi khoản trả dừng lại có ý nghĩa.",
   burstIntro:
-    "Phép thử bổ sung: gửi đồng thời nhiều khoản. Revert nghĩa là đã vào block rồi thất bại. Đang chờ nghĩa là chưa vào block; có thể vào block sau.",
+    "Phép thử bổ sung: gửi đồng thời nhiều khoản. Revert nghĩa là đã vào block rồi thất bại. Bị từ chối khi nhận nghĩa là node không nhận khoản trả vào pool.",
   settled: "Vào block",
   pending: "Đang chờ trong pool",
   poolRefused: "Bị từ chối khi nhận",

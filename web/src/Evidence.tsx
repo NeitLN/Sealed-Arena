@@ -4,6 +4,7 @@ import { ARENA } from "./arena.config.js";
 import { designText } from "./designText.js";
 import rows from "./evalSummary.json";
 import type { Lang } from "./i18n.js";
+import leakedKey from "./leakedKeySummary.json";
 
 export function StatusPill({
   state,
@@ -92,15 +93,15 @@ export function AgentEvidence({ lang }: { lang: Lang }) {
     <div className="agent-evidence">
       <article className="key-evidence">
         <p className="micro-label">
-          {t.recorded} · {evidence.leakedKey.at.slice(0, 10)} · Fuji
+          {t.recorded} · {leakedKey.at.slice(0, 10)} · Fuji
         </p>
         <h3>{t.leaked}</h3>
         <p className="evidence-number">
-          {evidence.leakedKey.passed}
-          <span>/{evidence.leakedKey.cases}</span>
+          {leakedKey.passed}
+          <span>/{leakedKey.cases}</span>
         </p>
         <p>{t.leakedLabel}</p>
-        <a className="text-link" href={`${ARENA.source}/blob/main/${evidence.leakedKey.source}`}>
+        <a className="text-link" href={`${ARENA.source}/blob/main/${leakedKey.source}`}>
           {lang === "vi" ? "Xem từng ca thử" : "Inspect every case"} ↗
         </a>
       </article>

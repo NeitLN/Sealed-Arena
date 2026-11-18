@@ -12,6 +12,7 @@ import { useRef, useState } from "react";
 import { type Address, formatEther, type Hex, parseEther } from "viem";
 import { ARENA } from "./arena.config.js";
 import type { arenaText } from "./arenaText.js";
+import { StatusPill } from "./Evidence.js";
 import { type SendOutcome, sendAsAgent } from "./forbiddenSend.js";
 import { type AgentView, chainClient } from "./owner.js";
 import { RPC } from "./useArenaLive.js";
@@ -231,16 +232,13 @@ export function TryPayment(o: {
         ) : null}
 
         {result?.kind === "refused" ? (
-          <Banner
-            status="info"
-            title={allowedRun ? t.tryAllowedRefused : t.tryRefused}
-            description={
-              <VStack gap={1}>
-                <Code>{result.reason}</Code>
-                {sent ? <Text type="supporting">{explain(t, result.reason, sent.to)}</Text> : null}
-              </VStack>
-            }
-          />
+          <div className="refusal-receipt" role="status">
+            <StatusPill state="refused">
+              {allowedRun ? t.tryAllowedRefused : t.tryRefused}
+            </StatusPill>
+            <code>{result.reason}</code>
+            {sent && <p>{explain(t, result.reason, sent.to)}</p>}
+          </div>
         ) : result?.kind === "accepted" && allowedRun ? (
           <Banner
             status="success"

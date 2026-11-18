@@ -7,6 +7,7 @@ import type { Lang } from "./i18n.js";
 import { LandingIcon } from "./LandingVisual.js";
 import { landingText } from "./landingText.js";
 import "./landing.css";
+import "./routes.css";
 
 export type Current = "home" | "owner" | "arena" | "rules" | "compare" | "business";
 export function SiteShell({

@@ -15,8 +15,8 @@ const en = {
   whoTitle: "Who it is for",
   who: [
     [
-      "Agent platforms",
-      "Platforms that hold wallets for many agents. Each agent gets its own mandate; a payment outside it is refused by the chain's validator (one today, run by the team) and is not included in a block.",
+      "Closed marketplaces",
+      "Operators with a known seller network, where agents buy APIs and data. Each owner sets a mandate; the node refuses payments outside it. This is the first-customer hypothesis.",
     ],
     [
       "Developers",
@@ -40,7 +40,10 @@ const en = {
   ],
   moneyTitle: "How it would earn",
   money: [
-    ["A fee per protected agent", "Paid by the platforms that hold wallets for their agents."],
+    [
+      "A fee per agent under a mandate",
+      "Paid by the platforms that hold wallets for their agents.",
+    ],
     [
       "Transaction fees on the L1",
       "A second source. The current genesis does not enable fee recipients, so collecting them needs a network upgrade.",
@@ -53,17 +56,14 @@ const en = {
   notTitle: "What it does not do",
   not: [
     "It does not know what the owner wanted: an inflated price from an allowed seller, inside the caps, still goes through.",
-    "Today the Sealed L1 on Fuji has one validator, run by the team.",
+    "Running this L1 requires trusting its operator and admin keys; independent operation has not been demonstrated.",
     "Testnet only: every coin here, including the test USDC, has no monetary value.",
     "Sellers cannot take these payments with a standard x402 client or facilitator: they must add the network eip155:261126 and our payment method.",
     "The agent pays only the L1's native coin (bridged test USDC) to plain addresses: no tokens, no contract calls.",
   ],
   checkTitle: "Check it yourself",
   check: [
-    [
-      "The node change",
-      "Two patch files: 1,912 non-blank lines of code and 1,295 non-blank lines of tests.",
-    ],
+    ["The node change", "Inspect the transaction-pool rule, block-validity check and their tests."],
     ["Every address", "deployments/fuji.json lists every contract and account on Fuji."],
     ["The evaluation", "Generated from the raw result files, with every case and its limits."],
     ["The limits", "Written down in the README, next to the results."],
@@ -81,13 +81,13 @@ const vi: BusinessText = {
   title: "Đưa agent một chiếc thẻ, không phải cả ví.",
   lead: "Sealed Arena dành cho các đội có agent AI tự trả tiền mua dữ liệu và API. Chủ đặt danh sách người nhận, hạn mức mỗi lần trả, hạn mức mỗi ngày và ngày hết hạn bằng passkey. Sealed L1 kiểm mọi giao dịch mà key của agent ký theo các điều đó.",
   hypothesisBadge: "Giả thuyết · chưa có khách hàng",
-  ctaConsole: "Mở trang chủ ví",
+  ctaConsole: "Mở bảng điều khiển chủ sở hữu",
   ctaEvaluation: "Đọc kết quả đánh giá",
   whoTitle: "Dành cho ai",
   who: [
     [
-      "Nền tảng agent",
-      "Nền tảng giữ ví cho nhiều agent. Mỗi agent có uỷ quyền riêng; khoản trả ngoài uỷ quyền bị validator của chain từ chối (hiện có một validator, do đội vận hành) và không được đưa vào block.",
+      "Marketplace khép kín",
+      "Bên vận hành mạng lưới người bán đã biết, nơi agent mua API và dữ liệu. Từng chủ sở hữu đặt uỷ quyền; node từ chối khoản trả ngoài phạm vi đó. Đây là giả thuyết khách hàng đầu tiên.",
     ],
     [
       "Lập trình viên",
@@ -111,7 +111,7 @@ const vi: BusinessText = {
   ],
   moneyTitle: "Cách có doanh thu",
   money: [
-    ["Phí theo mỗi agent được bảo vệ", "Do các nền tảng giữ ví cho agent trả."],
+    ["Phí theo mỗi agent có uỷ quyền", "Do các nền tảng giữ ví cho agent trả."],
     [
       "Phí giao dịch trên L1",
       "Nguồn thứ hai. Genesis hiện tại chưa bật người nhận phí, nên muốn thu cần nâng cấp mạng.",
@@ -124,7 +124,7 @@ const vi: BusinessText = {
   notTitle: "Những gì nó không làm",
   not: [
     "Nó không biết chủ thật sự muốn gì: người bán được phép đòi giá cao hơn mà vẫn trong hạn mức thì khoản trả vẫn qua.",
-    "Hiện Sealed L1 trên Fuji có một validator, do đội vận hành.",
+    "Vận hành L1 này đòi hỏi tin bên vận hành và khoá quản trị; chưa chứng minh việc vận hành bởi các bên độc lập.",
     "Chỉ là testnet: mọi coin ở đây, kể cả USDC thử, không có giá trị tiền.",
     "Người bán không nhận được các khoản này bằng client hay facilitator x402 chuẩn: phải thêm mạng eip155:261126 và phương thức thanh toán của dự án.",
     "Agent chỉ trả coin gốc của L1 (USDC thử đã bắc cầu) cho địa chỉ thường: không token, không gọi contract.",
@@ -133,7 +133,7 @@ const vi: BusinessText = {
   check: [
     [
       "Thay đổi trong node",
-      "Hai file bản vá: 1.912 dòng code và 1.295 dòng test (không tính dòng trống).",
+      "Xem quy tắc tại pool, phép kiểm hợp lệ của block và các bài kiểm thử.",
     ],
     ["Mọi địa chỉ", "deployments/fuji.json ghi mọi contract và tài khoản trên Fuji."],
     ["Kết quả đánh giá", "Sinh từ các file kết quả gốc, có từng ca và giới hạn."],

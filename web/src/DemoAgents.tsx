@@ -4,10 +4,12 @@ import { Card } from "@astryxdesign/core/Card";
 import { Code } from "@astryxdesign/core/Code";
 import { HStack, VStack } from "@astryxdesign/core/Layout";
 import { Heading, Text } from "@astryxdesign/core/Text";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { type Address, type Hex, type PublicClient, parseEther } from "viem";
+import { designText } from "./designText.js";
+import { StatusPill } from "./Evidence.js";
 import { type SendOutcome, sendAsAgent } from "./forbiddenSend.js";
-import type { T } from "./i18n.js";
+import type { Lang, T } from "./i18n.js";
 import { type Passkey, RELAYER_URL } from "./owner.js";
 
 /** An address nobody holds a key for; never on a mandate. */
@@ -37,6 +39,8 @@ function storeKey(agent: Address, key: Hex) {
  */
 export function DemoAgents(o: {
   t: T;
+  lang: Lang;
+  children: ReactNode;
   client: PublicClient | undefined;
   passkey: Passkey | undefined;
   /** The agent the page shows, and whether it is linked to this browser's passkey. */
@@ -48,6 +52,7 @@ export function DemoAgents(o: {
   onTried: () => void;
 }) {
   const { t, client } = o;
+  const d = designText(o.lang);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string>();
   const [trying, setTrying] = useState<"stranger" | "payee">();
@@ -97,41 +102,45 @@ export function DemoAgents(o: {
   };
 
   return (
-    <Card>
-      <VStack gap={4}>
-        <VStack gap={2}>
+    <div className="demo-workflow">
+      <Card>
+        <VStack gap={3}>
           <Heading level={2}>{t("demoTitle")}</Heading>
           <Text type="body" color="secondary">
             {t("demoIntro")}
           </Text>
+          {!myKey ? (
+            <HStack gap={3} vAlign="center" wrap="wrap">
+              <Button
+                label={t("demoGet")}
+                variant="primary"
+                isLoading={claiming}
+                isDisabled={claiming || !o.passkey}
+                onClick={() => void claim()}
+              />
+              {!o.passkey && (
+                <Text type="supporting" color="secondary">
+                  {t("demoNeedPasskey")}
+                </Text>
+              )}
+            </HStack>
+          ) : (
+            <Text type="supporting">{t("demoStep3")}</Text>
+          )}
+          {claimError && <Banner status="error" title={claimError} />}
         </VStack>
-        <VStack gap={1}>
-          {(["demoStep1", "demoStep2", "demoStep3", "demoStep4"] as const).map((k, i) => (
-            <Text key={k} type="body">
-              {i + 1}. {t(k)}
-            </Text>
-          ))}
-        </VStack>
+      </Card>
+      {o.children}
+      <section className="console-test" aria-label={d.workflow[3]}>
+        <Heading level={2}>{d.workflow[3]}</Heading>
         {!myKey ? (
-          <HStack gap={3} vAlign="center" wrap="wrap">
-            <Button
-              label={t("demoGet")}
-              variant="primary"
-              isLoading={claiming}
-              isDisabled={claiming || !o.passkey}
-              onClick={() => void claim()}
-            />
-            {!o.passkey ? (
-              <Text type="supporting" color="secondary">
-                {t("demoNeedPasskey")}
-              </Text>
-            ) : null}
-          </HStack>
+          <p className="caption">{o.current && o.ownedByMe ? d.ownKeyHint : d.pendingMandate}</p>
         ) : (
-          <VStack gap={3}>
-            <Text type="supporting" color="secondary">
+          <VStack gap={4}>
+            <Text type="body" color="secondary">
               {t("demoTryHint")}
             </Text>
+            {!o.payee && <p className="caption">{d.pendingMandate}</p>}
             <HStack gap={3} wrap="wrap">
               <Button
                 label={t("demoTry")}
@@ -148,27 +157,44 @@ export function DemoAgents(o: {
                 onClick={() => void tryPayment("payee")}
               />
             </HStack>
+            <div aria-live="polite">
+              {out?.kind === "refused" ? (
+                <div className="refusal-receipt">
+                  <StatusPill state="refused">{t("demoRefused")}</StatusPill>
+                  <code>{out.reason}</code>
+                </div>
+              ) : out?.kind === "accepted" && tried?.to === "payee" ? (
+                <Banner
+                  status="success"
+                  title={t("demoPaid")}
+                  description={<Code>{out.hash}</Code>}
+                />
+              ) : out?.kind === "accepted" ? (
+                <Banner
+                  status="error"
+                  title={t("demoAccepted")}
+                  description={<Code>{out.hash}</Code>}
+                />
+              ) : out?.kind === "busy" ? (
+                <Banner status="warning" title={t("demoBusy")} />
+              ) : out?.kind === "node" ? (
+                <Banner
+                  status="warning"
+                  title={t("demoNode")}
+                  description={<Code>{out.message}</Code>}
+                />
+              ) : out?.kind === "error" ? (
+                <Banner status="warning" title={t("demoError")} description={out.message} />
+              ) : null}
+            </div>
+            <details className="demo-key">
+              <summary>{d.privateDemo}</summary>
+              <p>{d.privateDemoNote}</p>
+              <code>{myKey}</code>
+            </details>
           </VStack>
         )}
-        {claimError ? <Banner status="error" title={claimError} /> : null}
-        {out?.kind === "refused" ? (
-          <Banner
-            status="success"
-            title={t("demoRefused")}
-            description={<Code>{out.reason}</Code>}
-          />
-        ) : out?.kind === "accepted" && tried?.to === "payee" ? (
-          <Banner status="success" title={t("demoPaid")} description={<Code>{out.hash}</Code>} />
-        ) : out?.kind === "accepted" ? (
-          <Banner status="error" title={t("demoAccepted")} description={<Code>{out.hash}</Code>} />
-        ) : out?.kind === "busy" ? (
-          <Banner status="warning" title={t("demoBusy")} />
-        ) : out?.kind === "node" ? (
-          <Banner status="warning" title={t("demoNode")} description={<Code>{out.message}</Code>} />
-        ) : out?.kind === "error" ? (
-          <Banner status="warning" title={t("demoError")} description={out.message} />
-        ) : null}
-      </VStack>
-    </Card>
+      </section>
+    </div>
   );
 }

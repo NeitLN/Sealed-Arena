@@ -3,12 +3,6 @@
   "sources": {
     "pages": "services/agent/transcripts/{injection,injection-strong,drain}-<timestamp>.json"
   },
-  "leakedKey": {
-    "at": "2026-11-18T05:54:16.771Z",
-    "cases": 23,
-    "passed": 23,
-    "source": "services/attacks/suite/results/leaked-key-fuji.json"
-  },
   "walletRuns": {
     "wallet-O+-2026-11-17T19-25-54-490Z.json": "2026-11-17T19:25:54.490Z",
     "wallet-O-2026-11-17T13-19-38-269Z.json": "2026-11-17T13:19:38.269Z",

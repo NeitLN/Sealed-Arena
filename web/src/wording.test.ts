@@ -6,8 +6,11 @@ import { arenaText } from "./arenaText.js";
 import { businessText } from "./businessText.js";
 import result from "./compare-result.json";
 import { compareText, type Result } from "./compareText.js";
+import { designText } from "./designText.js";
 import { KEYS, useI18n } from "./i18n.js";
 import { landingText } from "./landingText.js";
+import leakedKey from "./leakedKeySummary.json";
+import { limitationsText } from "./limitationsText.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -41,6 +44,28 @@ const allText = (v: unknown): string[] =>
         : [];
 
 describe("page wording", () => {
+  it.each(["en", "vi"] as const)(
+    "design and limitations copy (%s) contain no forbidden claim",
+    (lang) => {
+      for (const s of [...allText(designText(lang)), ...allText(limitationsText(lang))])
+        for (const re of FORBIDDEN) expect(s).not.toMatch(re);
+      expect(designText(lang).burstIntro).not.toMatch(
+        /may enter a later block|có thể vào block sau/,
+      );
+    },
+  );
+
+  it("derives the leaked-key count from attack cases, excluding the positive control", () => {
+    const raw = JSON.parse(readFileSync(resolve(ROOT, leakedKey.source), "utf8")) as {
+      at: string;
+      results: { name: string; expected: string; result: string }[];
+    };
+    const attacks = raw.results.filter((row) => !row.name.startsWith("control:"));
+    expect(leakedKey.at).toBe(raw.at);
+    expect(leakedKey.cases).toBe(attacks.length);
+    expect(leakedKey.passed).toBe(attacks.filter((row) => row.result === row.expected).length);
+    expect(raw.results.length).toBeGreaterThan(leakedKey.cases);
+  });
   it.each(["en", "vi"] as const)("challenge pages (%s) contain no forbidden claim", (lang) => {
     for (const s of allText(arenaText(lang)))
       for (const re of FORBIDDEN) expect(s, `${re} in: ${s}`).not.toMatch(re);
@@ -132,12 +157,14 @@ describe("page wording", () => {
     expect(compareText("vi", result as unknown as Result).notes[0]).toMatch(/dựng tay/);
   });
 
-  it("states the six limits in both languages", () => {
-    expect(arenaText("en").limits).toHaveLength(6);
-    expect(arenaText("vi").limits).toHaveLength(6);
+  it("states all fourteen limitations in both languages", () => {
+    expect(arenaText("en").limits).toHaveLength(14);
+    expect(arenaText("vi").limits).toHaveLength(14);
   });
 
   it.each([
+    ["designText", (l: "en" | "vi") => designText(l)],
+    ["limitationsText", (l: "en" | "vi") => limitationsText(l)],
     ["arenaText", (l: "en" | "vi") => arenaText(l)],
     ["landingText", (l: "en" | "vi") => landingText(l)],
     ["businessText", (l: "en" | "vi") => businessText(l)],

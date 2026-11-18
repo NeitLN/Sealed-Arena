@@ -10,6 +10,10 @@
   --ink: #17263c;
   --muted: #576579;
   --line: #dce2eb;
+  --line-strong: #9cacc4;
+  --surface-sunk: #edf1f7;
+  --on-ink-muted: #ced9eb;
+  --on-ink-line: #ffffff30;
   --seal: #3159cf;
   --seal-soft: #eaf0ff;
   --signal: #ae3d3d;
@@ -26,6 +30,7 @@
 }
 [data-astryx-theme="neutral"] {
   --font-family-body: var(--display);
+  --font-size-supporting: 14px;
   --font-family-heading: var(--display);
   --font-family-code: var(--mono);
   --color-background-body: var(--paper);
@@ -62,7 +67,7 @@
 body {
   margin: 0;
 }
-a {
+:where(a:not(.astryx-button)) {
   color: var(--seal);
   text-underline-offset: 4px;
 }
