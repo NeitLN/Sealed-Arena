@@ -9,3 +9,46 @@
   --brand-seal: light-dark(#0f7f71, #6cc7b6);
   --brand-on-seal: light-dark(#ffffff, #111111);
 }
+
+:root {
+  --paper: #f5f8f7;
+  --ink: #153e38;
+  --seal: var(--brand-seal);
+  --muted: #4f6661;
+  --line: #d5e1dc;
+  --display: "Figtree", sans-serif;
+}
+[data-astryx-theme="neutral"] {
+  --color-background-body: var(--paper);
+  --color-accent: var(--seal);
+  --color-text-primary: var(--ink);
+  --color-text-secondary: var(--muted);
+  --color-border-primary: var(--line);
+  background: var(--paper);
+  min-height: 100vh;
+}
+.site-header.landing {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  overflow: visible;
+}
+.site-content {
+  width: 100%;
+  min-width: 0;
+  margin: auto;
+  padding: clamp(16px, 4vw, 48px) clamp(16px, 3vw, 32px);
+  overflow-wrap: anywhere;
+}
+.page-eyebrow {
+  font: 600 11px / 1.5 monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+.site-content h1 {
+  font-family: var(--display);
+  color: var(--ink);
+  letter-spacing: -0.035em;
+}

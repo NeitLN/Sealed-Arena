@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p e2e",
     "e2e": "vite build --mode localnet && tsx e2e/owner.e2e.ts",
+    "e2e:landing": "vite build && tsx e2e/landing.e2e.ts",
     "e2e:live": "tsx e2e/live.e2e.ts",
     "test": "vitest run"
   },

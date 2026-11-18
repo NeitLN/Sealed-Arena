@@ -1,202 +1,362 @@
-import { Badge } from "@astryxdesign/core/Badge";
-import { Button } from "@astryxdesign/core/Button";
-import { Card } from "@astryxdesign/core/Card";
-import { Grid } from "@astryxdesign/core/Grid";
-import { InfoTip } from "@astryxdesign/core/InfoTip";
-import { HStack, VStack } from "@astryxdesign/core/Layout";
-import { Link } from "@astryxdesign/core/Link";
-import { Skeleton } from "@astryxdesign/core/Skeleton";
-import { StatusDot } from "@astryxdesign/core/StatusDot";
-import { Heading, Text } from "@astryxdesign/core/Text";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import evaluation from "./agentEvidence.json";
 import { ARENA } from "./arena.config.js";
-import result from "./compare-result.json";
-import type { Result } from "./compareText.js";
+import { BrandMark } from "./BrandMark.js";
+import r from "./compare-result.json";
 import { useI18n } from "./i18n.js";
+import { LandingIcon, LandingVisual } from "./LandingVisual.js";
 import { landingText } from "./landingText.js";
 import { SiteShell } from "./SiteShell.js";
 import { useArenaLive } from "./useArenaLive.js";
 
-const r = result as unknown as Result;
-
 /** USDC·hours from the recorder's score (coin·seconds with 18 decimals). */
 export const survivalHours = (score: bigint) => Number(score / 10n ** 15n) / 1000 / 3600;
-
-function Tile(o: { label: ReactNode; children: ReactNode }) {
-  return (
-    <Card>
-      <VStack gap={2}>
-        <Text type="supporting" color="secondary">
-          {o.label}
-        </Text>
-        {o.children}
-      </VStack>
-    </Card>
-  );
-}
-
-const number = (v: number | undefined) =>
-  v === undefined ? (
-    <Skeleton width={80} height={36} />
-  ) : (
-    <Text type="display-3">{v.toLocaleString()}</Text>
-  );
 
 export default function LandingPage() {
   const { lang, setLang } = useI18n();
   const t = landingText(lang);
+
   const live = useArenaLive(1);
   const hours = live.rec ? survivalHours(live.rec.score) : undefined;
+  const [paused, setPaused] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const help = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const close = (e: PointerEvent | KeyboardEvent) => {
+      if (!help.current?.open) return;
+      if (e instanceof KeyboardEvent) {
+        if (e.key !== "Escape") return;
+        help.current.querySelector("summary")?.focus();
+      } else if (e.target instanceof Node && help.current.contains(e.target)) return;
+      help.current.open = false;
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("pointerdown", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", close);
+    };
+  }, []);
+  useEffect(() => {
+    const sections = root.current?.querySelectorAll(".reveal");
+    if (!sections || !("IntersectionObserver" in window)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+      },
+      { threshold: 0.08 },
+    );
+    for (const section of sections) observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
   const fill = (s: string) =>
     s
       .replace("{passed}", String(r.O.passedVerifyBeforeSettle))
       .replace("{attempts}", String(r.O.attempts))
       .replace("{reverted}", String(r.O.revertedOnChain));
+  const value = (v: number | undefined, decimals = 0) =>
+    v === undefined ? (
+      <span className="metric-loading">
+        <span className="metric-skeleton" aria-hidden="true" />
+        <span className="landing-sr-only">{live.error ? t.dataUnavailable : t.loading}</span>
+      </span>
+    ) : (
+      v.toLocaleString(lang, { maximumFractionDigits: decimals, minimumFractionDigits: decimals })
+    );
 
   return (
-    <SiteShell lang={lang} setLang={setLang} current="home">
-      <VStack gap={10}>
-        {/* Hero (centered-hero template) */}
-        <VStack gap={6} hAlign="center">
-          <VStack gap={3} hAlign="center">
-            <Badge variant="blue" label={t.eyebrow} />
-            <Heading level={1} type="display-2" justify="center" textWrap="balance">
-              {t.headline}
-            </Heading>
-            <Text type="body" color="secondary" justify="center" textWrap="balance">
-              {t.lead}
-            </Text>
-          </VStack>
-          <HStack gap={3} wrap="wrap" hAlign="center">
-            <Button label={t.tryIt} variant="primary" href="/arena" />
-            <Button label={t.seeCompare} variant="secondary" href="/compare" />
-          </HStack>
-          <Link href="/console">{t.ownerConsole}</Link>
-        </VStack>
+    <SiteShell current="home" lang={lang} setLang={setLang}>
+      <div className="landing" ref={root} data-motion={paused ? "paused" : "running"}>
+        <section className="landing-hero landing-container" aria-labelledby="hero-title">
+          <div className="hero-copy">
+            <div className="hero-eyebrow">
+              <span className="avalanche-symbol" aria-hidden="true">
+                ▲
+              </span>
+              {t.eyebrow}
+              <span className="eyebrow-line" />
+            </div>
+            <h1 id="hero-title">
+              {t.headline} <span>{t.headlineAccent}</span>
+            </h1>
+            <p className="hero-thesis">{t.thesis}</p>
+            <p className="hero-lead">{t.lead}</p>
+            <div className="hero-actions">
+              <a className="landing-button button-primary" href="/arena">
+                {t.tryIt}
+                <LandingIcon name="arrow" />
+              </a>
+              <a className="landing-button button-secondary" href="/compare">
+                {t.seeCompare}
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+            <p className="hero-note">
+              <LandingIcon name="key" size={15} />
+              {t.heroNote}
+            </p>
+          </div>
+          <LandingVisual t={t} paused={paused} onPause={() => setPaused((p) => !p)} />
+          <div className="hero-baseline">
+            <span>{t.stackNote}</span>
+            <a href="#live-proof">
+              {t.scroll}
+              <span aria-hidden="true">↓</span>
+            </a>
+          </div>
+        </section>
 
-        {/* Live proof */}
-        <VStack gap={3}>
-          <HStack gap={2} vAlign="center">
-            <StatusDot variant={live.error ? "warning" : "success"} label={t.liveTitle} />
-            <Heading level={2}>{t.liveTitle}</Heading>
-          </HStack>
-          <Text type="supporting" color="secondary">
-            {live.error ? t.liveDown : t.liveNote}
-          </Text>
-          <Grid columns={{ minWidth: 200, max: 4 }} gap={4}>
-            <Tile label={t.refused}>{number(live.summary?.rejected)}</Tile>
-            <Tile label={t.senders}>{number(live.summary?.distinctSenders)}</Tile>
-            <Tile
-              label={
-                <HStack gap={1} vAlign="center">
-                  <span>{t.survival}</span>
-                  <InfoTip content={t.survivalHelp} size="xsm" />
-                </HStack>
-              }
-            >
-              {hours === undefined ? (
-                <Skeleton width={80} height={36} />
-              ) : (
-                <HStack gap={2} vAlign="end">
-                  <Text type="display-3">{hours.toFixed(1)}</Text>
-                  <Text type="supporting" color="secondary">
-                    {t.survivalUnit}
-                  </Text>
-                </HStack>
-              )}
-            </Tile>
-            <Tile label={t.status}>
-              {live.rec ? (
-                <HStack>
-                  <Badge
-                    variant={live.rec.breached ? "error" : "success"}
-                    label={live.rec.breached ? t.breached : t.intact}
+        <section className="live-section" id="live-proof" aria-labelledby="live-title">
+          <div className="landing-container">
+            <div className="live-heading">
+              <div>
+                <p className="micro-label">{t.liveEyebrow}</p>
+                <h2 id="live-title" className="live-title">
+                  <span
+                    className={`live-indicator ${live.error || !live.rec || !live.summary ? "is-waiting" : ""}`}
                   />
-                </HStack>
-              ) : (
-                <Skeleton width={96} height={24} />
-              )}
-            </Tile>
-          </Grid>
-        </VStack>
+                  {t.liveTitle}
+                </h2>
+              </div>
+              <a className="text-link" href="/arena">
+                {t.liveLink}
+                <LandingIcon name="arrow" size={17} />
+              </a>
+            </div>
+            <div className="live-metrics">
+              <div className="live-metric">
+                <p>{t.refusedShort}</p>
+                <strong>{value(live.summary?.rejected)}</strong>
+                <span>{t.refusedSource}</span>
+              </div>
+              <div className="live-metric">
+                <p>{t.senders}</p>
+                <strong>{value(live.summary?.distinctSenders)}</strong>
+                <span>{t.refusedSource}</span>
+              </div>
+              <div className="live-metric">
+                <div className="metric-label">
+                  {t.survival}
+                  <details className="metric-help" ref={help}>
+                    <summary aria-label={t.aboutSurvival}>i</summary>
+                    <div>{t.survivalHelp}</div>
+                  </details>
+                </div>
+                <strong>
+                  {value(hours, 1)}
+                  <small>{t.survivalUnit}</small>
+                </strong>
+                <span>{t.onChain}</span>
+              </div>
+              <div className="live-metric metric-status">
+                <p>{t.status}</p>
+                <strong className={live.rec?.breached ? "status-breached" : ""}>
+                  {live.rec ? (
+                    <>
+                      <span className="status-symbol">
+                        <LandingIcon name={live.rec.breached ? "cross" : "check"} size={23} />
+                      </span>
+                      {live.rec.breached ? t.breached : t.intact}
+                    </>
+                  ) : (
+                    value(undefined)
+                  )}
+                </strong>
+                <span>{t.onChain}</span>
+              </div>
+            </div>
+            <p className="live-note">{live.error ? t.liveDown : t.liveNote}</p>
+          </div>
+        </section>
 
-        {/* How it works */}
-        <VStack gap={3}>
-          <Heading level={2}>{t.howTitle}</Heading>
-          <Grid columns={{ minWidth: 240, max: 3 }} gap={4}>
-            {[
-              [t.step1Title, t.step1],
-              [t.step2Title, t.step2],
-              [t.step3Title, t.step3],
-            ].map(([title, body], i) => (
-              <Card key={title}>
-                <VStack gap={2}>
-                  <Text type="supporting" color="secondary">
-                    {String(i + 1).padStart(2, "0")}
-                  </Text>
-                  <Heading level={3}>{title}</Heading>
-                  <Text type="body" color="secondary">
-                    {body}
-                  </Text>
-                </VStack>
-              </Card>
+        <section
+          className="how-section landing-container reveal"
+          id="how-it-works"
+          aria-labelledby="how-title"
+        >
+          <div className="section-heading">
+            <div>
+              <p className="micro-label">{t.howEyebrow}</p>
+              <h2 id="how-title" className="landing-section-title">
+                {t.howHeading}
+              </h2>
+            </div>
+            <p className="section-intro">{t.howLead}</p>
+          </div>
+          <div className="process-grid">
+            {(
+              [
+                { title: t.step1Title, body: t.step1, tag: t.step1Tag, icon: "key" },
+                { title: t.step2Title, body: t.step2, tag: t.step2Tag, icon: "arrow" },
+                { title: t.step3Title, body: t.step3, tag: t.step3Tag, icon: "layers" },
+              ] as const
+            ).map((step, i) => (
+              <article className="process-step" key={step.title}>
+                <div className="process-step-top">
+                  <span className="step-icon">
+                    <LandingIcon name={step.icon} size={25} />
+                  </span>
+                  <span className="step-number">0{i + 1}</span>
+                </div>
+                <p className="micro-label">{step.tag}</p>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+                {i < 2 && (
+                  <span className="step-connector" aria-hidden="true">
+                    <LandingIcon name="arrow" size={17} />
+                  </span>
+                )}
+              </article>
             ))}
-          </Grid>
-        </VStack>
+          </div>
+        </section>
 
-        {/* Comparison teaser */}
-        <VStack gap={3}>
-          <Heading level={2}>{t.compareTitle}</Heading>
-          <Text type="supporting" color="secondary">
-            {t.compareNote}
-          </Text>
-          <Grid columns={{ minWidth: 240, max: 3 }} gap={4}>
-            <Card>
-              <VStack gap={3}>
-                <Heading level={3}>{t.plain}</Heading>
-                <HStack>
-                  <Badge variant="error" label={`−${r.P.attackerReceived} USDC`} />
-                </HStack>
-                <Text type="body" color="secondary">
-                  {t.plainResult}
-                </Text>
-              </VStack>
-            </Card>
-            <Card>
-              <VStack gap={3}>
-                <Heading level={3}>{t.limit}</Heading>
-                <HStack>
-                  <Badge
-                    variant="warning"
-                    label={`${r.O.revertedOnChain}/${r.O.attempts} ${t.revertedShort}`}
-                  />
-                </HStack>
-                <Text type="body" color="secondary">
-                  {fill(t.limitResult)}
-                </Text>
-              </VStack>
-            </Card>
-            <Card variant="green">
-              <VStack gap={3}>
-                <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap">
-                  <Heading level={3}>{t.sealed}</Heading>
-                  <Badge variant="neutral" label={t.thisProject} />
-                </HStack>
-                <HStack>
-                  <Badge variant="success" label={r.S.injection.reason} />
-                </HStack>
-                <Text type="body" color="secondary">
+        <section className="evidence-section" id="evidence" aria-labelledby="evidence-title">
+          <div className="landing-container reveal">
+            <div className="section-heading">
+              <div>
+                <p className="micro-label">{t.compareEyebrow}</p>
+                <h2 id="evidence-title" className="landing-section-title">
+                  {t.compareHeading}
+                </h2>
+              </div>
+              <div className="section-intro">
+                <p>{t.compareTitle}.</p>
+                <p>{t.compareNote}</p>
+              </div>
+            </div>
+            <div className="comparison-grid">
+              <article className="comparison-card plain-card">
+                <span className="micro-label">{t.plainBaseline}</span>
+                <h3>{t.plain}</h3>
+                <p className="test-tag">{t.injectedTag}</p>
+                <div className="comparison-amount">
+                  −{r.P.attackerReceived}
+                  <small>USDC</small>
+                </div>
+                <p className="comparison-outcome">
+                  <span className="outcome-dot" />
+                  {t.plainLabel}
+                </p>
+                <div className="comparison-track" aria-hidden="true">
+                  <span>AGENT</span>
+                  <i />
+                  <span>BLOCK</span>
+                  <i />
+                  <span>↗</span>
+                </div>
+                <p className="comparison-detail">
+                  {t.plainResult
+                    .replace("{pages}", evaluation.pages)
+                    .replace("{memory}", evaluation.memory)}
+                </p>
+              </article>
+              <article className="comparison-card contract-card">
+                <span className="micro-label">{t.contractBaseline}</span>
+                <h3>{t.limit}</h3>
+                <p className="test-tag">{t.burstTag.replace("{attempts}", String(r.O.attempts))}</p>
+                <div className="comparison-amount">
+                  {r.O.revertedOnChain}
+                  <small>/ {r.O.attempts}</small>
+                </div>
+                <p className="comparison-outcome">
+                  <span className="outcome-dot" />
+                  {t.limitLabel}
+                </p>
+                <div className="comparison-track" aria-hidden="true">
+                  <span>AGENT</span>
+                  <i />
+                  <span>BLOCK</span>
+                  <i />
+                  <span>×</span>
+                </div>
+                <p className="comparison-detail">{fill(t.limitResult)}.</p>
+              </article>
+              <article className="comparison-card sealed-card">
+                <div className="sealed-card-label">
+                  <span className="micro-label">{t.projectLabel}</span>
+                  <BrandMark size={26} />
+                </div>
+                <h3>{t.sealed}</h3>
+                <p className="test-tag">{t.burstTag.replace("{attempts}", String(r.S.attempts))}</p>
+                <dl className="burst-counts">
+                  {[
+                    [t.inBlocks, r.S.settledOnChain],
+                    [t.keptOut, r.S.leftOutOfBlocks],
+                    [t.reverted, r.S.txs.filter((tx) => tx.status === "reverted").length],
+                  ].map(([label, count]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{count}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="comparison-detail">
+                  {t.poolResult
+                    .replace("{accepted}", String(r.S.acceptedByPool))
+                    .replace("{refused}", String(r.S.refusedByPool))}{" "}
                   {t.sealedResult}
-                </Text>
-              </VStack>
-            </Card>
-          </Grid>
-          <HStack gap={4} wrap="wrap">
-            <Link href="/compare">{t.fullResults}</Link>
-            <Link href={`${ARENA.source}/blob/main/docs/EVALUATION.md`}>{t.evaluation}</Link>
-          </HStack>
-        </VStack>
-      </VStack>
+                </p>
+                <p className="test-tag">{t.injectionLabel}</p>
+                <code>{r.S.injection.reason}</code>
+              </article>
+            </div>
+            <div className="evidence-footer">
+              <p>{t.compareCaveat}</p>
+              <div>
+                <a className="text-link" href="/compare">
+                  {t.fullResults}
+                  <LandingIcon name="arrow" size={17} />
+                </a>
+                <a
+                  className="text-link secondary-text-link"
+                  href={`${ARENA.source}/blob/main/docs/EVALUATION.md`}
+                >
+                  {t.evaluation}
+                  <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="landing-container challenge-section reveal"
+          aria-labelledby="challenge-title"
+        >
+          <div className="challenge-panel">
+            <div className="challenge-rings" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <BrandMark size={110} />
+            </div>
+            <div className="challenge-copy">
+              <p className="micro-label">{t.challengeEyebrow}</p>
+              <h2 id="challenge-title" className="landing-section-title challenge-title">
+                {t.challengeTitle}
+              </h2>
+              <p>{t.challengeBody}</p>
+              <div className="hero-actions">
+                <a className="landing-button button-light" href="/arena">
+                  {t.tryIt}
+                  <LandingIcon name="arrow" />
+                </a>
+                <a className="challenge-rules" href="/arena/rules">
+                  {t.rules}
+                  <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </SiteShell>
   );
 }

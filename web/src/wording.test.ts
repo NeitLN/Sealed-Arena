@@ -74,8 +74,15 @@ describe("page wording", () => {
   it("landing page says the plain-wallet loss is a hand-written transcript and the refusal count is off-chain", () => {
     expect(landingText("en").plainResult).toMatch(/hand-written/);
     expect(landingText("vi").plainResult).toMatch(/dựng tay/);
-    expect(landingText("en").refused).toMatch(/off-chain/);
-    expect(landingText("vi").refused).toMatch(/ngoài chain/);
+    expect(landingText("en").refusedSource).toMatch(/off-chain/);
+    expect(landingText("vi").refusedSource).toMatch(/ngoài chain/);
+  });
+
+  it.each(["en", "vi"] as const)("S burst outcomes in %s describe block inclusion", (lang) => {
+    const t = landingText(lang);
+    expect([t.inBlocks, t.keptOut, t.reverted, t.sealedResult].join(" ")).not.toMatch(
+      /refused|từ chối/i,
+    );
   });
 
   it("landing page numbers come from the comparison results, not the text", () => {
