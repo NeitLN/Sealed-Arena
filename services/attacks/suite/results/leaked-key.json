@@ -1,4 +1,5 @@
 {
+  "at": "2026-11-18T06:35:59.802Z",
   "results": [
     {
       "name": "control: pay an allowed payee inside the mandate",
@@ -26,6 +27,18 @@
       "result": "blocked",
       "reason": "RPC rejected: agent: payee not allowed",
       "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "transfer to an allowed payee as a blob transaction (type 3)",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: transaction type not supported"
+    },
+    {
+      "name": "transfer to an allowed payee as a set-code transaction (type 4)",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: transaction type not supported"
     },
     {
       "name": "transfer above perTxCap",
