@@ -93,6 +93,15 @@ export function demoIssuer(rpc: string, key: Hex): DemoIssuer {
     return hash;
   };
   return {
+    async ready() {
+      const role = await pub.readContract({
+        address: PRECOMPILES.txAllowList,
+        abi: allowListAbi,
+        functionName: "readAllowList",
+        args: [account.address],
+      });
+      return role === 3n; // manager
+    },
     enable: (agent) =>
       one(async () =>
         landed(

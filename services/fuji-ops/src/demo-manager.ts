@@ -5,12 +5,19 @@
 //                                                      give it the manager role
 //   pnpm --filter fuji-ops demo-manager fund <coins>  send it coins from the admin (each demo agent gets 0.05)
 //   pnpm --filter fuji-ops demo-manager status        its role and balance
+//   pnpm --filter fuji-ops demo-manager audit         every address the manager allowed must be a registered agent
+//   pnpm --filter fuji-ops demo-manager revoke        the admin removes the manager role (the relayer then answers 503)
 // The relayer on the VM reads the same key as RELAYER_DEMO_MANAGER_KEY.
 // Needs the L1 RPC (FUJI_L1_RPC or the SSH tunnel) and the admin key in Sealed-Arena/.env.
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { allowListAbi, PRECOMPILES } from "@sealed-arena/shared";
+import {
+  AGENT_POLICY_ADDRESS,
+  agentPolicyAbi,
+  allowListAbi,
+  PRECOMPILES,
+} from "@sealed-arena/shared";
 import {
   type Address,
   createPublicClient,
@@ -114,6 +121,70 @@ async function status() {
   );
 }
 
+/** The manager's address from deployments/fuji.json (its key is not needed to audit or revoke it). */
+function recordedManager(): Address {
+  const m = (d.demoManager as { address?: Address } | undefined)?.address;
+  if (!m) throw new Error("no demoManager in deployments/fuji.json");
+  return m;
+}
+
+/**
+ * The relayer registers a demo agent before it allows it to send, so every address the manager key
+ * allowed must be a registered agent. One that is not was allowed by someone holding the key.
+ */
+async function audit() {
+  const manager = recordedManager();
+  const roleSet = allowListAbi.find((x) => x.type === "event" && x.name === "RoleSet");
+  const logs = (await pub.getLogs({
+    address: LIST,
+    event: roleSet as never,
+    args: { sender: manager } as never,
+    fromBlock: 0n,
+    toBlock: "latest",
+  })) as unknown as Array<{ args: { role: bigint; account: Address }; blockNumber: bigint }>;
+  let bad = 0;
+  for (const l of logs) {
+    const { role, account } = l.args;
+    if (role !== 1n) {
+      console.log(`${account}: role set to ${ROLE[Number(role)] ?? role} by the manager`);
+      continue;
+    }
+    const registered = (await pub.readContract({
+      address: AGENT_POLICY_ADDRESS,
+      abi: agentPolicyAbi,
+      functionName: "isAgent",
+      args: [account],
+    } as never)) as boolean;
+    if (!registered) bad++;
+    console.log(
+      `${registered ? "PASS" : "FAIL"}  ${account} allowed in block ${l.blockNumber}, ${registered ? "registered agent" : "NOT a registered agent"}`,
+    );
+  }
+  console.log(
+    `audit: ${logs.length} role changes by ${manager}; ${bad} allowed address(es) not registered`,
+  );
+  if (bad) process.exitCode = 1;
+}
+
+async function revoke() {
+  const manager = recordedManager();
+  const hash = await admin.writeContract({
+    address: LIST,
+    abi: allowListAbi,
+    functionName: "setNone",
+    args: [manager],
+  });
+  await pub.waitForTransactionReceipt({ hash });
+  record("revokeTx", hash);
+  const role = await pub.readContract({
+    address: LIST,
+    abi: allowListAbi,
+    functionName: "readAllowList",
+    args: [manager],
+  });
+  console.log(`demo manager ${manager}: role ${ROLE[Number(role)] ?? role} (revoke tx ${hash})`);
+}
+
 const [cmd, arg] = process.argv.slice(2);
 const run =
   cmd === "grant"
@@ -122,9 +193,13 @@ const run =
       ? fund(arg)
       : cmd === "status"
         ? status()
-        : undefined;
+        : cmd === "audit"
+          ? audit()
+          : cmd === "revoke"
+            ? revoke()
+            : undefined;
 if (!run) {
-  console.error("usage: demo-manager <grant | fund <coins> | status>");
+  console.error("usage: demo-manager <grant | fund <coins> | status | audit | revoke>");
   process.exit(2);
 }
 run.catch((e) => {

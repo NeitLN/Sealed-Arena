@@ -7,7 +7,7 @@ import { createRelayerApp, type DemoIssuer, type RelayChain } from "./app.js";
 const X = `0x${"11".repeat(32)}` as Hex;
 const Y = `0x${"22".repeat(32)}` as Hex;
 
-function setup(o: { revert?: string; now?: () => number; perDay?: number } = {}) {
+function setup(o: { revert?: string; now?: () => number; perDay?: number; ready?: boolean } = {}) {
   const steps: string[] = [];
   const sent: Hex[] = [];
   const chain: RelayChain = {
@@ -24,6 +24,7 @@ function setup(o: { revert?: string; now?: () => number; perDay?: number } = {})
     },
   };
   const issuer: DemoIssuer = {
+    ready: async () => o.ready ?? true,
     enable: async (a) => {
       steps.push(`enable ${a}`);
       return "0xbbb";
@@ -97,6 +98,14 @@ describe("demo agents", () => {
       { ownerX: X, ownerY: "nope" },
     ])
       expect((await claim(app, body)).status).toBe(400);
+    expect(steps).toEqual([]);
+  });
+
+  it("answers 503 demo-disabled, sending nothing, when the manager key has lost its role", async () => {
+    const { app, steps } = setup({ ready: false });
+    const res = await claim(app, { ownerX: X, ownerY: Y });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ error: "demo-disabled" });
     expect(steps).toEqual([]);
   });
 

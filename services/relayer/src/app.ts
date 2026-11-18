@@ -39,6 +39,8 @@ export type RelayChain = {
  * manager role (never the admin role). Used only after the agent is registered.
  */
 export type DemoIssuer = {
+  /** Whether the issuing key still holds the TxAllowList manager role (it can be revoked). */
+  ready(): Promise<boolean>;
   /** TxAllowList.setEnabled(agent); resolves with the transaction once it is in a block. */
   enable(agent: Address): Promise<Hex>;
   /** Sends `wei` of the native coin to the agent; resolves once it is in a block. */
@@ -244,6 +246,9 @@ export function createRelayerApp(o: RelayerOptions) {
   app.post("/demo/claim", async (c) => {
     const demo = o.demo;
     if (!demo) return c.json({ ok: false, error: "no_demo" }, 404);
+    // Revoked on purpose (RUNBOOK, "if the relayer host is suspected"): say so instead of failing later.
+    if (!(await demo.issuer.ready().catch(() => false)))
+      return c.json({ ok: false, error: "demo-disabled" }, 503);
     const body = (await c.req.json().catch(() => undefined)) as
       | { ownerX?: unknown; ownerY?: unknown }
       | undefined;

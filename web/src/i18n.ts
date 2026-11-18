@@ -86,6 +86,7 @@ const en = {
   demoNeedPasskey: "Create a passkey first.",
   demoFailed: "Could not get a demo agent. Try again later.",
   demo_cap: "No more demo agents today. Try again tomorrow.",
+  "demo-disabled": "Demo agents are paused by the team for now. The rest of the console works.",
   demoTry: "Pay a stranger 0.01 USDC",
   demoTryPayee: "Pay your first allowed payee 0.01 USDC",
   demoTryHint:
@@ -183,6 +184,8 @@ const vi: Record<Key, string> = {
   demoNeedPasskey: "Hãy tạo passkey trước.",
   demoFailed: "Không nhận được agent demo. Thử lại sau.",
   demo_cap: "Hôm nay đã hết agent demo. Hãy thử lại vào ngày mai.",
+  "demo-disabled":
+    "Đội đang tạm dừng cấp agent demo. Các phần khác của trang chủ ví vẫn dùng được.",
   demoTry: "Trả 0,01 USDC cho người lạ",
   demoTryPayee: "Trả 0,01 USDC cho người nhận được phép đầu tiên",
   demoTryHint:
