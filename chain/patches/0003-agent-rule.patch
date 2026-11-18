@@ -1,9 +1,9 @@
 diff --git a/graft/subnet-evm/core/agent_rule.go b/graft/subnet-evm/core/agent_rule.go
 new file mode 100644
-index 0000000..8c77f41
+index 0000000..434ffff
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule.go
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,243 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -34,7 +34,24 @@ index 0000000..8c77f41
 +	ErrAgentMandateExpired   = errors.New("agent: mandate expired")
 +	ErrAgentBudgetExceeded   = errors.New("agent: budget exceeded")
 +	ErrAgentTxTypeNotAllowed = errors.New("agent: transaction type not allowed")
++
++	// Rule v2 (from agentRuleV2Config's activation time).
++	ErrAgentGasLimit          = errors.New("agent: gas limit must be 21000")
++	ErrAgentCallData          = errors.New("agent: call data or access list not allowed")
++	ErrAgentPayeeIsPrecompile = errors.New("agent: payee is a precompile")
++	ErrAgentTipTooHigh        = errors.New("agent: tip too high")
++	ErrAgentSetCodeAuthority  = errors.New("agent: set-code authority is a registered agent")
 +)
++
++// Rule v2 constants. Changing them is a new rule version.
++const (
++	// AgentTransferGas is the only gas limit an agent payment may have: a plain transfer to an
++	// address without code uses exactly this much, so an included payment always succeeds.
++	AgentTransferGas uint64 = 21_000
++)
++
++// AgentMaxTip is the highest effective priority fee per gas an agent may pay (1 gwei).
++var AgentMaxTip = big.NewInt(1_000_000_000)
 +
 +// AgentRuleState is the read access the rule needs. Both the EVM state in preCheck
 +// and the txpool state satisfy it.
@@ -56,6 +73,78 @@ index 0000000..8c77f41
 +	// its other pooled transactions). Only the pool sets it; preCheck leaves it nil, so block
 +	// validity is unchanged.
 +	Reserved *big.Int
++
++	// V2 applies the rule v2 checks (set from the rule version at the block's time). The fields
++	// below are read only when V2 is set.
++	V2            bool
++	TxType        uint8
++	GasTipCap     *big.Int // for types 0 and 1, the gas price
++	BaseFee       *big.Int // base fee of the block (pool: of the head); nil before London
++	DataLen       int
++	AccessListLen int
++}
++
++// IsNativePrecompile reports whether addr is one of the EVM's native precompiles at the pinned
++// version (0x01 to 0x0a, and P-256 verification at 0x100). They have no code in state, so the
++// "payee has code" check does not catch them. The list is part of rule v2: it does not follow
++// library upgrades.
++func IsNativePrecompile(addr common.Address) bool {
++	for _, b := range addr[:18] {
++		if b != 0 {
++			return false
++		}
++	}
++	v := uint16(addr[18])<<8 | uint16(addr[19])
++	return (v >= 0x01 && v <= 0x0a) || v == 0x100
++}
++
++// effectiveTip is min(tipCap, feeCap - baseFee), or tipCap when there is no base fee.
++func effectiveTip(tx AgentTx) *big.Int {
++	tip := tx.GasTipCap
++	if tip == nil {
++		tip = tx.GasFeeCap
++	}
++	if tx.BaseFee == nil {
++		return tip
++	}
++	headroom := new(big.Int).Sub(tx.GasFeeCap, tx.BaseFee)
++	if headroom.Cmp(tip) < 0 {
++		return headroom
++	}
++	return tip
++}
++
++// checkAgentTxV2 is applied after every v1 check passed, so it only refuses transactions that
++// v1 accepts, and v1 refusal reasons do not change.
++func checkAgentTxV2(tx AgentTx) error {
++	if tx.TxType > 2 {
++		return ErrAgentTxTypeNotAllowed
++	}
++	if tx.GasLimit != AgentTransferGas {
++		return fmt.Errorf("%w: %d", ErrAgentGasLimit, tx.GasLimit)
++	}
++	if tx.DataLen != 0 || tx.AccessListLen != 0 {
++		return ErrAgentCallData
++	}
++	if tx.To != nil && IsNativePrecompile(*tx.To) {
++		return fmt.Errorf("%w: %s", ErrAgentPayeeIsPrecompile, tx.To.Hex())
++	}
++	if tip := effectiveTip(tx); tip.Cmp(AgentMaxTip) > 0 {
++		return fmt.Errorf("%w: %s above %s", ErrAgentTipTooHigh, tip, AgentMaxTip)
++	}
++	return nil
++}
++
++// CheckSetCodeAuthorities refuses (rule v2) a transaction from any sender whose set-code
++// authorizations (EIP-7702) name a registered agent: setting code on the agent's account would
++// let anyone call into it without a transaction from the agent.
++func CheckSetCodeAuthorities(state AgentRuleState, authorities []common.Address) error {
++	for _, a := range authorities {
++		if registered, _, _, _ := agentpolicy.GetMandateForRule(state, a); registered {
++			return fmt.Errorf("%w: %s", ErrAgentSetCodeAuthority, a.Hex())
++		}
++	}
++	return nil
 +}
 +
 +// AgentCharge returns value + gasLimit * gasFeeCap, the most the transaction can take
@@ -127,6 +216,11 @@ index 0000000..8c77f41
 +	}
 +	if total := new(big.Int).Add(spent, charge); total.Cmp(m.DailyCap) > 0 {
 +		return nil, true, fmt.Errorf("%w: spentToday %s + charge %s above dailyCap %s", ErrAgentBudgetExceeded, spent, charge, m.DailyCap)
++	}
++	if tx.V2 {
++		if err := checkAgentTxV2(tx); err != nil {
++			return nil, true, err
++		}
 +	}
 +	return charge, true, nil
 +}
@@ -814,8 +908,210 @@ index 0000000..0a4f168
 +	require.Equal(t, uint64(2), version())
 +	e.checkInvariant()
 +}
+diff --git a/graft/subnet-evm/core/agent_rule_v2_test.go b/graft/subnet-evm/core/agent_rule_v2_test.go
+new file mode 100644
+index 0000000..cf7680c
+--- /dev/null
++++ b/graft/subnet-evm/core/agent_rule_v2_test.go
+@@ -0,0 +1,196 @@
++// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
++
++package core
++
++import (
++	"math/big"
++	"testing"
++
++	"github.com/ava-labs/libevm/common"
++	"github.com/ava-labs/libevm/core/rawdb"
++	"github.com/ava-labs/libevm/core/types"
++	"github.com/ava-labs/libevm/core/vm"
++	"github.com/stretchr/testify/require"
++
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++)
++
++// agentTx2 signs a type 2 transaction from the agent with the given tip, gas and data.
++func (e *arEnv) agentTx2(to *common.Address, value *big.Int, gas uint64, tip *big.Int, data []byte, al types.AccessList) *types.Transaction {
++	tx, err := types.SignNewTx(arAgentKey, e.signer, &types.DynamicFeeTx{
++		ChainID: e.chainID(), Nonce: e.nonces[arAgent], GasTipCap: tip, GasFeeCap: arFeeCap,
++		Gas: gas, To: to, Value: value, Data: data, AccessList: al,
++	})
++	require.NoError(e.t, err)
++	e.nonces[arAgent]++
++	return tx
++}
++
++var arFiveGwei = big.NewInt(5_000_000_000)
++
++// Before the switch, v1 holds (a 5 gwei tip is fine); from the block at T the same payment is
++// invalid, and a payment within the v2 limits goes through.
++func TestAgentRuleV2ActivationBoundary(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(40), dummy.NewCoinbaseFaker())
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil)) // t = 20
++	e.good(10, e.agentTx2(&arPayee, common.Big1, 30_000, arFiveGwei, nil, nil))      // t = 30, gas 30000 too
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil)), ErrAgentTipTooHigh) // t = 40
++	receipts := e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil)) // t = 40
++	require.Equal(t, types.ReceiptStatusSuccessful, receipts[0].Status)
++	require.Equal(t, arTransfer, receipts[0].GasUsed)
++	e.checkInvariant()
++}
++
++func TestAgentRuleV2GasDataAndAccessList(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer+1, arTip, nil, nil)), ErrAgentGasLimit)
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, 30_000, arTip, []byte{0x01}, nil)), ErrAgentGasLimit)
++	// Gas below the transfer cost: the agent check in preCheck refuses it before the intrinsic
++	// gas check; either way the transaction is invalid and nothing is charged.
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer-1, arTip, nil, nil)), ErrAgentGasLimit)
++	require.Equal(t, 0, e.spend().TotalCharged.Sign())
++	// Data or an access list with exactly 21000 gas: refused (intrinsic gas fails first for data).
++	al := types.AccessList{{Address: arStranger}}
++	err := e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, al))
++	require.Error(t, err)
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil))
++	e.checkInvariant()
++}
++
++func TestAgentRuleV2TipCap(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
++	over := new(big.Int).Add(AgentMaxTip, common.Big1)
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer, over, nil, nil)), ErrAgentTipTooHigh)
++	receipts := e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil))
++	require.Equal(t, types.ReceiptStatusSuccessful, receipts[0].Status)
++	// A legacy payment pays gasPrice - baseFee as its tip: 1000 gwei here, far above the cap.
++	require.ErrorIs(t, e.bad(e.sign0(&arPayee, common.Big1)), ErrAgentTipTooHigh)
++}
++
++func (e *arEnv) sign0(to *common.Address, value *big.Int) *types.Transaction {
++	tx, err := types.SignNewTx(arAgentKey, e.signer, &types.LegacyTx{
++		Nonce: e.nonces[arAgent], GasPrice: arFeeCap, Gas: arTransfer, To: to, Value: value,
++	})
++	require.NoError(e.t, err)
++	e.nonces[arAgent]++
++	return tx
++}
++
++func TestAgentRuleV2NativePrecompilePayeeRefused(t *testing.T) {
++	bn256Add := common.BytesToAddress([]byte{0x06})
++	m := arMandate([]common.Address{arPayee, bn256Add}, arCoin, new(big.Int).Mul(arCoin, big.NewInt(5)), arFarFuture)
++	e := newArEnvWith(t, m, arConfigV2At(0), dummy.NewCoinbaseFaker())
++	require.ErrorIs(t, e.bad(e.agentTx2(&bn256Add, common.Big0, arTransfer, arTip, nil, nil)), ErrAgentPayeeIsPrecompile)
++	require.Equal(t, 0, e.spend().TotalCharged.Sign())
++	require.True(t, IsNativePrecompile(common.BytesToAddress([]byte{0x01})))
++	require.True(t, IsNativePrecompile(common.BytesToAddress([]byte{0x0a})))
++	require.True(t, IsNativePrecompile(common.HexToAddress("0x0000000000000000000000000000000000000100")))
++	require.False(t, IsNativePrecompile(common.BytesToAddress([]byte{0x0b})))
++	require.False(t, IsNativePrecompile(arPayee))
++}
++
++func TestAgentRuleV2TxTypeWhitelist(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
++	st, err := e.chain.State()
++	require.NoError(t, err)
++	for _, typ := range []uint8{3, 4, 0x7f} {
++		_, applies, err := CheckAgentTx(st, e.head.Time(), AgentTx{
++			From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap,
++			Plain: true, V2: true, TxType: typ, GasTipCap: arTip,
++		})
++		require.True(t, applies)
++		require.ErrorIs(t, err, ErrAgentTxTypeNotAllowed, "type %d", typ)
++	}
++	for _, typ := range []uint8{0, 1, 2} {
++		_, _, err := CheckAgentTx(st, e.head.Time(), AgentTx{
++			From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap,
++			Plain: true, V2: true, TxType: typ, GasTipCap: arTip,
++		})
++		require.NoError(t, err, "type %d", typ)
++	}
++}
++
++// A set-code authorization naming a registered agent makes the transaction invalid from v2 on,
++// whoever sends it; before v2 it is not checked. (No such transaction decodes at the pinned
++// version, so the message is built by hand.)
++func TestAgentRuleV2SetCodeAuthorityRefused(t *testing.T) {
++	run := func(cfgV2 bool, authorities []common.Address) error {
++		cfg := arConfig()
++		if cfgV2 {
++			cfg = arConfigV2At(0)
++		}
++		e := newArEnvWith(t, arBigMandate(), cfg, dummy.NewCoinbaseFaker())
++		st, err := e.chain.State()
++		require.NoError(t, err)
++		msg := &Message{
++			From: arRelayer, To: &arStranger, Nonce: st.GetNonce(arRelayer), Value: common.Big1,
++			GasLimit: arTransfer, GasPrice: arFeeCap, GasFeeCap: arFeeCap, GasTipCap: arTip,
++			SetCodeAuthorities: authorities,
++		}
++		_, _, err = e.applyMessage(msg)
++		return err
++	}
++	require.ErrorIs(t, run(true, []common.Address{arAgent}), ErrAgentSetCodeAuthority)
++	require.NoError(t, run(true, []common.Address{arStranger}))
++	require.NoError(t, run(false, []common.Address{arAgent}))
++}
++
++// A node syncing from genesis re-executes blocks from both sides of the switch and reaches the
++// same head: blocks before T stay valid under v1 even though they would be invalid under v2.
++func TestAgentRuleV2GenesisReplay(t *testing.T) {
++	cfg := arConfigV2At(40)
++	e := newArEnvWith(t, arBigMandate(), cfg, dummy.NewCoinbaseFaker())
++	e.good(10, e.agentTx2(&arPayee, common.Big1, 30_000, arFiveGwei, nil, nil)) // t = 20, v1 only
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, arFiveGwei, nil, nil)) // t = 30, v1 only
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil)) // t = 40, v2
++	e.good(10, e.agentTx2(&arPayee, common.Big1, arTransfer, AgentMaxTip, nil, nil)) // t = 50, v2
++
++	fresh, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, e.gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
++	require.NoError(t, err)
++	defer fresh.Stop()
++	var blocks types.Blocks
++	for n := uint64(1); n <= e.head.NumberU64(); n++ {
++		blocks = append(blocks, e.chain.GetBlockByNumber(n))
++	}
++	_, err = fresh.InsertChain(blocks)
++	require.NoError(t, err)
++	require.Equal(t, e.head.Hash(), fresh.CurrentBlock().Hash())
++	st, err := fresh.State()
++	require.NoError(t, err)
++	require.Equal(t, uint64(2), agentpolicy.RuleVersion(st))
++}
++
++// The effective tip is min(tipCap, feeCap - baseFee): what the block producer gets per gas. A
++// payment whose declared tip is above the cap but whose fee cap leaves less than the cap above
++// the base fee is valid, legacy ones included (their tip is gasPrice - baseFee).
++func TestAgentRuleV2EffectiveTipUsesBaseFee(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
++	st, err := e.chain.State()
++	require.NoError(t, err)
++	baseFee := big.NewInt(25_000_000_000)
++	halfGwei := big.NewInt(500_000_000)
++	check := func(txType uint8, tipCap, feeCap *big.Int) error {
++		_, _, err := CheckAgentTx(st, e.head.Time(), AgentTx{
++			From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer,
++			GasFeeCap: feeCap, Plain: true, V2: true, TxType: txType, GasTipCap: tipCap, BaseFee: baseFee,
++		})
++		return err
++	}
++	justAbove := new(big.Int).Add(new(big.Int).Add(baseFee, AgentMaxTip), common.Big1)
++	atCap := new(big.Int).Add(baseFee, AgentMaxTip)
++	half := new(big.Int).Add(baseFee, halfGwei)
++	// Legacy: tip = gasPrice - baseFee.
++	require.NoError(t, check(0, half, half))
++	require.NoError(t, check(0, atCap, atCap))
++	require.ErrorIs(t, check(0, justAbove, justAbove), ErrAgentTipTooHigh)
++	// Type 2: a 2 gwei tip cap with only 0.5 gwei of room above the base fee pays 0.5 gwei.
++	require.NoError(t, check(2, big.NewInt(2_000_000_000), half))
++	require.ErrorIs(t, check(2, big.NewInt(2_000_000_000), justAbove), ErrAgentTipTooHigh)
++	// No base fee (before London): the declared tip counts.
++	_, _, err = CheckAgentTx(st, e.head.Time(), AgentTx{
++		From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap,
++		Plain: true, V2: true, TxType: 2, GasTipCap: big.NewInt(2_000_000_000),
++	})
++	require.ErrorIs(t, err, ErrAgentTipTooHigh)
++}
 diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
-index 415a986..789b90b 100644
+index 415a986..820c494 100644
 --- a/graft/subnet-evm/core/state_transition.go
 +++ b/graft/subnet-evm/core/state_transition.go
 @@ -33,6 +33,7 @@ import (
@@ -826,7 +1122,28 @@ index 415a986..789b90b 100644
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
  	"github.com/ava-labs/libevm/common"
  	cmath "github.com/ava-labs/libevm/common/math"
-@@ -168,6 +169,10 @@ type StateTransition struct {
+@@ -97,6 +98,12 @@ type Message struct {
+ 	BlobGasFeeCap *big.Int
+ 	BlobHashes    []common.Hash
+ 
++	// Sealed Arena (agent rule v2): the transaction type, and the authorities of set-code
++	// authorizations (EIP-7702; no transaction of that type decodes at the pinned version, so
++	// nothing sets it yet).
++	TxType             uint8
++	SetCodeAuthorities []common.Address
++
+ 	// When SkipAccountChecks is true, the message nonce is not checked against the
+ 	// account nonce in state. It also disables checking that the sender is an EOA.
+ 	// This field will be set to true for operations like RPC eth_call.
+@@ -118,6 +125,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
+ 		SkipAccountChecks: false,
+ 		BlobHashes:        tx.BlobHashes(),
+ 		BlobGasFeeCap:     tx.BlobGasFeeCap(),
++		TxType:            tx.Type(),
+ 	}
+ 	// If baseFee provided, set gasPrice to effectiveGasPrice.
+ 	if baseFee != nil {
+@@ -168,6 +176,10 @@ type StateTransition struct {
  	initialGas   uint64
  	state        vm.StateDB
  	evm          *vm.EVM
@@ -837,21 +1154,33 @@ index 415a986..789b90b 100644
  }
  
  // NewStateTransition initialises and returns a new state transition object.
-@@ -257,6 +262,25 @@ func (st *StateTransition) preCheck() error {
+@@ -257,6 +269,37 @@ func (st *StateTransition) preCheck() error {
  				return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, msg.From)
  			}
  		}
 +
 +		// Sealed Arena: an agent transaction outside its mandate is invalid, not reverted.
 +		// Only read here; the spend is recorded after buyGas, once every check passed.
-+		if params.GetExtra(st.evm.ChainConfig()).IsPrecompileEnabled(agentpolicy.ContractAddress, st.evm.Context.Time) {
++		if version := AgentRuleVersionAt(st.evm.ChainConfig(), st.evm.Context.Time); version != AgentRuleOff {
++			v2 := version == AgentRuleV2
++			if v2 {
++				if err := CheckSetCodeAuthorities(st.state, msg.SetCodeAuthorities); err != nil {
++					return err
++				}
++			}
 +			charge, applies, err := CheckAgentTx(st.state, st.evm.Context.Time, AgentTx{
-+				From:      msg.From,
-+				To:        msg.To,
-+				Value:     msg.Value,
-+				GasLimit:  msg.GasLimit,
-+				GasFeeCap: msg.GasFeeCap,
-+				Plain:     msg.BlobHashes == nil,
++				From:          msg.From,
++				To:            msg.To,
++				Value:         msg.Value,
++				GasLimit:      msg.GasLimit,
++				GasFeeCap:     msg.GasFeeCap,
++				Plain:         msg.BlobHashes == nil,
++				V2:            v2,
++				TxType:        msg.TxType,
++				GasTipCap:     msg.GasTipCap,
++				BaseFee:       st.evm.Context.BaseFee,
++				DataLen:       len(msg.Data),
++				AccessListLen: len(msg.AccessList),
 +			})
 +			if err != nil {
 +				return err
@@ -863,7 +1192,7 @@ index 415a986..789b90b 100644
  	}
  	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
  	if st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber) {
-@@ -315,7 +339,16 @@ func (st *StateTransition) preCheck() error {
+@@ -315,7 +358,16 @@ func (st *StateTransition) preCheck() error {
  			}
  		}
  	}
@@ -882,18 +1211,19 @@ index 415a986..789b90b 100644
  
  // TransitionDb will transition the state by applying the current message and
 diff --git a/graft/subnet-evm/core/txpool/legacypool/legacypool.go b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
-index cb2602f..7dae7de 100644
+index cb2602f..6cb651a 100644
 --- a/graft/subnet-evm/core/txpool/legacypool/legacypool.go
 +++ b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
-@@ -43,6 +43,7 @@ import (
+@@ -43,6 +43,8 @@ import (
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentrulev2"
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
  	"github.com/ava-labs/libevm/common"
  	"github.com/ava-labs/libevm/common/prque"
-@@ -707,6 +708,7 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
+@@ -707,6 +709,7 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
  			params.IsMergeTODO,
  			pool.currentHead.Load().Time,
  		),
@@ -901,10 +1231,11 @@ index cb2602f..7dae7de 100644
  		MinimumFee: pool.minimumFee,
  
  		FirstNonceGap: nil, // Pool allows arbitrary arrival order, don't invalidate nonce gaps
-@@ -734,6 +736,24 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
+@@ -734,6 +737,25 @@ func (pool *LegacyPool) validateTx(tx *types.Transaction, local bool) error {
  			}
  			return nil
  		},
++		AgentBaseFee: pool.currentHead.Load().BaseFee,
 +		// Sealed Arena: the charges of the sender's pooled transactions with a lower nonce, pending
 +		// and queued. Counting in nonce order means payments that arrive out of order, or are queued
 +		// ahead with a gap, cannot take the budget from an earlier nonce; pruneAgentTxs drops what
@@ -926,7 +1257,7 @@ index cb2602f..7dae7de 100644
  	}
  	if err := txpool.ValidateTransactionWithState(tx, pool.signer, opts); err != nil {
  		return err
-@@ -1381,6 +1401,7 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest,
+@@ -1381,6 +1403,7 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest,
  	// because of another transaction (e.g. higher gas price).
  	if reset != nil {
  		pool.demoteUnexecutables()
@@ -934,7 +1265,7 @@ index cb2602f..7dae7de 100644
  		if reset.newHead != nil {
  			if pool.chainconfig.IsLondon(reset.newHead.Number) {
  				if err := pool.updateBaseFeeAt(reset.newHead); err != nil {
-@@ -1743,6 +1764,67 @@ func (pool *LegacyPool) truncateQueue() {
+@@ -1743,6 +1766,75 @@ func (pool *LegacyPool) truncateQueue() {
  // Note: transactions are not marked as removed in the priced list because re-heaping
  // is always explicitly triggered by SetBaseFee and it would be unnecessary and wasteful
  // to trigger a re-heap is this function
@@ -950,6 +1281,7 @@ index cb2602f..7dae7de 100644
 +		return
 +	}
 +	now := txpool.PoolTime(head.Time)
++	v2 := params.GetRulesExtra(rules).IsPrecompileEnabled(agentrulev2.ContractAddress)
 +	accounts := make(map[common.Address]struct{}, len(pool.pending)+len(pool.queue))
 +	for addr := range pool.pending {
 +		accounts[addr] = struct{}{}
@@ -978,6 +1310,13 @@ index cb2602f..7dae7de 100644
 +				GasFeeCap: tx.GasFeeCap(),
 +				Plain:     t == types.LegacyTxType || t == types.AccessListTxType || t == types.DynamicFeeTxType,
 +				Reserved:  reserved,
++
++				V2:            v2,
++				TxType:        t,
++				GasTipCap:     tx.GasTipCap(),
++				BaseFee:       head.BaseFee,
++				DataLen:       len(tx.Data()),
++				AccessListLen: len(tx.AccessList()),
 +			}
 +			_, applies, err := core.CheckAgentTx(pool.currentState, now, agentTx)
 +			if !applies {
@@ -1003,10 +1342,10 @@ index cb2602f..7dae7de 100644
  	// Iterate over all accounts and demote any non-executable transactions
  	gasLimit := pool.currentHead.Load().GasLimit
 diff --git a/graft/subnet-evm/core/txpool/validation.go b/graft/subnet-evm/core/txpool/validation.go
-index 1827192..36d1e55 100644
+index 1827192..a96bbc3 100644
 --- a/graft/subnet-evm/core/txpool/validation.go
 +++ b/graft/subnet-evm/core/txpool/validation.go
-@@ -31,10 +31,12 @@ import (
+@@ -31,10 +31,13 @@ import (
  	"crypto/sha256"
  	"fmt"
  	"math/big"
@@ -1016,10 +1355,11 @@ index 1827192..36d1e55 100644
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentrulev2"
  	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
  	"github.com/ava-labs/libevm/common"
  	ethcore "github.com/ava-labs/libevm/core"
-@@ -190,10 +192,33 @@ func validateBlobSidecar(hashes []common.Hash, sidecar *types.BlobTxSidecar) err
+@@ -190,10 +193,36 @@ func validateBlobSidecar(hashes []common.Hash, sidecar *types.BlobTxSidecar) err
  	return nil
  }
  
@@ -1050,10 +1390,13 @@ index 1827192..36d1e55 100644
 +	// the sender's pooled transactions, pending and queued, with a nonce lower than `nonce`. The
 +	// rule counts it toward the daily budget.
 +	AgentReserved func(addr common.Address, nonce uint64) *big.Int
++	// AgentBaseFee is the base fee the agent rule v2 tip check uses (the head's; the next block's
++	// may differ, and the pool drops what no longer fits at the next head).
++	AgentBaseFee *big.Int
  
  	// FirstNonceGap is an optional callback to retrieve the first nonce gap in
  	// the list of pooled transactions of a specific account. If this method is
-@@ -285,5 +310,25 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
+@@ -285,5 +314,31 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
  		}
  	}
  
@@ -1065,13 +1408,19 @@ index 1827192..36d1e55 100644
 +			reserved = opts.AgentReserved(from, tx.Nonce())
 +		}
 +		if _, _, err := core.CheckAgentTx(opts.State, opts.Time, core.AgentTx{
-+			From:      from,
-+			To:        tx.To(),
-+			Value:     tx.Value(),
-+			GasLimit:  tx.Gas(),
-+			GasFeeCap: tx.GasFeeCap(),
-+			Plain:     plain,
-+			Reserved:  reserved,
++			From:          from,
++			To:            tx.To(),
++			Value:         tx.Value(),
++			GasLimit:      tx.Gas(),
++			GasFeeCap:     tx.GasFeeCap(),
++			Plain:         plain,
++			Reserved:      reserved,
++			V2:            params.GetRulesExtra(opts.Rules).IsPrecompileEnabled(agentrulev2.ContractAddress),
++			TxType:        tx.Type(),
++			GasTipCap:     tx.GasTipCap(),
++			BaseFee:       opts.AgentBaseFee,
++			DataLen:       len(tx.Data()),
++			AccessListLen: len(tx.AccessList()),
 +		}); err != nil {
 +			return err
 +		}
@@ -1154,10 +1503,10 @@ index 0000000..6de1051
 +}
 diff --git a/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
 new file mode 100644
-index 0000000..e6c7435
+index 0000000..0d2d043
 --- /dev/null
 +++ b/graft/subnet-evm/plugin/evm/agent_rule_vm_test.go
-@@ -0,0 +1,429 @@
+@@ -0,0 +1,460 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package evm
@@ -1186,6 +1535,7 @@ index 0000000..e6c7435
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
 +	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentpolicy"
++	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/agentrulev2"
 +	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 +	"github.com/ava-labs/avalanchego/vms/components/chain"
 +)
@@ -1356,10 +1706,18 @@ index 0000000..e6c7435
 +}
 +
 +func newAgentPoolEnv(t *testing.T, fits int64) *agentPoolEnv {
++	return newAgentPoolEnvRule(t, fits, false)
++}
++
++// newAgentPoolEnvRule is newAgentPoolEnv with agent rule v2 active from genesis when v2 is set.
++func newAgentPoolEnvRule(t *testing.T, fits int64, v2 bool) *agentPoolEnv {
 +	genesis := &core.Genesis{}
 +	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))))
 +	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 +		agentpolicy.ConfigKey: agentpolicy.NewConfig(utils.PointerTo[uint64](0)),
++	}
++	if v2 {
++		params.GetExtra(genesis.Config).GenesisPrecompiles[agentrulev2.ConfigKey] = agentrulev2.NewConfig(utils.PointerTo[uint64](0))
 +	}
 +	genesisJSON, err := genesis.MarshalJSON()
 +	require.NoError(t, err)
@@ -1586,6 +1944,28 @@ index 0000000..e6c7435
 +	sp := agentpolicy.SpendForDay(state, agent, ethBlock.Time())
 +	require.Equal(t, 0, charge.Cmp(sp.SpentToday))
 +	require.Equal(t, 0, new(big.Int).Mul(charge, big.NewInt(2)).Cmp(sp.TotalCharged))
++}
++
++// With rule v2 the pool refuses an agent payment whose tip is above the cap, or whose gas is not
++// 21000, on arrival; a payment within the v2 limits is admitted and built into a block.
++func TestAgentRulePoolV2RefusesOnArrival(t *testing.T) {
++	e := newAgentPoolEnvRule(t, 7, true)
++	head := e.tvm.vm.blockChain.CurrentBlock()
++	feeCap := new(big.Int).Mul(head.BaseFee, big.NewInt(2))
++	pay := func(nonce uint64, gas uint64, tip *big.Int) *types.Transaction {
++		tx, err := types.SignNewTx(e.agentKey, e.signer, &types.DynamicFeeTx{
++			ChainID: e.chainID, Nonce: nonce, GasTipCap: tip, GasFeeCap: feeCap, Gas: gas, To: &e.payee, Value: big.NewInt(1),
++		})
++		require.NoError(t, err)
++		return tx
++	}
++	over := new(big.Int).Add(core.AgentMaxTip, common.Big1)
++	require.ErrorIs(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{pay(0, 21_000, over)})[0], core.ErrAgentTipTooHigh)
++	require.ErrorIs(t, e.tvm.vm.txPool.AddRemotesSync([]*types.Transaction{pay(0, 30_000, core.AgentMaxTip)})[0], core.ErrAgentGasLimit)
++	e.block(pay(0, 21_000, core.AgentMaxTip))
++	state, err := e.tvm.vm.blockChain.State()
++	require.NoError(t, err)
++	require.Equal(t, uint64(1), state.GetNonce(e.agent))
 +}
 diff --git a/graft/subnet-evm/precompile/contracts/agentpolicy/config.go b/graft/subnet-evm/precompile/contracts/agentpolicy/config.go
 index 9e9df04..e0be2ab 100644
