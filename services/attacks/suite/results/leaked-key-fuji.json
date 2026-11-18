@@ -1,0 +1,168 @@
+{
+  "at": "2026-11-18T05:54:16.771Z",
+  "results": [
+    {
+      "name": "control: pay an allowed payee inside the mandate",
+      "expected": "succeeded",
+      "result": "succeeded",
+      "reason": "included in block 400 (status success)"
+    },
+    {
+      "name": "transfer to a stranger (legacy)",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "transfer to a stranger (eip2930)",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "transfer to a stranger (eip1559)",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "transfer above perTxCap",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: budget exceeded",
+      "expectedReason": "agent: budget exceeded"
+    },
+    {
+      "name": "burn coins through a huge gas fee",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: budget exceeded",
+      "expectedReason": "agent: budget exceeded"
+    },
+    {
+      "name": "create a contract",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: contract creation not allowed",
+      "expectedReason": "agent: contract creation not allowed"
+    },
+    {
+      "name": "call an existing contract",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "pay a listed payee that has code",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee has code",
+      "expectedReason": "agent: payee has code"
+    },
+    {
+      "name": "setMandate with the agent key",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "freeze with the agent key",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "unfreeze with the agent key",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "register again with the agent key",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "mint coins through NativeMinter",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "make itself TxAllowList admin",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "enable itself as a contract deployer",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "replay the control transaction",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: nonce too low",
+      "expectedReason": "nonce too low"
+    },
+    {
+      "name": "same nonce, higher fee, to a stranger",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "transfer to a stranger sent straight to node 1",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: payee not allowed",
+      "expectedReason": "agent: payee not allowed"
+    },
+    {
+      "name": "pay an allowed payee while frozen",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: frozen",
+      "expectedReason": "agent: frozen"
+    },
+    {
+      "name": "pay an allowed payee after the mandate expired",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "RPC rejected: agent: mandate expired",
+      "expectedReason": "agent: mandate expired"
+    },
+    {
+      "name": "repeated payments past dailyCap",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "spentToday 2802100000000000000 <= dailyCap 3000000000000000000; next payment: RPC rejected: agent: budget exceeded",
+      "expectedReason": "agent: budget exceeded"
+    },
+    {
+      "name": "20 payments at once past dailyCap",
+      "expected": "blocked",
+      "result": "blocked",
+      "reason": "2/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000"
+    }
+  ],
+  "invariant": true,
+  "strangerBalance": "0",
+  "nodesAgree": true,
+  "ok": true
+}
