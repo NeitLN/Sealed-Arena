@@ -289,7 +289,7 @@ export default function LandingPage() {
                 <dl className="burst-counts">
                   {[
                     [t.inBlocks, r.S.settledOnChain],
-                    [t.keptOut, r.S.leftOutOfBlocks],
+                    [t.keptOut, r.S.refusedByPool],
                     [t.reverted, r.S.txs.filter((tx) => tx.status === "reverted").length],
                   ].map(([label, count]) => (
                     <div key={label}>

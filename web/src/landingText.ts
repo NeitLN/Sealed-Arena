@@ -13,7 +13,7 @@ const en = {
   injectedTag: "Injected page · hand-written transcript",
   burstTag: "{attempts} simultaneous payments",
   inBlocks: "In blocks",
-  keptOut: "Waiting in the pool",
+  keptOut: "Refused on arrival",
   reverted: "Reverted",
   injectionLabel: "Payment to the attacker refused by the node",
   challengeEyebrow: "SEALED ARENA / OPEN CHALLENGE",
@@ -53,9 +53,9 @@ const en = {
   limitResult: "{passed} of {attempts} passed the check, then {reverted} reverted inside blocks",
   sealed: "Sealed L1",
   poolResult:
-    "The pool accepted {accepted} of {attempts}: each payment alone is inside the caps. The rule lets into blocks only what fits the daily cap.",
+    "The node accepted {accepted} of {attempts}. It counts the payments already in its pool toward the daily cap, so it refused the rest on arrival.",
   sealedResult:
-    "Over-limit payments stayed out of blocks. A waiting payment can enter a later day's block within that day's cap.",
+    "Nothing over the cap reached a block, and nothing was left waiting for a later day.",
   fullResults: "Full results",
   evaluation: "Evaluation report",
   skip: "Skip to content",
@@ -130,7 +130,7 @@ const vi: Text = {
   injectedTag: "Trang cài lệnh · bản ghi dựng tay",
   burstTag: "{attempts} khoản trả đồng thời",
   inBlocks: "Vào block",
-  keptOut: "Đang chờ trong pool",
+  keptOut: "Bị từ chối khi gửi",
   reverted: "Revert",
   injectionLabel: "Node từ chối khoản trả cho kẻ tấn công",
   challengeEyebrow: "SEALED ARENA / THỬ THÁCH MỞ",
@@ -170,9 +170,9 @@ const vi: Text = {
   limitResult: "{passed}/{attempts} qua bước kiểm, rồi {reverted} revert trong block",
   sealed: "L1 Sealed",
   poolResult:
-    "Pool nhận {accepted}/{attempts} khoản: từng khoản riêng lẻ đều trong hạn mức. Quy tắc chỉ cho vào block phần vừa hạn mức ngày.",
+    "Node nhận {accepted}/{attempts} khoản. Node tính cả các khoản đang có trong pool vào hạn mức ngày, nên từ chối phần còn lại ngay khi gửi.",
   sealedResult:
-    "Khoản vượt hạn mức chưa vào block. Giao dịch chờ có thể vào block ngày sau nếu còn hạn mức của ngày đó.",
+    "Không khoản nào vượt hạn mức vào block, và không khoản nào bị để chờ sang ngày sau.",
   fullResults: "Xem đầy đủ",
   evaluation: "Báo cáo đánh giá",
   skip: "Đến nội dung chính",

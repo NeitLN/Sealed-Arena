@@ -245,9 +245,9 @@ export const coin = (n: number | bigint) => BigInt(n) * 10n ** 18n;
 export async function freshAgent(
   n: Node,
   payees: readonly Address[],
-  o: { funding?: bigint; perTxCap?: bigint; dailyCap?: bigint } = {},
+  o: { funding?: bigint; perTxCap?: bigint; dailyCap?: bigint; key?: Hex } = {},
 ): Promise<PrivateKeyAccount> {
-  const agent = privateKeyToAccount(generatePrivateKey());
+  const agent = privateKeyToAccount(o.key ?? generatePrivateKey());
   await sendAndWait(n, accounts.admin, {
     to: PRECOMPILES.txAllowList,
     data: encodeFunctionData({
