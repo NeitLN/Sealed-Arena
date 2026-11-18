@@ -6,11 +6,13 @@
 
 **An Avalanche L1 where a payment from an AI agent's key is valid only if it stays inside the mandate its owner set with a passkey.**
 
-Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction: it is an **invalid** transaction that no block accepted by the chain's validators can contain.
+Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction: it is an **invalid** transaction: the chain's validator does not accept a block that contains it.
+
+> **Today:** one validator, run by the team, on the Fuji testnet. The claim is about where the rule is checked (transaction validity), not about who operates the chain. See [Security model and limitations](#security-model-and-limitations).
 
 > Built for Team1 Vietnam UniHack 2026, _Build on Avalanche_, track AI agents & security. Testnet only.
 
-> **Tóm tắt (Tiếng Việt).** Sealed Arena là một Avalanche L1 riêng. Mỗi khoản chi từ khoá của một AI agent chỉ hợp lệ khi nằm trong uỷ quyền mà chủ ví đặt bằng passkey: danh sách người nhận, hạn mức mỗi giao dịch, hạn mức mỗi ngày, hạn dùng. Quy tắc nằm trong điều kiện hợp lệ của giao dịch ở node (Subnet-EVM), nên giao dịch vượt uỷ quyền không vào được block nào, kể cả khi kẻ tấn công cầm được private key của agent. Chủ ví có thể dừng agent bất cứ lúc nào bằng passkey. Dự án chỉ chạy trên testnet; tài sản không có giá trị quy đổi.
+> **Tóm tắt (Tiếng Việt).** Sealed Arena là một Avalanche L1 riêng. Mỗi khoản chi từ khoá của một AI agent chỉ hợp lệ khi nằm trong uỷ quyền mà chủ ví đặt bằng passkey: danh sách người nhận, hạn mức mỗi giao dịch, hạn mức mỗi ngày, hạn dùng. Quy tắc nằm trong điều kiện hợp lệ của giao dịch ở node (Subnet-EVM), nên giao dịch vượt uỷ quyền không được đưa vào block mà validator của chain chấp nhận (hiện có một validator, do đội vận hành), kể cả khi kẻ tấn công cầm được private key của agent. Chủ ví có thể dừng agent bất cứ lúc nào bằng passkey. Dự án chỉ chạy trên testnet; tài sản không có giá trị quy đổi.
 
 ---
 
@@ -30,7 +32,7 @@ flowchart LR
     end
     pre -- "reads mandate,<br/>records spend" --> policy
     pre -- "inside mandate" --> block["Block"]
-    pre -- "outside mandate" --> reject["Invalid: rejected,<br/>never in a block"]
+    pre -- "outside mandate" --> reject["Invalid: refused,<br/>not included in a block"]
 ```
 
 1. The owner registers an agent key with a P-256 **passkey** and sets a **mandate**: allowed payees (up to 16), a per-transaction cap, a daily cap and an expiry. Every change needs a fresh WebAuthn proof from that passkey, bound to the chain id, the agent and a nonce, so the agent key alone can never change it.
@@ -56,18 +58,18 @@ We have no customers yet; this is a hypothesis we have not tested.
 
 ## Avalanche components used
 
-| Component                                                            | Role here                                                      |
-| -------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Avalanche L1 on Fuji (ACP-77), one validator, P-Chain continuous fee | Runs the Sealed chain; created with the Avalanche Platform CLI |
-| Subnet-EVM, patched (`chain/patches/`)                               | The validity rule in `preCheck` and the transaction pool       |
-| Stateful precompile `AgentPolicy` (`0x0300…01`)                      | Mandates, passkey (P-256 WebAuthn) proofs, spend counters      |
-| Precompiles TxAllowList, ContractDeployerAllowList, NativeMinter     | Who may send and deploy; minting only for the ICTT remote      |
-| ValidatorManager on the Fuji C-Chain (proof of authority)            | The L1's validator set                                         |
-| ICTT: `ERC20TokenHome` (C-Chain), `NativeTokenRemote` (L1)           | USDC as the L1's native coin                                   |
-| ICM (Teleporter) and the ICM relayer                                 | Carries the open challenge's survival record to the C-Chain    |
-| ERC-8004 registries on the Fuji C-Chain                              | Public identity and reputation record of the challenge agent   |
+| Component                                                            | Role here                                                                                                               |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Avalanche L1 on Fuji (ACP-77), one validator, P-Chain continuous fee | Runs the Sealed chain; created with the Avalanche Platform CLI                                                          |
+| Subnet-EVM, patched (`chain/patches/`)                               | The validity rule in `preCheck` and the transaction pool                                                                |
+| Stateful precompile `AgentPolicy` (`0x0300…01`)                      | Mandates, passkey (P-256 WebAuthn) proofs, spend counters                                                               |
+| Precompiles TxAllowList, ContractDeployerAllowList, NativeMinter     | Who may send and deploy; the ICTT remote is the only minter the project uses (the admin key can also mint, see limit 2) |
+| ValidatorManager on the Fuji C-Chain (proof of authority)            | The L1's validator set                                                                                                  |
+| ICTT: `ERC20TokenHome` (C-Chain), `NativeTokenRemote` (L1)           | USDC as the L1's native coin                                                                                            |
+| ICM (Teleporter) and the ICM relayer                                 | Carries the open challenge's survival record to the C-Chain                                                             |
+| ERC-8004 registries on the Fuji C-Chain                              | Public identity and reputation record of the challenge agent                                                            |
 
-**Size of the node change.** Two patch files on avalanchego `v1.15.3`: 1,912 non-blank lines of code added and 4 removed, plus 1,295 non-blank lines of tests. The rule itself is about 170 lines (`core/agent_rule.go` and its hooks in `core/state_transition.go` and `core/txpool/`); the rest is the `AgentPolicy` precompile, including WebAuthn verification and its ABI.
+**Size of the node change.** Two patch files (`0002-agentpolicy-precompile.patch`, `0003-agent-rule.patch`) on avalanchego `v1.15.3`: 1,912 non-blank lines of code added and 4 removed, plus 1,295 non-blank lines of tests. The rule itself is about 170 lines (`core/agent_rule.go` and its hooks in `core/state_transition.go` and `core/txpool/`); the rest is the `AgentPolicy` precompile, including WebAuthn verification and its ABI. An earlier spike patch (`0001-spike-agent-rule.patch`), cited in D1, was removed once the rule was written; D1's evidence can be re-run at commit `8d42e78`.
 
 ## Status
 
@@ -183,32 +185,32 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 
 `bash scripts/check.sh` is the single quick check and runs in CI on every pull request. Highlights:
 
-- Go tests run against hand-built blocks: a block that contains a forbidden agent transaction must be rejected at import, for every transaction type.
+- Go tests run against hand-built blocks: a block that contains a forbidden agent transaction must be rejected at import, for transaction types 0, 1 and 2.
 - A VM-level test drives the real transaction pool and block builder: 20 payments that are each valid alone are queued at once, and only what fits the daily budget reaches a block.
 - WebAuthn test vectors in [`chain/testvectors/`](chain/testvectors) are shared by the Go precompile tests and the TypeScript encoder tests, so both sides agree byte for byte.
 - `chain/tests/rule/run.sh` checks the same behaviour over RPC on a running local L1 with one and three nodes.
 - The x402 suite (`services/attacks/src/x402.ts`) starts the facilitator and two sample sellers, buys one dataset end to end, then sends each payment that must be refused (wrong payee, price, resource, chain id, signer, reused request id, already broadcast, seller outside the mandate) and checks the agent's balance and nonce do not move.
 - `ArenaRecorder` has Foundry tests for the score, the invariant, breaches and direct deposits (with a fuzz test), and `services/attacks/src/arena.ts` runs the leaked-key suite against an agent funded only through the recorder, then checks that a checkpoint finds no breach.
 - `web/e2e/owner.e2e.ts` drives the owner console in Chromium with a virtual passkey on the local network: link an agent, set a mandate, freeze and unfreeze (the agent's payment is refused while frozen), and checks that a different passkey cannot freeze the agent.
-- The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 24 ways out (every transaction type, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
+- The [leaked-key attack suite](services/attacks) plays someone who holds the agent's key: 24 ways out (transaction types 0, 1 and 2, fees, contracts, the precompiles, replay, each node directly, frozen, expired, budget, 20 at once), one positive control, then the balance invariant and agreement of the three nodes. `bash scripts/check-localnet.sh` runs it with the rest of the network checks.
 
 ## Security model and limitations
 
-What the rule gives: on the Sealed L1, a transaction sent with an agent's key that falls outside the agent's mandate cannot be included in a block. This is enforced by the chain's validators running the patched node.
+What the rule gives: on the Sealed L1, a transaction sent with an agent's key that falls outside the agent's mandate cannot be included in a block. The patched node checks this as part of block validity; today one validator, run by the team, does so.
 
 What it does not give, stated plainly:
 
 1. **Testnet only.** Coins on the L1 have no monetary value. This is not a payment service.
-2. **The team runs all validators.** The claim is "the rule is enforced by the chain's consensus", not that control is spread across independent parties. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses. Disabling and re-enabling the `AgentPolicy` precompile in a network upgrade would erase every registration and mandate; the same commitment covers this. The operator's admin key also holds the NativeMinter admin role on the L1 and could mint native coin outside the bridge; the project uses the bridge as its only minter.
-3. **Only assets on this L1 are protected.**
-4. **A leaked key can still spend inside the mandate**: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires.
+2. **One validator, run by the team.** The claim is that the rule is part of block validity on this chain, not that control is spread across independent parties: today the team operates the validator, holds the admin keys (TxAllowList, ContractDeployerAllowList, NativeMinter, and the manager key of limit 13) and can ship network upgrades. The node source and the validator set are public. Network upgrades and genesis are operator actions outside the rule; we commit to shipping no upgrade that touches agent addresses. Disabling and re-enabling the `AgentPolicy` precompile in a network upgrade would erase every registration and mandate; the same commitment covers this. The operator's admin key also holds the NativeMinter admin role on the L1 and could mint native coin outside the bridge; the project uses the bridge as its only minter.
+3. **Only the native coin on this L1 is covered.** The rule sees transactions, not off-chain signatures (permits, EIP-3009 authorisations). The L1 has no token that honours such signatures, and contract deployment is allow-listed. Assets on other chains are not covered.
+4. **A leaked key can still spend inside the mandate**: to allowed payees, up to the daily budget, until the owner freezes the agent or the mandate expires. The daily budget is counted per UTC day (it resets at 00:00 UTC, 07:00 in Vietnam), not over a rolling 24 hours: around 00:00 UTC up to twice the daily cap can be spent within minutes.
 5. **Someone holding the key can grief**: use up the daily budget or occupy nonces.
 6. **Simulation is not admission.** `eth_call` and `eth_estimateGas` do not apply the rule; services read the mandate from the precompile instead.
 7. **The open challenge measures how hard the system was tried, not that it is safe.**
 8. **The ERC-8004 record is only as trustworthy as its writer.** Anyone can give feedback in ERC-8004; read the survival record as feedback whose client is our ReputationReceiver (address in `services/fuji-ops/deployments/fuji.json`). ICM only carries this record; it plays no part in keeping funds safe, which is the L1 node's rule.
 9. **x402 here needs our payment method.** Sellers must add the network `eip155:261126` and point `/verify` and `/settle` at this facilitator; a standard x402 client (EIP-3009 tokens) cannot pay it. The facilitator holds no keys, but a seller still has to trust it or read the chain itself (the sample seller does both).
 10. **Owner passkey proofs are bound to the chain id and the agent, not to one deployment.** The challenge covers the chain id (`261126`), the agent and a nonce. The local network and the L1 on Fuji share that chain id, so each deployment must register its agents under its own owner key; the Fuji challenge agent does. Binding proofs to the blockchain ID is planned.
-11. **The precompile checks less of WebAuthn than a full relying party.** It verifies the P-256 signature, the challenge and the User Present flag. It does not check `rpIdHash` or the origin, and it does not require User Verification (the owner console asks for it as `preferred`). A page that tricks the owner into signing its challenge produces a valid proof.
+11. **The precompile checks less of WebAuthn than a full relying party.** It verifies the P-256 signature, the challenge and the User Present flag. It does not check `rpIdHash` or the origin, and it does not require User Verification (the owner console asks for it as `preferred`). The proof also does not show the owner what is being signed: the passkey prompt names the site, not the mandate. If the console's origin is compromised (its hosting, its domain, or a script it loads), the owner can be made to sign a different mandate.
 12. **Waiting payments are not re-checked.** Payments the pool accepted but the block builder left out (over the day's budget) stay in the pool and are not checked again while they wait. On a later day they can enter a block within that day's cap, until the owner freezes the agent or the mandate expires.
 13. **The relayer host can allow senders.** For demo agents the relayer holds a second key with the TxAllowList manager role. It registers each demo agent to the visitor's passkey before allowing it, but whoever takes over the host could allow any address to send, outside any mandate. The admin can remove the role (`setNone`).
 
