@@ -35,6 +35,7 @@ bash scripts/localnet.sh seed      # agent thử: TxAllowList, cấp coin, đăn
 bash scripts/localnet.sh down      # xoá container, volume dữ liệu và network docker
 
 bash scripts/check-localnet.sh     # mạng mới + smoke + seed + leaked-key + x402 + ArenaRecorder + chain/tests/rule/run.sh
+bash chain/tests/byzantine/run.sh  # node 3 chạy plugin không có quy tắc; node 1, 2 phải từ chối block nó đề xuất (cần image node mới)
 ```
 - Mặc định 3 node (đổi bằng `SEALED_NODE_COUNT=1`). Các node cùng chạy trong một container; cổng HTTP `9650`, `9652`, `9654` đều được mở ra máy, đường dẫn RPC giống nhau.
 - Genesis: `chain/genesis/sealed-local.json` (giải thích trong `chain/genesis/README.md`). Đổi file genesis bằng `SEALED_GENESIS_FILE=<tên file trong chain/genesis>`.

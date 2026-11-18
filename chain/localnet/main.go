@@ -12,6 +12,11 @@
 //	AVALANCHEGO_PATH    path to the avalanchego binary (default /avalanchego/avalanchego)
 //	SEALED_PLUGIN_DIR   plugin directory holding the Subnet-EVM binary (default /avalanchego/plugins)
 //	SEALED_BASE_PORT    HTTP port of node i is base+2i, staking port is base+2i+1 (default 9650)
+//	SEALED_NORULE_NODES comma-separated 1-based node numbers that run the Subnet-EVM plugin from
+//	                    SEALED_NORULE_PLUGIN_DIR instead (a build without the agent rule, for the
+//	                    test in chain/tests/byzantine); empty by default
+//	SEALED_NORULE_PLUGIN_DIR  plugin directory for those nodes (default /norule/plugins)
+//	SEALED_LOG_LEVEL    avalanchego log level for every node (default: avalanchego's own)
 package main
 
 import (
@@ -23,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/config"
@@ -126,14 +132,33 @@ func newNetwork() (*tmpnet.Network, error) {
 		return nil, err
 	}
 
+	noRule, err := noRuleNodes(nodeCount)
+	if err != nil {
+		return nil, err
+	}
+	avalanchego := env("AVALANCHEGO_PATH", "/avalanchego/avalanchego")
+
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	validatorIDs := make([]ids.NodeID, 0, nodeCount)
 	for i, node := range nodes {
+		if noRule[i+1] {
+			// Same avalanchego, a Subnet-EVM plugin built without the agent rule.
+			node.RuntimeConfig = &tmpnet.NodeRuntimeConfig{
+				Process: &tmpnet.ProcessRuntimeConfig{
+					AvalancheGoPath: avalanchego,
+					PluginDir:       env("SEALED_NORULE_PLUGIN_DIR", "/norule/plugins"),
+				},
+			}
+			fmt.Printf("sealed-localnet: node %d runs the plugin without the agent rule\n", i+1)
+		}
 		// Fixed ports and a wildcard host so the API can be published from the container.
 		node.Flags["http-host"] = "0.0.0.0"
 		node.Flags["http-port"] = strconv.Itoa(basePort + 2*i)
 		node.Flags["staking-port"] = strconv.Itoa(basePort + 2*i + 1)
 		node.Flags["http-allowed-hosts"] = "*"
+		if lvl := env("SEALED_LOG_LEVEL", ""); lvl != "" {
+			node.Flags["log-level"] = lvl
+		}
 		validatorIDs = append(validatorIDs, node.NodeID)
 	}
 
@@ -142,7 +167,7 @@ func newNetwork() (*tmpnet.Network, error) {
 		Nodes: nodes,
 		DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
 			Process: &tmpnet.ProcessRuntimeConfig{
-				AvalancheGoPath: env("AVALANCHEGO_PATH", "/avalanchego/avalanchego"),
+				AvalancheGoPath: avalanchego,
 				PluginDir:       env("SEALED_PLUGIN_DIR", "/avalanchego/plugins"),
 			},
 		},
@@ -157,6 +182,23 @@ func newNetwork() (*tmpnet.Network, error) {
 			ValidatorIDs: validatorIDs,
 		}},
 	}, nil
+}
+
+// noRuleNodes parses SEALED_NORULE_NODES ("3" or "2,3") into a set of 1-based node numbers.
+func noRuleNodes(nodeCount int) (map[int]bool, error) {
+	set := map[int]bool{}
+	for _, f := range strings.Split(env("SEALED_NORULE_NODES", ""), ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		n, err := strconv.Atoi(f)
+		if err != nil || n < 1 || n > nodeCount {
+			return nil, fmt.Errorf("invalid SEALED_NORULE_NODES entry %q", f)
+		}
+		set[n] = true
+	}
+	return set, nil
 }
 
 func stateFor(network *tmpnet.Network) (*State, error) {

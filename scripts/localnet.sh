@@ -10,6 +10,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE=(docker compose -f "$ROOT/infra/local/docker-compose.yml")
+# SEALED_BYZANTINE=1: node 3 runs a plugin without the agent rule (chain/tests/byzantine).
+if [ "${SEALED_BYZANTINE:-0}" = "1" ]; then
+  COMPOSE+=(-f "$ROOT/infra/local/docker-compose.byzantine.yml")
+fi
 CONTAINER=sealed-node
 HOST_URL="http://127.0.0.1:9650"
 UP_TIMEOUT="${SEALED_UP_TIMEOUT:-600}"
