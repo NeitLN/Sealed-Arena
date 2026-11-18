@@ -110,6 +110,17 @@ describe("page wording", () => {
       expect(landingText(lang).limitResult).toMatch(/\{passed\}.*\{attempts\}.*\{reverted\}/);
   });
 
+  it("explains the clean-up after the S measurement, with its blocks, in both languages", () => {
+    const r = result as unknown as Result;
+    const a = r.S.afterMeasurement;
+    if (!a) throw new Error("compare-result.json has no afterMeasurement for S");
+    for (const lang of ["en", "vi"] as const) {
+      const note = compareText(lang, r).notes.at(-1) ?? "";
+      expect(note).toContain(`block ${a.waitingIncluded.block}`);
+      expect(note).toContain(String(a.waitingIncluded.count));
+    }
+  });
+
   it("says the P column is a hand-written transcript, in both languages", () => {
     expect(compareText("en", result as unknown as Result).notes[0]).toMatch(/hand-written/);
     expect(compareText("vi", result as unknown as Result).notes[0]).toMatch(/dựng tay/);

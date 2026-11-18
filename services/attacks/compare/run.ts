@@ -351,15 +351,15 @@ async function runO() {
 
 /**
  * After the measurement: the suite owner key widens the mandate, the payments still waiting in
- * the pool go through to the seller, and the rest of the balance is paid to the same team-held
- * seller, so the test USDC is not stranded on a key nobody keeps.
+ * the pool are then included, and the rest of the balance is paid to the same team-held seller, so
+ * the test USDC is not stranded on a key nobody keeps. Recorded with hashes, so that anyone looking
+ * the agent up sees why all 20 payments are in blocks in the end.
  */
-async function returnLeftover(
+async function cleanUp(
   n: ReturnType<typeof sealed.nodes>[number],
   agent: Awaited<ReturnType<typeof sealed.freshAgent>>,
-  mined: number,
-  accepted: number,
-): Promise<bigint> {
+  waiting: Hex[],
+) {
   const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600);
   await sealed.setMandate(n, agent.address, {
     payees: [SELLER],
@@ -367,25 +367,37 @@ async function returnLeftover(
     dailyCap: parseEther("100"),
     expiry,
   });
-  for (let i = 0; i < 40; i++) {
-    if ((await n.client.getTransactionCount({ address: agent.address })) >= accepted) break;
-    await new Promise((r) => setTimeout(r, 3000));
-  }
+  const widenedAt = Number(await n.client.getBlockNumber());
+  const included = await Promise.all(
+    waiting.map((hash) => n.client.waitForTransactionReceipt({ hash, timeout: 120_000 })),
+  );
   const fees = await n.client.estimateFeesPerGas();
   const balance = await n.client.getBalance({ address: agent.address });
   const gasCost = 21_000n * fees.maxFeePerGas;
-  if (balance <= gasCost) return 0n;
-  const value = balance - gasCost;
-  const hash = await sealed.wallet(n, agent).sendTransaction({
-    to: SELLER,
-    value,
-    gas: 21_000n,
-    maxFeePerGas: fees.maxFeePerGas,
-    maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
-  });
-  await n.client.waitForTransactionReceipt({ hash });
-  void mined;
-  return value;
+  let leftover: { block: number; tx: Hex; value: string } | null = null;
+  if (balance > gasCost) {
+    const value = balance - gasCost;
+    const hash = await sealed.wallet(n, agent).sendTransaction({
+      to: SELLER,
+      value,
+      gas: 21_000n,
+      maxFeePerGas: fees.maxFeePerGas,
+      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+    });
+    const r = await n.client.waitForTransactionReceipt({ hash });
+    leftover = { block: Number(r.blockNumber), tx: hash, value: formatEther(value) };
+  }
+  return {
+    note: "After the measurement the run cleaned up: the suite owner key widened the mandate, so the payments still waiting in the pool were included, and the rest of the balance went back to the same team-held seller. The numbers above are from before the mandate was widened.",
+    mandateWidened: { block: widenedAt, tx: null },
+    waitingIncluded: {
+      block: included[0] ? Number(included[0].blockNumber) : null,
+      count: included.length,
+      value: formatEther(parseEther(CAPS.payment) * BigInt(included.length)),
+      txs: waiting,
+    },
+    leftoverReturned: leftover,
+  };
 }
 
 /** S: a fresh agent on the Sealed L1 (not the challenge agent); same caps, same payment burst. */
@@ -454,7 +466,7 @@ async function runS() {
   const toSeller = receipts.filter((r) => r.status === "success").length;
   const valueSent = parseEther(CAPS.payment) * BigInt(toSeller);
   const balanceAfter = await n.client.getBalance({ address: agent.address });
-  const returned = await returnLeftover(n, agent, mined, accepted.length);
+  const afterMeasurement = await cleanUp(n, agent, accepted.slice(mined) as Hex[]);
   return {
     agent: agent.address,
     caps: { perTx: CAPS.perTx, daily: CAPS.daily },
@@ -470,13 +482,13 @@ async function runS() {
     gasPaidByRefused: "0 (a payment the rule refuses is never in a block)",
     funding: formatEther(funding),
     balanceDrop: formatEther(before - balanceAfter),
-    returnedAfterRun: formatEther(returned),
     overDailyCap: valueSent > parseEther(CAPS.daily),
     txs: receipts.map((r) => ({
       tx: r.transactionHash,
       status: r.status,
       block: Number(r.blockNumber),
     })),
+    afterMeasurement,
   };
 }
 
