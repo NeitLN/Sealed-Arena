@@ -111,6 +111,7 @@ Một chiều: qua T thì muốn quay lại phải phát hành thêm một lần
 3. `docker stop -t 60 sealed-fuji`, sao lưu volume (`tar` thư mục `_data`), `docker rm sealed-fuji`, chạy lại container với image mới và cùng lệnh khởi động.
 4. Kiểm trước T: node khoẻ, RPC công khai trả lời, `ruleVersion()` còn lỗi (v1), trang chủ ví và relayer chạy. Sau T: `ruleVersion()` trả 2, relayer `/info` báo `ruleVersion: 2`, chạy lại các bộ kiểm trên Fuji.
 5. Agent của thử thách mở: đặt lại uỷ quyền bằng `setMandateV2` để có hạn mức phí.
+6. Relayer ICM (`icm-relayer` v1.8.4) đọc `eth_getChainConfig` lúc khởi động và giải mã mọi mục trong `upgrades.precompileUpgrades` bằng danh sách precompile gốc của Subnet-EVM; gặp `agentRuleV2Config` thì dừng với `failed to fetch chain config` và khởi động lại mãi. Chạy proxy `services/fuji-ops/src/chain-config-proxy.ts` (Node 24, không cần cài gói) trên cổng `127.0.0.1:9660` và đặt `rpc-endpoint` của L1 trong cấu hình relayer về cổng đó. Proxy chuyển nguyên mọi yêu cầu, chỉ bỏ các mục precompile riêng của dự án khỏi câu trả lời `eth_getChainConfig`; cấu hình Warp giữ nguyên. Kênh `ws-endpoint` vẫn nối thẳng vào node. Kiểm: `docker inspect -f '{{.RestartCount}}' icm-relayer` đứng yên.
 
 Mạng local: `SEALED_RULE_V2_AT=0 bash scripts/check-localnet.sh` (v2 từ đầu) hoặc `SEALED_RULE_V2_AT=+90 bash scripts/localnet.sh up` (chuyển sau 90 giây).
 
