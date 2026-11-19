@@ -148,6 +148,7 @@ The burst run is `services/attacks/compare/results/fuji-2026-11-17T06-00-03-128Z
 - Comparison of P, O and S: https://sealed-arena.vercel.app/compare
 - Who it is for and the business model (hypothesis): https://sealed-arena.vercel.app/business
 - Every address and transaction: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
+- Agent rule v2 ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 3.5: fixed gas, tip of at most 1 gwei, a daily cap on fees, owner proofs bound to this chain) is in force on the Sealed L1 on Fuji from block 491 (19/11/2026, 11:00 UTC). The challenge agent's mandate was set again with a daily fee cap after the switch, and the leaked-key suite and the live console test were run again under v2.
 
 | What                                    | Where                       | Address or ID                                                                                             |
 | --------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
