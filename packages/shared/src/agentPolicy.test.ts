@@ -5,15 +5,22 @@ import { describe, expect, it } from "vitest";
 import {
   AGENT_POLICY_ADDRESS,
   agentPolicyAbi,
+  cb58ToHex,
   challengeToBase64Url,
+  domainV2,
   encodeAuth,
   freezeChallenge,
+  freezeChallengeV2,
   type Mandate,
+  mandateV2Hash,
   normalizeLowS,
   P256_N,
   registerDigest,
+  registerDigestV2,
   setMandateChallenge,
+  setMandateV2Challenge,
   unfreezeChallenge,
+  unfreezeChallengeV2,
   type WebAuthnAssertion,
 } from "./agentPolicy.js";
 import { ADDRESSES } from "./chain.js";
@@ -111,5 +118,34 @@ describe("normalizeLowS", () => {
     expect(normalizeLowS(P256_N - 1n)).toBe(1n);
     expect(normalizeLowS(P256_N / 2n)).toBe(P256_N / 2n);
     expect(normalizeLowS(P256_N / 2n + 1n)).toBe(P256_N - (P256_N / 2n + 1n));
+  });
+});
+
+describe("rule v2 digests", () => {
+  const v = JSON.parse(readFileSync(repoFile("chain/testvectors/agentpolicy-v2.json"), "utf8"));
+  const i = v.input;
+  const m = {
+    payees: i.mandate.payees,
+    perTxCap: BigInt(i.mandate.perTxCap),
+    dailyCap: BigInt(i.mandate.dailyCap),
+    dailyFeeCap: BigInt(i.mandate.dailyFeeCap),
+    expiry: BigInt(i.mandate.expiry),
+  };
+
+  it("reproduce chain/testvectors/agentpolicy-v2.json (the Go tests check the same file)", () => {
+    const domain = domainV2(i.networkId, i.blockchainId, BigInt(i.chainId));
+    expect(domain).toBe(v.domain);
+    expect(registerDigestV2(domain, i.agent, i.ownerX, i.ownerY)).toBe(v.register);
+    expect(mandateV2Hash(m)).toBe(v.mandateHash);
+    expect(setMandateV2Challenge(domain, i.agent, m, BigInt(i.nonce))).toBe(v.setMandate);
+    expect(freezeChallengeV2(domain, i.agent, BigInt(i.epoch))).toBe(v.freeze);
+    expect(unfreezeChallengeV2(domain, i.agent, BigInt(i.nonce), BigInt(i.epoch))).toBe(v.unfreeze);
+    expect(cb58ToHex(v.cb58.id)).toBe(v.cb58.hex);
+  });
+
+  it("change with the blockchain id (local and Fuji share the EVM chain id)", () => {
+    const a = domainV2(i.networkId, i.blockchainId, BigInt(i.chainId));
+    const b = domainV2(i.networkId, `0x${"00".repeat(31)}01`, BigInt(i.chainId));
+    expect(a).not.toBe(b);
   });
 });
