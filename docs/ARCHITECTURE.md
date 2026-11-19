@@ -165,6 +165,31 @@ Mã định danh và địa chỉ: `services/fuji-ops/deployments/fuji.json`.
 - Ra Internet chỉ có: RPC của L1 (`POST /rpc`), relayer passkey (`/relayer/*`), qua HTTPS (Caddy, Let's Encrypt). Cổng RPC của node không mở. Trang chủ ví chạy trên Vercel; relayer chỉ nhận trình duyệt từ tên miền của trang.
 - Relayer chỉ gửi `register` cho agent đã có quyền gửi giao dịch (TxAllowList), để không bị rút gas.
 
+### 3.5 Luật agent v2
+
+Bật bằng khoá cấu hình riêng `agentRuleV2Config` (precompile không có hàm ở `0x0300…02`) lên lịch trong `precompileUpgrades` tại thời điểm T. Block trước T giữ nghĩa v1 khi chạy lại lịch sử; từ block đầu tiên có thời gian ≥ T mọi node áp v2. Bật một chiều: `Verify` từ chối `disable`. Mạng local: biến `SEALED_RULE_V2_AT` của `chain/localnet` (`0`, `+90` hoặc unix giây) thêm khoá này vào genesis. Fuji: RUNBOOK §7.1.
+
+**Giao dịch của agent** (kiểm sau mọi điều kiện ở 3.1, nên lý do từ chối của v1 không đổi; pool và `preCheck` cùng phiên bản theo `PoolTime`):
+- loại 0, 1, 2; không access list;
+- call data rỗng, hoặc đúng 32 byte (tham chiếu thanh toán x402, mục 4); payee vẫn phải là tài khoản không có code nên data không được thực thi;
+- `gasLimit` đúng bằng gas nội tại của data: `21000 + 16 × byte khác 0 + 4 × byte 0` (`core.AgentPaymentGas`, tối đa 21512);
+- payee không phải precompile gốc (`0x01`–`0x0a`, `0x100`; danh sách cố định của luật);
+- tip hiệu dụng `min(tipCap, feeCap − baseFee)` ≤ 1 gwei;
+- giao dịch có set-code authority là agent đã đăng ký bị từ chối (chuẩn bị cho bản libevm sau, hôm nay chưa loại nào decode được type 4);
+- nếu uỷ quyền có hạn mức phí: `feeSpentToday + gasLimit × feeCap ≤ dailyFeeCap` (`agent: fee budget exceeded`), bộ đếm phí về 0 theo ngày UTC như `spentToday`. Phí vẫn tính vào `dailyCap` như v1.
+
+**Precompile AgentPolicy dưới v2** (`precompile/contracts/agentpolicy/v2.go`):
+- `setMandateV2(agent, (payees, perTxCap, dailyCap, dailyFeeCap, expiry), nonce, auth)`, với `dailyFeeCap ≤ dailyCap`. `setMandate` (v1) bị từ chối. Uỷ quyền đặt trước T không có hạn mức phí (`feeCapSet == false`): chỉ `dailyCap` giới hạn phí như v1; trang chủ ví nhắc đặt lại.
+- Bằng chứng gắn với miền ký `domain = keccak256(abi.encode("SealedArena.AgentPolicy.v2", networkID, blockchainID, evmChainID, địa chỉ AgentPolicy))`. Mạng local và L1 trên Fuji cùng chain id EVM 261126 nhưng khác blockchain id, nên bằng chứng cho mạng này bị mạng kia từ chối. Thiếu snow context thì từ chối (fail closed). Chữ ký v1 bị từ chối.
+  - register (khoá agent ký): `keccak256(abi.encode("SealedArena:register", domain, agent, ownerX, ownerY))`
+  - setMandateV2: `keccak256(abi.encode("SealedArena:setMandate", domain, agent, keccak256(abi.encode(mV2)), nonce))`
+  - freeze: `keccak256(abi.encode("SealedArena:freeze", domain, agent, freezeEpoch))`: ký trên epoch, không dùng nonce, nên ký sẵn được; không đổi nonce; freeze lần hai không làm gì.
+  - unfreeze: `keccak256(abi.encode("SealedArena:unfreeze", domain, agent, nonce, freezeEpoch))`: tăng cả nonce lẫn epoch, nên lệnh freeze ký sẵn trước đó hết hiệu lực.
+- View mới: `getMandateV2`, `getFeeSpend`, `freezeEpoch`, `ruleVersion`. Trước T các hàm mới chạy như selector không tồn tại.
+- Mã hoá phía TypeScript: `packages/shared/src/agentPolicy.ts`; vector dùng chung Go và TypeScript: `chain/testvectors/agentpolicy-v2.json`.
+
+**Phía client** (`packages/shared/src/policyCalls.ts`): đọc `ruleVersion()` (lỗi trong khi node vẫn trả lời nghĩa là v1) rồi dựng đúng lời gọi và challenge của phiên bản đó, nên trang chủ ví, relayer và script tự chuyển khi qua T. Id của L1 trên Fuji là hằng số (`FUJI_POLICY_IDS`); mạng khác lấy `networkID` từ `info.getNetworkID` của node và blockchain id từ đường dẫn RPC. Relayer trả chúng trong `/info`. Khoản trả của agent dùng `agentPaymentGas(data)` và tip tối đa 1 gwei (`agentFees`), hợp lệ cả dưới v1.
+
 ## 4. Thanh toán x402 trên L1
 
 Chuẩn `exact` của x402 trên EVM chỉ có ba phương thức (EIP-3009, Permit2, ERC-7710); coin gốc không dùng được cả ba. Dự án thêm một phương thức mới.
@@ -174,7 +199,8 @@ Chuẩn `exact` của x402 trên EVM chỉ có ba phương thức (EIP-3009, Per
 - `extra`: `{ assetTransferMethod: "signed-native-tx", paymentFlow: "upfront", requestId, resourceUrl }`. `requestId` (32 byte ngẫu nhiên) cấp mới cho mỗi phản hồi 402.
 - Payload người mua gửi: `{ "signedTransaction": "0x..." }`, là giao dịch L1 (EIP-1559) đã ký bởi khoá agent với:
   - `to` = `payTo` của người bán, `value` = `amount`,
-  - `data` = `keccak256(abi.encode(resourceUrl, requestId))` (32 byte), `requestId` do người bán cấp trong phản hồi 402.
+  - `data` = `keccak256(abi.encode(resourceUrl, requestId))` (32 byte), `requestId` do người bán cấp trong phản hồi 402,
+  - `gas` = gas nội tại của `data` (`agentPaymentGas`, 21000 + 16/4 mỗi byte), tip tối đa 1 gwei: điều luật v2 đòi (mục 3.5), và vẫn hợp lệ dưới v1.
 - Facilitator `/verify`: giải mã, kiểm chain id, `to`, `value`, `data`, chữ ký; kiểm giao dịch chưa được phát và nonce đúng nonce kế tiếp; kiểm số dư đủ `value + gas × maxFeePerGas`; với agent đã đăng ký, đọc `getMandate`/`getSpend` (qua `eth_call`) và chạy lại quy tắc ở mục 3.1 theo đúng thứ tự (`precheckMandate` trong `packages/shared/src/x402.ts`) để báo trước lý do từ chối. Không giữ tiền, không giữ khoá của ai.
 - Facilitator `/settle`: kiểm lại như `/verify`, `eth_sendRawTransaction`, chờ receipt, trả hash. Hai lần settle cùng một giao dịch cùng lúc chỉ một lần được phát.
 - Người bán giữ điều khoản của chính mình theo `requestId` (không dùng bản người mua gửi lại), đánh dấu `requestId` đã dùng trước khi gọi facilitator, và chỉ giao hàng sau khi `/settle` thành công **và** tự đọc chain thấy receipt thành công với `to`, `value`, `data` đúng như đã cấp.

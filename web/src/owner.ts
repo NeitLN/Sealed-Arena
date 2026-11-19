@@ -4,6 +4,8 @@ import {
   assertionToAuth,
   CHAIN_ID,
   type Mandate,
+  type RuleVersion,
+  readRuleVersion,
   spkiToXY,
 } from "@sealed-arena/shared";
 import {
@@ -20,7 +22,15 @@ import {
 /** Where the relayer runs. Its /info tells the RPC URL. */
 export const RELAYER_URL: string = import.meta.env.VITE_RELAYER_URL ?? "http://127.0.0.1:4040";
 
-export type RelayerInfo = { relayer: Address; chainId: number; target: Address; rpc: string };
+export type RelayerInfo = {
+  relayer: Address;
+  chainId: number;
+  target: Address;
+  rpc: string;
+  /** Ids a v2 owner proof is bound to (relayers from rule v2 on). */
+  networkId?: number;
+  blockchainId?: Hex;
+};
 
 export async function relayerInfo(): Promise<RelayerInfo> {
   const res = await fetch(`${RELAYER_URL}/info`);
@@ -136,6 +146,13 @@ export type AgentView = {
   spentToday: bigint;
   totalCharged: bigint;
   balance: bigint;
+  /** Agent rule version in force; the fields below are read only under v2 (zero/false before). */
+  version: RuleVersion;
+  freezeEpoch: bigint;
+  /** Whether the mandate has a daily fee cap (set with setMandateV2). */
+  feeCapSet: boolean;
+  dailyFeeCap: bigint;
+  feeSpentToday: bigint;
 };
 
 export async function readAgent(c: PublicClient, agent: Address): Promise<AgentView> {
@@ -146,15 +163,32 @@ export async function readAgent(c: PublicClient, agent: Address): Promise<AgentV
       functionName,
       args: [agent],
     } as never);
-  const [registered, key, nonce, mf, spend, balance] = await Promise.all([
+  const [registered, key, nonce, mf, spend, balance, version] = await Promise.all([
     read("isAgent") as Promise<boolean>,
     read("ownerKey") as Promise<readonly [Hex, Hex]>,
     read("ownerNonce") as Promise<bigint>,
     read("getMandate") as Promise<readonly [Mandate, boolean]>,
     read("getSpend") as Promise<readonly [bigint, bigint, bigint]>,
     c.getBalance({ address: agent }),
+    readRuleVersion(c),
   ]);
+  let v2 = { freezeEpoch: 0n, feeCapSet: false, dailyFeeCap: 0n, feeSpentToday: 0n };
+  if (version === 2) {
+    const [epoch, m2, fee] = await Promise.all([
+      read("freezeEpoch") as Promise<bigint>,
+      read("getMandateV2") as Promise<readonly [{ dailyFeeCap: bigint }, boolean, boolean]>,
+      read("getFeeSpend") as Promise<readonly [bigint, bigint]>,
+    ]);
+    v2 = {
+      freezeEpoch: epoch,
+      feeCapSet: m2[1],
+      dailyFeeCap: m2[0].dailyFeeCap,
+      feeSpentToday: fee[0],
+    };
+  }
   return {
+    version,
+    ...v2,
     registered,
     ownerX: key[0],
     ownerY: key[1],

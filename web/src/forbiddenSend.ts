@@ -1,6 +1,6 @@
 // "Try a forbidden payment" on /arena: sign a real transaction with the public challenge key in the
 // browser and send it to the Sealed L1 through the public RPC, then show what the node answered.
-import { CHAIN_ID } from "@sealed-arena/shared";
+import { agentFees, CHAIN_ID } from "@sealed-arena/shared";
 import { type Address, type Hex, keccak256, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -65,8 +65,7 @@ export async function sendAsAgent(
       chainId: CHAIN_ID,
       nonce,
       gas: 21_000n,
-      maxFeePerGas: fees.maxFeePerGas,
-      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+      ...agentFees(fees),
       to,
       value,
     });

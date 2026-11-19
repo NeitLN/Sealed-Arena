@@ -17,6 +17,9 @@
 //	                    test in chain/tests/byzantine); empty by default
 //	SEALED_NORULE_PLUGIN_DIR  plugin directory for those nodes (default /norule/plugins)
 //	SEALED_LOG_LEVEL    avalanchego log level for every node (default: avalanchego's own)
+//	SEALED_RULE_V2_AT   schedules agent rule v2 (agentRuleV2Config) in the genesis of a new
+//	                    network: "0" from the start, "+90" 90 seconds after the network is
+//	                    created, or a unix time; empty by default (rule v1 only)
 package main
 
 import (
@@ -126,6 +129,16 @@ func newNetwork() (*tmpnet.Network, error) {
 	genesisBytes, err := os.ReadFile(env("SEALED_GENESIS", "/sealed/genesis/sealed-local.json"))
 	if err != nil {
 		return nil, fmt.Errorf("read genesis: %w", err)
+	}
+	if at := env("SEALED_RULE_V2_AT", ""); at != "" {
+		ts, err := ruleV2Time(at, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		if genesisBytes, err = withRuleV2(genesisBytes, ts); err != nil {
+			return nil, err
+		}
+		fmt.Printf("sealed-localnet: agent rule v2 from unix time %d\n", ts)
 	}
 	vmID, err := ids.FromString(subnetEVMID)
 	if err != nil {
@@ -258,4 +271,35 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+
+// ruleV2Time parses SEALED_RULE_V2_AT: "+N" is N seconds from now, anything else a unix time.
+func ruleV2Time(at string, now time.Time) (uint64, error) {
+	if rest, ok := strings.CutPrefix(at, "+"); ok {
+		n, err := strconv.ParseUint(rest, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid SEALED_RULE_V2_AT %q", at)
+		}
+		return uint64(now.Unix()) + n, nil
+	}
+	ts, err := strconv.ParseUint(at, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid SEALED_RULE_V2_AT %q", at)
+	}
+	return ts, nil
+}
+
+// withRuleV2 adds agentRuleV2Config with the given activation time to the genesis chain config.
+func withRuleV2(genesisBytes []byte, ts uint64) ([]byte, error) {
+	var g map[string]any
+	if err := json.Unmarshal(genesisBytes, &g); err != nil {
+		return nil, fmt.Errorf("parse genesis: %w", err)
+	}
+	cfg, ok := g["config"].(map[string]any)
+	if !ok {
+		return nil, errors.New("genesis has no config")
+	}
+	cfg["agentRuleV2Config"] = map[string]any{"blockTimestamp": ts}
+	return json.Marshal(g)
 }

@@ -1,4 +1,4 @@
-import { CHAIN_ID, fetchWithPayment, NATIVE_SYMBOL } from "@sealed-arena/shared";
+import { agentFees, CHAIN_ID, fetchWithPayment, NATIVE_SYMBOL } from "@sealed-arena/shared";
 import { type Address, BaseError, formatEther, type Hex, isAddress, type PublicClient } from "viem";
 import type { PrivateKeyAccount } from "viem/accounts";
 import type { CallRecord, Tool } from "./agent.js";
@@ -132,8 +132,7 @@ export function createTools(ctx: ToolContext): Tool[] {
           chainId: CHAIN_ID,
           nonce,
           gas,
-          maxFeePerGas: fees.maxFeePerGas,
-          maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+          ...agentFees(fees),
           to: to as Address,
           value,
         });

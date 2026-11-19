@@ -1,4 +1,4 @@
-import { agentPolicyAbi, registerDigest } from "@sealed-arena/shared";
+import { agentPolicyAbi, domainV2, registerDigest, registerDigestV2 } from "@sealed-arena/shared";
 import { type Address, decodeFunctionData, type Hex, recoverAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
@@ -6,13 +6,23 @@ import { createRelayerApp, type DemoIssuer, type RelayChain } from "./app.js";
 
 const X = `0x${"11".repeat(32)}` as Hex;
 const Y = `0x${"22".repeat(32)}` as Hex;
+const IDS = { chainId: 261126n, networkId: 12345, blockchainId: `0x${"ab".repeat(32)}` as Hex };
 
-function setup(o: { revert?: string; now?: () => number; perDay?: number; ready?: boolean } = {}) {
+function setup(
+  o: {
+    revert?: string;
+    now?: () => number;
+    perDay?: number;
+    ready?: boolean;
+    version?: 1 | 2;
+  } = {},
+) {
   const steps: string[] = [];
   const sent: Hex[] = [];
   const chain: RelayChain = {
     relayer: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
     chainId: 261126,
+    policy: async () => ({ version: o.version ?? 1, ids: IDS }),
     simulate: async () => {
       if (o.revert) throw new Error(o.revert);
     },
@@ -133,5 +143,19 @@ describe("demo agents", () => {
     const res = await claim(app, { ownerX: X, ownerY: Y }, "3.3.3.3");
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ error: "demo_cap" });
+  });
+});
+
+describe("demo agents under rule v2", () => {
+  it("the agent signs the v2 register digest (bound to the network and blockchain ids)", async () => {
+    const { app, sent } = setup({ version: 2 });
+    const res = await claim(app, { ownerX: X, ownerY: Y });
+    expect(res.status).toBe(200);
+    const { args } = decodeFunctionData({ abi: agentPolicyAbi, data: sent[0] as Hex });
+    const [agent, , , sig] = args as readonly [Address, Hex, Hex, Hex];
+    const domain = domainV2(IDS.networkId, IDS.blockchainId, IDS.chainId);
+    expect(
+      await recoverAddress({ hash: registerDigestV2(domain, agent, X, Y), signature: sig }),
+    ).toBe(agent);
   });
 });

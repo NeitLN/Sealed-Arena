@@ -11,28 +11,22 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
 import {
-  agentPolicyAbi,
   CHAIN_ID,
   checkPayees,
+  defaultDailyFeeCap,
+  FUJI_POLICY_IDS,
   formatUsdc,
-  freezeChallenge,
-  type Mandate,
+  type MandateInput,
   type PayeeWarning,
+  type PolicyIds,
   parseUsdc,
-  registerDigest,
-  setMandateChallenge,
-  unfreezeChallenge,
+  registerData,
+  registerDigestFor,
+  setFrozenRequest,
+  setMandateRequest,
 } from "@sealed-arena/shared";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import {
-  type Address,
-  encodeFunctionData,
-  getAddress,
-  type Hex,
-  isAddress,
-  isHex,
-  type PublicClient,
-} from "viem";
+import { type Address, getAddress, type Hex, isAddress, isHex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { useAgentView } from "./agentView.js";
 import { BrandMark } from "./BrandMark.js";
@@ -112,6 +106,9 @@ export default function OwnerPage() {
   const [client, setClient] = useState<PublicClient>(() => chainClient(RPC, { live: true }));
   const [local, setLocal] = useState(false);
   const [boot, setBoot] = useState<string>();
+  // What a rule v2 owner proof is bound to: the Sealed L1 on Fuji, or the local network the
+  // relayer reports.
+  const [ids, setIds] = useState<PolicyIds>(FUJI_POLICY_IDS);
 
   const [agentInput, setAgentInput] = useState(saved.agent ?? "");
   const agent = isAddress(agentInput) ? (getAddress(agentInput) as Address) : undefined;
@@ -122,6 +119,7 @@ export default function OwnerPage() {
   const [payeesText, setPayeesText] = useState("");
   const [perTx, setPerTx] = useState(DEFAULTS.perTx);
   const [daily, setDaily] = useState(DEFAULTS.daily);
+  const [dailyFee, setDailyFee] = useState("");
   const [days, setDays] = useState(DEFAULTS.days);
   const [unchecked, setUnchecked] = useState<string[]>([]);
   const outcomeRef = useRef<HTMLDivElement>(null);
@@ -135,6 +133,12 @@ export default function OwnerPage() {
         if (info.chainId !== CHAIN_ID) return setBoot("chain_mismatch");
         if (info.rpc !== RPC) setClient(chainClient(info.rpc, { live: true }));
         setLocal(isLocalRpc(info.rpc));
+        if (isLocalRpc(info.rpc) && info.networkId && info.blockchainId)
+          setIds({
+            chainId: BigInt(CHAIN_ID),
+            networkId: info.networkId,
+            blockchainId: info.blockchainId,
+          });
       })
       .catch(() => setBoot("relayer_down"));
   }, []);
@@ -199,12 +203,13 @@ export default function OwnerPage() {
     }
   };
 
+  const version = view?.version;
   const digest = useMemo(
     () =>
-      agent && saved.passkey
-        ? registerDigest(BigInt(CHAIN_ID), agent, saved.passkey.x, saved.passkey.y)
+      agent && saved.passkey && version
+        ? registerDigestFor(version, ids, agent, saved.passkey.x, saved.passkey.y)
         : undefined,
-    [agent, saved.passkey],
+    [agent, saved.passkey, version, ids],
   );
 
   const onCreatePasskey = () =>
@@ -235,15 +240,11 @@ export default function OwnerPage() {
         if (!isHex(agentSig) || agentSig.length !== 132) throw new Error("signature_invalid");
         sig = agentSig;
       }
-      return encodeFunctionData({
-        abi: agentPolicyAbi,
-        functionName: "register",
-        args: [agent, saved.passkey.x, saved.passkey.y, sig],
-      });
+      return registerData(agent, saved.passkey.x, saved.passkey.y, sig);
     });
 
   /** Mandate from the form, or the key of the first problem. */
-  const formMandate = (): Mandate | string => {
+  const formMandate = (): MandateInput | string => {
     const list = payeesText
       .split(/[\s,]+/)
       .map((s) => s.trim())
@@ -252,18 +253,22 @@ export default function OwnerPage() {
     if (check.errors[0]) return check.errors[0];
     let perTxCap: bigint;
     let dailyCap: bigint;
+    let dailyFeeCap: bigint;
     try {
       perTxCap = parseUsdc(perTx);
       dailyCap = parseUsdc(daily);
+      dailyFeeCap = dailyFee.trim() ? parseUsdc(dailyFee) : defaultDailyFeeCap(dailyCap);
     } catch {
       return "amount_invalid";
     }
+    if (dailyFeeCap > dailyCap) return "fee_cap_invalid";
     const d = Number(days);
     if (!Number.isInteger(d) || d < 1 || d > 365) return "days_invalid";
     return {
       payees: list.map((a) => getAddress(a)),
       perTxCap,
       dailyCap,
+      dailyFeeCap,
       expiry: BigInt(Math.floor(Date.now() / 1000) + d * 86_400),
     };
   };
@@ -283,16 +288,8 @@ export default function OwnerPage() {
       setUnchecked([]);
       const passkey = saved.passkey;
       await act("setMandate", async () => {
-        const nonce = view.nonce;
-        const auth = await signWithPasskey(
-          setMandateChallenge(BigInt(CHAIN_ID), agent, draft, nonce),
-          passkey.credentialId,
-        );
-        return encodeFunctionData({
-          abi: agentPolicyAbi,
-          functionName: "setMandate",
-          args: [agent, draft, nonce, auth],
-        });
+        const req = setMandateRequest(view.version, ids, agent, draft, view.nonce);
+        return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
       });
     })();
 
@@ -301,17 +298,11 @@ export default function OwnerPage() {
     const passkey = saved.passkey;
     const freeze = !view.frozen;
     void act(freeze ? "freeze" : "unfreeze", async () => {
-      const challenge = (freeze ? freezeChallenge : unfreezeChallenge)(
-        BigInt(CHAIN_ID),
-        agent,
-        view.nonce,
-      );
-      const auth = await signWithPasskey(challenge, passkey.credentialId);
-      return encodeFunctionData({
-        abi: agentPolicyAbi,
-        functionName: freeze ? "freeze" : "unfreeze",
-        args: [agent, view.nonce, auth],
+      const req = setFrozenRequest(view.version, ids, agent, freeze, {
+        ownerNonce: view.nonce,
+        freezeEpoch: view.freezeEpoch,
       });
+      return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
     });
   };
 
@@ -356,6 +347,12 @@ export default function OwnerPage() {
                   label={t("spentToday")}
                   value={`${usdc(view.spentToday)} / ${usdc(view.mandate.dailyCap)} USDC`}
                 />
+                {view.feeCapSet ? (
+                  <Row
+                    label={t("feeSpentToday")}
+                    value={`${usdc(view.feeSpentToday)} / ${usdc(view.dailyFeeCap)} USDC`}
+                  />
+                ) : null}
                 <Row label={t("perTxCap")} value={`${usdc(view.mandate.perTxCap)} USDC`} />
                 <Row label={t("totalCharged")} value={`${usdc(view.totalCharged)} USDC`} />
                 <Row label={t("balance")} value={`${usdc(view.balance)} USDC`} />
@@ -367,6 +364,9 @@ export default function OwnerPage() {
                 <Text type="supporting" color="secondary">
                   {t("resetsNote")}
                 </Text>
+                {view.version === 2 && !view.feeCapSet ? (
+                  <Banner status="warning" title={t("feeCapNotSet")} />
+                ) : null}
                 <Divider />
                 <Text type="supporting" weight="bold">
                   {t("payees")}
@@ -596,7 +596,7 @@ export default function OwnerPage() {
                       }}
                       placeholder={"0x…\n0x…"}
                     />
-                    <Grid columns={isMobile ? 1 : 3} gap={3}>
+                    <Grid columns={isMobile ? 1 : view?.version === 2 ? 4 : 3} gap={3}>
                       <TextInput
                         label={t("perTxCapFee")}
                         value={perTx}
@@ -609,6 +609,19 @@ export default function OwnerPage() {
                         onChange={setDaily}
                         inputMode="decimal"
                       />
+                      {view?.version === 2 ? (
+                        <TextInput
+                          label={t("dailyFeeCap")}
+                          value={dailyFee}
+                          onChange={setDailyFee}
+                          placeholder={
+                            typeof draft !== "string"
+                              ? formatUsdc(defaultDailyFeeCap(draft.dailyCap))
+                              : ""
+                          }
+                          inputMode="decimal"
+                        />
+                      ) : null}
                       <TextInput
                         label={t("validDays")}
                         value={days}
@@ -649,6 +662,12 @@ export default function OwnerPage() {
                           <dt>{d.perDay}</dt>
                           <dd>{daily || "—"} USDC</dd>
                         </div>
+                        {view?.version === 2 && typeof draft !== "string" ? (
+                          <div>
+                            <dt>{t("dailyFeeCap")}</dt>
+                            <dd>{formatUsdc(draft.dailyFeeCap ?? 0n)} USDC</dd>
+                          </div>
+                        ) : null}
                         <div>
                           <dt>{t("validDays")}</dt>
                           <dd>{days || "—"}</dd>

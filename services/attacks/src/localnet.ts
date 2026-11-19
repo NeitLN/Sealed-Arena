@@ -6,20 +6,25 @@ import {
   AGENT_POLICY_ADDRESS,
   agentPolicyAbi,
   allowListAbi,
+  blockchainIdFromRpc,
   CHAIN_ID,
+  cb58ToHex,
   challengeToBase64Url,
   encodeAuth,
-  freezeChallenge,
   LOCAL_AGENT,
   LOCAL_NODE_URLS,
   LOCAL_OWNER_P256_KEY,
   LOCAL_ROLES,
-  type Mandate,
+  type MandateInput,
   normalizeLowS,
+  type PolicyIds,
   PRECOMPILES,
-  registerDigest,
-  setMandateChallenge,
-  unfreezeChallenge,
+  readFreezeEpoch,
+  readRuleVersion,
+  registerData,
+  registerDigestFor,
+  setFrozenRequest,
+  setMandateRequest,
 } from "@sealed-arena/shared";
 import {
   type Address,
@@ -194,49 +199,78 @@ export const isTxAllowed = async (n: Node, who: Address) =>
 
 // ---- owner actions, sent by the relayer ------------------------------------------
 
+// Owner proofs are bound to the chain: under rule v2 to the Avalanche network id and the
+// blockchain id too (the node's info API and the RPC path give them).
+const idsCache = new Map<string, Promise<PolicyIds>>();
+
+async function networkIdOf(n: Node): Promise<number> {
+  const base = n.url.slice(0, n.url.indexOf("/ext/"));
+  const r = await fetch(`${base}/ext/info`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "info.getNetworkID", params: {} }),
+  });
+  return Number(((await r.json()) as { result: { networkID: string } }).result.networkID);
+}
+
+/** The ids a v2 proof for the chain behind `n` is bound to. */
+export function policyIds(n: Node): Promise<PolicyIds> {
+  let ids = idsCache.get(n.url);
+  if (!ids) {
+    const bc = blockchainIdFromRpc(n.url);
+    if (!bc) throw new Error(`no blockchain id in ${n.url}`);
+    ids = networkIdOf(n).then((networkId) => ({
+      chainId: BigInt(CHAIN_ID),
+      networkId,
+      blockchainId: cb58ToHex(bc),
+    }));
+    idsCache.set(n.url, ids);
+  }
+  return ids;
+}
+
+/** The agent rule version in force (1 before agentRuleV2Config activates, 2 from then). */
+export const ruleVersion = (n: Node) => readRuleVersion(n.client);
+
 export async function registerAgent(n: Node, agent: PrivateKeyAccount): Promise<void> {
-  const digest = registerDigest(BigInt(CHAIN_ID), agent.address, OWNER_X, OWNER_Y);
-  const agentSig = await agent.sign({ hash: digest });
+  const [v, ids] = await Promise.all([ruleVersion(n), policyIds(n)]);
+  const agentSig = await agent.sign({
+    hash: registerDigestFor(v, ids, agent.address, OWNER_X, OWNER_Y),
+  });
   await sendAndWait(n, accounts.relayer, {
     to: AGENT_POLICY_ADDRESS,
-    data: encodeFunctionData({
-      abi: agentPolicyAbi,
-      functionName: "register",
-      args: [agent.address, OWNER_X, OWNER_Y, agentSig],
-    }),
+    data: registerData(agent.address, OWNER_X, OWNER_Y, agentSig),
   });
 }
 
-/** Sets the agent's mandate with the owner key; returns the transaction hash. */
-export async function setMandate(n: Node, agent: Address, m: Mandate): Promise<Hex> {
-  const nonce = await readPolicy.ownerNonce(n, agent);
-  const auth = ownerProof(setMandateChallenge(BigInt(CHAIN_ID), agent, m, nonce));
+/**
+ * Sets the agent's mandate with the owner key (setMandate under v1, setMandateV2 under v2, where
+ * dailyFeeCap defaults to dailyCap / 20); returns the transaction hash.
+ */
+export async function setMandate(n: Node, agent: Address, m: MandateInput): Promise<Hex> {
+  const [v, ids, nonce] = await Promise.all([
+    ruleVersion(n),
+    policyIds(n),
+    readPolicy.ownerNonce(n, agent),
+  ]);
+  const req = setMandateRequest(v, ids, agent, m, nonce);
   return sendAndWait(n, accounts.relayer, {
     to: AGENT_POLICY_ADDRESS,
-    data: encodeFunctionData({
-      abi: agentPolicyAbi,
-      functionName: "setMandate",
-      args: [agent, m, nonce, auth],
-    }),
+    data: req.data(ownerProof(req.challenge)),
   });
 }
 
 export async function setFrozen(n: Node, agent: Address, frozen: boolean): Promise<void> {
-  const nonce = await readPolicy.ownerNonce(n, agent);
-  const challenge = (frozen ? freezeChallenge : unfreezeChallenge)(BigInt(CHAIN_ID), agent, nonce);
+  const [v, ids, ownerNonce] = await Promise.all([
+    ruleVersion(n),
+    policyIds(n),
+    readPolicy.ownerNonce(n, agent),
+  ]);
+  const freezeEpoch = v === 2 ? await readFreezeEpoch(n.client, agent) : 0n;
+  const req = setFrozenRequest(v, ids, agent, frozen, { ownerNonce, freezeEpoch });
   await sendAndWait(n, accounts.relayer, {
     to: AGENT_POLICY_ADDRESS,
-    data: frozen
-      ? encodeFunctionData({
-          abi: agentPolicyAbi,
-          functionName: "freeze",
-          args: [agent, nonce, ownerProof(challenge)],
-        })
-      : encodeFunctionData({
-          abi: agentPolicyAbi,
-          functionName: "unfreeze",
-          args: [agent, nonce, ownerProof(challenge)],
-        }),
+    data: req.data(ownerProof(req.challenge)),
   });
 }
 

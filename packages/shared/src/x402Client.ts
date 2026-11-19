@@ -12,14 +12,8 @@ import type {
 import type { Address, Hex, PublicClient } from "viem";
 import type { PrivateKeyAccount } from "viem/accounts";
 import { CHAIN_ID } from "./chain.js";
-import {
-  NATIVE_ASSET,
-  PAYMENT_GAS,
-  paymentData,
-  SIGNED_NATIVE_TX,
-  X402_NETWORK,
-  X402_SCHEME,
-} from "./x402.js";
+import { agentFees, agentPaymentGas } from "./policyCalls.js";
+import { NATIVE_ASSET, paymentData, SIGNED_NATIVE_TX, X402_NETWORK, X402_SCHEME } from "./x402.js";
 
 /** The payment option this client can pay, from a 402 response. */
 export function pickSignedNativeTx(required: PaymentRequired): PaymentRequirements | undefined {
@@ -42,16 +36,18 @@ export async function signPayment(
     client.getTransactionCount({ address: account.address, blockTag: "pending" }),
     client.estimateFeesPerGas(),
   ]);
+  // Exactly the intrinsic gas of the 32-byte reference, tip at most 1 gwei: what agent rule v2
+  // requires (and valid under v1).
+  const data = paymentData(req.extra.resourceUrl as string, req.extra.requestId as Hex);
   return account.signTransaction({
     type: "eip1559",
     chainId: CHAIN_ID,
     nonce,
-    gas: PAYMENT_GAS,
-    maxFeePerGas: fees.maxFeePerGas,
-    maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+    gas: agentPaymentGas(data),
+    ...agentFees(fees),
     to: req.payTo as Address,
     value: BigInt(req.amount),
-    data: paymentData(req.extra.resourceUrl as string, req.extra.requestId as Hex),
+    data,
   });
 }
 

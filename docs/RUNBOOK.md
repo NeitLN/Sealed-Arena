@@ -103,6 +103,17 @@ pnpm --filter fuji-ops ictt send <USDC> <địa chỉ trên L1>
 - Relayer ICM đọc log C-Chain 200 khối một lần và không có tham số đổi số này; `api.avax-test.network` chỉ cho tối đa 100, nên sau mỗi lần bị trễ relayer thoát rồi khởi động lại liên tục và không chuyển gì. `relayer-config` vì vậy đọc C-Chain qua `avalanche-fuji-c-chain-rpc.publicnode.com` (cho 200). Kiểm: `docker inspect -f '{{.RestartCount}}' icm-relayer` phải đứng yên. Đây không phải thay đổi về tin cậy: relayer chỉ lấy log từ nguồn đó; chain đích vẫn kiểm chữ ký Warp của validator nguồn trước khi nhận một thông điệp.
 - Chạy các bộ kiểm trên Fuji: đặt `SEALED_NODE_URLS`, `SEALED_RPC_PATH`, `SEALED_ADMIN_KEY`, `SEALED_RELAYER_KEY`, `SEALED_DEPLOYER_KEY`, `SEALED_AGENT_KEY`, `SEALED_SEED_FUNDING` rồi `pnpm --filter attacks seed` và `leaked-key`. Cách gọn: `pnpm --filter attacks suite leaked-key --fuji` và `suite wallet S --fuji` (đọc `.env`, cần đường hầm tới node ở `127.0.0.1:19650`). `leaked-key` cần agent chưa tiêu gì trong ngày UTC; nếu đã tiêu, nó dừng với `NOT RUN`. Trang đã triển khai: `pnpm --filter web e2e:live`.
 
+### 7.1 Bật luật agent v2 trên Fuji
+
+Một chiều: qua T thì muốn quay lại phải phát hành thêm một lần nâng cấp. Chọn T cách lúc triển khai đủ để kiểm node mới và quay về bản cũ nếu cần; tránh đúng 00:00 UTC (lúc bộ đếm ngày quay về 0).
+1. Trên máy node: `git pull`, `bash chain/scripts/fetch.sh`, `SEALED_IMAGE=sealed-node:<tag> bash chain/scripts/build.sh`.
+2. Ghi lịch vào cấu hình nâng cấp của chain, trong volume dữ liệu node: `configs/chains/<blockchainID>/upgrade.json` với nội dung `{"precompileUpgrades":[{"agentRuleV2Config":{"blockTimestamp":<T>}}]}`.
+3. `docker stop -t 60 sealed-fuji`, sao lưu volume (`tar` thư mục `_data`), `docker rm sealed-fuji`, chạy lại container với image mới và cùng lệnh khởi động.
+4. Kiểm trước T: node khoẻ, RPC công khai trả lời, `ruleVersion()` còn lỗi (v1), trang chủ ví và relayer chạy. Sau T: `ruleVersion()` trả 2, relayer `/info` báo `ruleVersion: 2`, chạy lại các bộ kiểm trên Fuji.
+5. Agent của thử thách mở: đặt lại uỷ quyền bằng `setMandateV2` để có hạn mức phí.
+
+Mạng local: `SEALED_RULE_V2_AT=0 bash scripts/check-localnet.sh` (v2 từ đầu) hoặc `SEALED_RULE_V2_AT=+90 bash scripts/localnet.sh up` (chuyển sau 90 giây).
+
 ## 8. Cổng RPC và thử thách mở
 ```bash
 GATEWAY_IP_SALT=<chuỗi bí mật ≥ 16 ký tự> SEALED_RPC_URL=<RPC của node> pnpm --filter rpc-gateway start   # cổng 4050

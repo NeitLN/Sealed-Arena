@@ -3,10 +3,11 @@
 // each forbidden payment and checks it is refused without moving the agent's coins.
 // Test keys only (packages/shared/src/addresses.local.ts); a fresh agent is made each run.
 import {
+  agentFees,
+  agentPaymentGas,
   CHAIN_ID,
   fetchWithPayment,
   LOCAL_PAYEES,
-  PAYMENT_GAS,
   paymentData,
   pickSignedNativeTx,
 } from "@sealed-arena/shared";
@@ -108,16 +109,16 @@ async function main(): Promise<void> {
       n.client.getTransactionCount({ address: signer.address, blockTag: "pending" }),
       n.client.estimateFeesPerGas(),
     ]);
+    const data = t.data ?? paymentData(req.extra.resourceUrl as string, req.extra.requestId as Hex);
     return signer.signTransaction({
       type: "eip1559",
       chainId: t.chainId ?? CHAIN_ID,
       nonce,
-      gas: PAYMENT_GAS,
-      maxFeePerGas: fees.maxFeePerGas,
-      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+      gas: agentPaymentGas(data),
+      ...agentFees(fees),
       to: t.to ?? (req.payTo as Address),
       value: t.value ?? BigInt(req.amount),
-      data: t.data ?? paymentData(req.extra.resourceUrl as string, req.extra.requestId as Hex),
+      data,
     });
   };
 

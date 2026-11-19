@@ -4,6 +4,7 @@ export { allowListAbi } from "./allowListAbi.js";
 export { arenaRecorderAbi } from "./arenaRecorderAbi.js";
 export * from "./chain.js";
 export { nativeMinterAbi } from "./nativeMinterAbi.js";
+export * from "./policyCalls.js";
 export * from "./webauthn.js";
 export * from "./x402.js";
 export * from "./x402Client.js";
