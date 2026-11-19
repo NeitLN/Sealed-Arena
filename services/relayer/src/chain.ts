@@ -1,9 +1,15 @@
 import {
   AGENT_POLICY_ADDRESS,
   allowListAbi,
+  blockchainIdFromRpc,
   CHAIN_ID,
+  cb58ToHex,
+  FUJI_BLOCKCHAIN_ID,
+  FUJI_POLICY_IDS,
   LOCAL_ROLES,
+  type PolicyIds,
   PRECOMPILES,
+  readRuleVersion,
 } from "@sealed-arena/shared";
 import { createPublicClient, createWalletClient, defineChain, type Hex, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -22,6 +28,26 @@ export function relayerKey(rpc: string, env: NodeJS.ProcessEnv = process.env): H
   throw new Error("RELAYER_PRIVATE_KEY is not set and the RPC is not local");
 }
 
+/**
+ * The ids a v2 owner proof is bound to: the Sealed L1 on Fuji by its blockchain id, any other
+ * chain (the local network) through the node's info API.
+ */
+export async function policyIdsFor(rpc: string, f: typeof fetch = fetch): Promise<PolicyIds> {
+  const bc = blockchainIdFromRpc(rpc);
+  if (!bc) throw new Error("the RPC URL has no /ext/bc/<blockchain id>/rpc path");
+  if (bc === FUJI_BLOCKCHAIN_ID) return FUJI_POLICY_IDS;
+  const r = await f(`${rpc.slice(0, rpc.indexOf("/ext/"))}/ext/info`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "info.getNetworkID", params: {} }),
+  });
+  const networkId = Number(
+    ((await r.json()) as { result?: { networkID?: string } }).result?.networkID,
+  );
+  if (!Number.isInteger(networkId) || networkId <= 0) throw new Error("info.getNetworkID failed");
+  return { chainId: BigInt(CHAIN_ID), networkId, blockchainId: cb58ToHex(bc) };
+}
+
 export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
   const chain = defineChain({
     id: CHAIN_ID,
@@ -32,9 +58,18 @@ export function sealedRelayChain(rpc: string, key: Hex): RelayChain {
   const account = privateKeyToAccount(key);
   const pub = createPublicClient({ chain, transport: http(rpc) });
   const wallet = createWalletClient({ account, chain, transport: http(rpc) });
+  let ids: Promise<PolicyIds> | undefined;
   return {
     relayer: account.address,
     chainId: CHAIN_ID,
+    async policy() {
+      ids ??= policyIdsFor(rpc).catch((e: unknown) => {
+        ids = undefined;
+        throw e;
+      });
+      const [version, i] = await Promise.all([readRuleVersion(pub), ids]);
+      return { version, ids: i };
+    },
     async simulate(data, to = AGENT_POLICY_ADDRESS) {
       await pub.call({ account: account.address, to, data });
     },

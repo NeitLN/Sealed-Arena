@@ -36,6 +36,10 @@ const en = {
   perTxCap: "Per payment (USDC)",
   perTxCapFee: "Per payment, maximum fee included (USDC)",
   dailyCap: "Per day (USDC)",
+  dailyFeeCap: "Daily fee cap (USDC)",
+  feeSpentToday: "Fees today",
+  feeCapNotSet:
+    "This mandate was set before the network's rule v2: it has no daily cap on fees. Set it again to add one.",
   validDays: "Valid (days)",
   signMandate: "Sign and set mandate",
   signAnyway: "Sign anyway",
@@ -60,6 +64,7 @@ const en = {
   tx: "Transaction",
   // validation
   amount_invalid: "Enter an amount like 0.5 (up to 18 decimals).",
+  fee_cap_invalid: "Fees per day cannot be more than the daily cap.",
   days_invalid: "Enter a whole number of days from 1 to 365.",
   payees_empty: "Add at least one payee.",
   payees_too_many: "At most 16 payees.",
@@ -145,6 +150,10 @@ const vi: Record<Key, string> = {
   perTxCap: "Mỗi lần (USDC)",
   perTxCapFee: "Mỗi lần, đã gồm phí tối đa (USDC)",
   dailyCap: "Mỗi ngày (USDC)",
+  dailyFeeCap: "Hạn mức phí/ngày (USDC)",
+  feeSpentToday: "Phí hôm nay",
+  feeCapNotSet:
+    "Uỷ quyền này đặt trước khi mạng chuyển sang luật v2 nên chưa có hạn mức phí mỗi ngày. Hãy đặt lại để thêm.",
   validDays: "Hiệu lực (ngày)",
   signMandate: "Ký và đặt uỷ quyền",
   signAnyway: "Vẫn ký",
@@ -167,6 +176,7 @@ const vi: Record<Key, string> = {
   working: "Đang chờ passkey của bạn và chain…",
   tx: "Giao dịch",
   amount_invalid: "Nhập số tiền dạng 0.5 (tối đa 18 chữ số thập phân).",
+  fee_cap_invalid: "Phí mỗi ngày không được lớn hơn hạn mức mỗi ngày.",
   days_invalid: "Nhập số ngày nguyên từ 1 đến 365.",
   payees_empty: "Thêm ít nhất một người nhận.",
   payees_too_many: "Tối đa 16 người nhận.",

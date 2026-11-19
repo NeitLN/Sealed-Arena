@@ -29,8 +29,6 @@ export const NATIVE_ASSET = "native";
 export const SIGNED_NATIVE_TX = "signed-native-tx";
 /** Settle first, then serve the resource. */
 export const UPFRONT_FLOW = "upfront";
-/** Gas limit the client signs: a plain transfer (21000) plus 32 bytes of non-zero calldata. */
-export const PAYMENT_GAS = 30_000n;
 
 /** `data` of the payment transaction: keccak256(abi.encode(resourceUrl, requestId)). */
 export function paymentData(resourceUrl: string, requestId: Hex): Hex {

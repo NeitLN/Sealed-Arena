@@ -10,6 +10,7 @@ services:
     environment:
       SEALED_NODE_COUNT: ${SEALED_NODE_COUNT:-3}
       SEALED_GENESIS: /sealed/genesis/${SEALED_GENESIS_FILE:-sealed-local.json}
+      SEALED_RULE_V2_AT: ${SEALED_RULE_V2_AT:-}
     volumes:
       - ../../chain/genesis:/sealed/genesis:ro
       - data:/data

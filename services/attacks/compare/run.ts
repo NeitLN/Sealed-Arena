@@ -10,6 +10,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { agentFees } from "@sealed-arena/shared";
 import {
   type Address,
   createPublicClient,
@@ -381,8 +382,7 @@ async function cleanUp(
       to: SELLER,
       value,
       gas: 21_000n,
-      maxFeePerGas: fees.maxFeePerGas,
-      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+      ...agentFees(fees),
     });
     const r = await n.client.waitForTransactionReceipt({ hash });
     leftover = { block: Number(r.blockNumber), tx: hash, value: formatEther(value) };
@@ -451,8 +451,7 @@ async function runS() {
       to,
       value,
       gas: 21_000n,
-      maxFeePerGas: fees.maxFeePerGas,
-      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+      ...agentFees(fees),
     });
   const before = await n.client.getBalance({ address: agent.address });
 

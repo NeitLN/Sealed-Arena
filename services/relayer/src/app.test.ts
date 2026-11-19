@@ -3,6 +3,7 @@ import { decodeFunctionData, encodeFunctionData, erc20Abi, type Hex } from "viem
 import { describe, expect, it } from "vitest";
 import { createRelayerApp, type RelayChain } from "./app.js";
 
+const IDS = { chainId: 261126n, networkId: 12345, blockchainId: `0x${"ab".repeat(32)}` as Hex };
 const agent = "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc";
 const freezeData = encodeFunctionData({
   abi: agentPolicyAbi,
@@ -16,6 +17,7 @@ function chain(o: { revert?: string; allowed?: string[] } = {}) {
   const c: RelayChain = {
     relayer: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
     chainId: 261126,
+    policy: async () => ({ version: 1, ids: IDS }),
     simulate: async () => {
       if (o.revert) throw new Error(o.revert);
     },
@@ -110,6 +112,9 @@ describe("relayer", () => {
       chainId: 261126,
       target: AGENT_POLICY_ADDRESS,
       rpc: "http://rpc.test/",
+      ruleVersion: 1,
+      networkId: 12345,
+      blockchainId: IDS.blockchainId,
     });
   });
 

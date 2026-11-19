@@ -1,4 +1,4 @@
-import { CHAIN_ID, PAYMENT_GAS, paymentData, pickSignedNativeTx } from "@sealed-arena/shared";
+import { agentPaymentGas, CHAIN_ID, paymentData, pickSignedNativeTx } from "@sealed-arena/shared";
 import { decodePaymentRequiredHeader, encodePaymentSignatureHeader } from "@x402/core/http";
 import type { PaymentRequirements } from "@x402/core/types";
 import { type Address, type Hex, keccak256, type PublicClient } from "viem";
@@ -57,16 +57,17 @@ async function quote(app: ReturnType<typeof createSellerApp>) {
 }
 
 async function sign(req: PaymentRequirements, nonce = 0): Promise<Hex> {
+  const data = paymentData(req.extra.resourceUrl as string, req.extra.requestId as Hex);
   return buyer.signTransaction({
     type: "eip1559",
     chainId: CHAIN_ID,
     nonce,
-    gas: PAYMENT_GAS,
+    gas: agentPaymentGas(data),
     maxFeePerGas: 25_000_000_000n,
     maxPriorityFeePerGas: 1_000_000_000n,
     to: req.payTo as Address,
     value: BigInt(req.amount),
-    data: paymentData(req.extra.resourceUrl as string, req.extra.requestId as Hex),
+    data,
   });
 }
 

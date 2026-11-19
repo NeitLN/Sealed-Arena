@@ -36,7 +36,10 @@ STRANGER="$(rand20)"
 admin() { node "$ADMIN" "$@"; }
 field() { sed -n "s/.*\"$1\":\"\{0,1\}\([^\",]*\)\"\{0,1\}.*/\1/p"; }
 
-GAS_PRICE=50000000000 # 50 gwei, legacy transactions so the charge is exact
+# EIP-1559 payments with a 50 gwei fee cap and a 1 gwei tip: the charge (value + gasLimit x fee
+# cap) is exact, and the tip is within agent rule v2's cap, so the script runs under v1 and v2.
+GAS_PRICE=50000000000
+TIP=1000000000
 VALUE=1000
 CHARGE=$((VALUE + 21000 * GAS_PRICE))
 FUNDED=10000000000000000000 # 10 coins
@@ -46,7 +49,7 @@ pass() { echo "  PASS  $*"; }
 fail() { echo "  FAIL  $*"; failures=$((failures + 1)); }
 
 pay() { # pay <to> <value> [nonce] -> prints receipt status or the RPC error
-  local args=(--legacy --gas-price "$GAS_PRICE" --gas-limit "${GAS:-21000}" --private-key "$AGENT_KEY" --rpc-url "$RPC")
+  local args=(--gas-price "$GAS_PRICE" --priority-gas-price "$TIP" --gas-limit "${GAS:-21000}" --private-key "$AGENT_KEY" --rpc-url "$RPC")
   [ -n "${3:-}" ] && args+=(--nonce "$3")
   cast send "$1" --value "$2" "${args[@]}" --json 2>&1 | sed -n 's/.*"status":"\([^"]*\)".*/\1/p; s/.*\(agent: [a-z ]*\).*/\1/p' | head -n1
 }
@@ -74,7 +77,7 @@ expect_reject "stranger" "agent: payee not allowed" "$(pay "$STRANGER" "$VALUE")
 expect_reject "over perTxCap" "agent: budget exceeded" "$(pay "$PAYEE" "$((2 * CHARGE))")"
 expect_reject "precompile as payee" "agent: payee not allowed" "$(pay 0x0300000000000000000000000000000000000001 0)"
 # cast wants --create after every other option
-raw="$(cast mktx --legacy --gas-price "$GAS_PRICE" --gas-limit 100000 \
+raw="$(cast mktx --gas-price "$GAS_PRICE" --priority-gas-price "$TIP" --gas-limit 100000 \
   --private-key "$AGENT_KEY" --rpc-url "$RPC" --create 0x600060005360016000f3)"
 out="$(cast publish --async --rpc-url "$RPC" "$raw" 2>&1 | grep -o 'agent: [a-z ]*' | head -n1 || true)"
 expect_reject "contract creation" "agent: contract creation not allowed" "$out"
@@ -89,7 +92,7 @@ echo "==> 4. 8 payments at once, daily budget left for 3"
 nonce="$(cast nonce "$AGENT" --rpc-url "$RPC")"
 accepted=0
 for i in 0 1 2 3 4 5 6 7; do
-  raw="$(cast mktx "$PAYEE" --value "$VALUE" --legacy --gas-price "$GAS_PRICE" --gas-limit 21000 \
+  raw="$(cast mktx "$PAYEE" --value "$VALUE" --gas-price "$GAS_PRICE" --priority-gas-price "$TIP" --gas-limit 21000 \
     --nonce "$((nonce + i))" --private-key "$AGENT_KEY" --rpc-url "$RPC")"
   if out="$(cast publish --async --rpc-url "$RPC" "$raw" 2>&1)"; then
     accepted=$((accepted + 1))

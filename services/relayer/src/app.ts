@@ -3,7 +3,10 @@ import {
   AGENT_POLICY_ADDRESS,
   agentPolicyAbi,
   arenaRecorderAbi,
-  registerDigest,
+  type PolicyIds,
+  type RuleVersion,
+  registerData,
+  registerDigestFor,
 } from "@sealed-arena/shared";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -20,12 +23,14 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 /** The owner actions the relayer sends. Each carries the owner's passkey proof, checked by the precompile. */
-export const RELAYED = new Set(["register", "setMandate", "freeze", "unfreeze"]);
+export const RELAYED = new Set(["register", "setMandate", "setMandateV2", "freeze", "unfreeze"]);
 
 /** What the relayer needs from the chain; the real one is in chain.ts. */
 export type RelayChain = {
   relayer: Address;
   chainId: number;
+  /** The agent rule version in force and the ids a v2 proof is bound to (returned by /info). */
+  policy(): Promise<{ version: RuleVersion; ids: PolicyIds }>;
   /** eth_call of the action from the relayer (to AgentPolicy unless `to` is given); throws with the node's message if it would revert. */
   simulate(data: Hex, to?: Address): Promise<void>;
   /** Whether `agent` may send transactions (TxAllowList role > 0). Only those are registered. */
@@ -124,14 +129,18 @@ export function createRelayerApp(o: RelayerOptions) {
     }
   };
 
-  app.get("/info", (c) =>
-    c.json({
+  app.get("/info", async (c) => {
+    const p = await o.chain.policy().catch(() => undefined);
+    return c.json({
       relayer: o.chain.relayer,
       chainId: o.chain.chainId,
       target: AGENT_POLICY_ADDRESS,
       ...(o.publicRpc ? { rpc: o.publicRpc } : {}),
-    }),
-  );
+      ...(p
+        ? { ruleVersion: p.version, networkId: p.ids.networkId, blockchainId: p.ids.blockchainId }
+        : {}),
+    });
+  });
 
   app.post("/relay", async (c) => {
     const ip = client(c);
@@ -270,14 +279,19 @@ export function createRelayerApp(o: RelayerOptions) {
 
     const privateKey = generatePrivateKey();
     const agent = privateKeyToAccount(privateKey);
+    let policy: { version: RuleVersion; ids: PolicyIds };
+    try {
+      policy = await o.chain.policy();
+    } catch (e) {
+      return c.json(
+        { ok: false, error: "send_failed", function: "register", reason: revertReason(e) },
+        502,
+      );
+    }
     const sig = await agent.sign({
-      hash: registerDigest(BigInt(o.chain.chainId), agent.address, x, y),
+      hash: registerDigestFor(policy.version, policy.ids, agent.address, x, y),
     });
-    const data = encodeFunctionData({
-      abi: agentPolicyAbi,
-      functionName: "register",
-      args: [agent.address, x, y, sig],
-    });
+    const data = registerData(agent.address, x, y, sig);
     try {
       await o.chain.simulate(data);
     } catch (e) {

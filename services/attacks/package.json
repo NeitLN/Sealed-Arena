@@ -9,6 +9,7 @@
   },
   "scripts": {
     "seed": "tsx src/seed.ts",
+    "rule-v2-switch": "tsx src/rule-v2-switch.ts",
     "leaked-key": "tsx src/leaked-key.ts",
     "byzantine": "tsx src/byzantine.ts",
     "typecheck": "tsc --noEmit -p .",
