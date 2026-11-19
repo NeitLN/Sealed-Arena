@@ -55,4 +55,24 @@ describe("chain-config proxy", () => {
       JSON.stringify(JSON.parse(err)),
     );
   });
+
+  it("keeps upstream upgrades other than Warp (only the Sealed keys are dropped)", () => {
+    const allow = { txAllowListConfig: { blockTimestamp: 1810000000, adminAddresses: [] } };
+    const withUpstream = {
+      ...config,
+      upgrades: { precompileUpgrades: [allow, ...config.upgrades.precompileUpgrades] },
+    };
+    const out = stripSealedUpgrades(withUpstream) as typeof withUpstream;
+    expect(out.upgrades.precompileUpgrades).toEqual([
+      allow,
+      { warpConfig: { blockTimestamp: 1800000000, quorumNumerator: 70 } },
+    ]);
+  });
+
+  it("leaves the answers of every other method alone, even when they look like a chain config", () => {
+    for (const method of ["eth_call", "eth_getBlockByNumber", "debug_traceCall"]) {
+      const body = JSON.stringify({ jsonrpc: "2.0", id: 9, result: config });
+      expect(rewriteResponse(JSON.stringify({ jsonrpc: "2.0", id: 9, method }), body)).toBe(body);
+    }
+  });
 });
