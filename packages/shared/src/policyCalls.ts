@@ -42,8 +42,15 @@ export function blockchainIdFromRpc(rpc: string): string | undefined {
 }
 
 /**
- * The rule version in force at the head. ruleVersion() exists only under v2: before, the call
- * fails like an unknown selector, which means v1. Any other failure (the node is down) throws.
+ * The node's answer when ruleVersion() is not active yet ("invalid non-activated function
+ * selector: 0x…"; "invalid function selector" on a node without the v2 functions).
+ */
+export const NOT_ACTIVE_SELECTOR = /invalid (non-activated )?function selector/i;
+
+/**
+ * The rule version in force at the head. ruleVersion() exists only under v2: before, the node
+ * refuses it as a selector that is not active, which means v1. Any other failure (the node is
+ * down, a rate limit) throws, so a client never signs a v1 proof by mistake.
  */
 export async function readRuleVersion(client: PublicClient): Promise<RuleVersion> {
   try {
@@ -54,10 +61,21 @@ export async function readRuleVersion(client: PublicClient): Promise<RuleVersion
     });
     return Number(v) >= 2 ? 2 : 1;
   } catch (err) {
-    await client.getBlockNumber(); // throws if the node is not reachable
-    void err;
-    return 1;
+    if (NOT_ACTIVE_SELECTOR.test(errorText(err))) return 1;
+    throw err;
   }
+}
+
+/** The error's message and the messages of its causes (viem wraps the node's answer). */
+function errorText(err: unknown): string {
+  const parts: string[] = [];
+  for (let e: unknown = err, i = 0; e && i < 8; i++) {
+    const o = e as { message?: unknown; details?: unknown; cause?: unknown };
+    if (typeof o.message === "string") parts.push(o.message);
+    if (typeof o.details === "string") parts.push(o.details);
+    e = o.cause;
+  }
+  return parts.join("\n");
 }
 
 export async function readFreezeEpoch(client: PublicClient, agent: Address): Promise<bigint> {

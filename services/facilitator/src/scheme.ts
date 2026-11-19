@@ -1,10 +1,12 @@
 import {
   AGENT_POLICY_ADDRESS,
+  type AgentState,
   agentPolicyAbi,
   checkSignedNativeTx,
   NATIVE_ASSET,
   paymentCharge,
   precheckMandate,
+  readRuleVersion,
   SIGNED_NATIVE_TX,
   X402_NETWORK,
   X402_SCHEME,
@@ -177,9 +179,46 @@ export class SignedNativeTxFacilitator implements SchemeNetworkFacilitator {
         this.client.getCode({ address: req.payTo as Address }),
       ]);
       const now = BigInt(Math.max(Number(block.timestamp), Math.floor(Date.now() / 1000)));
+      let v2: AgentState["v2"];
+      if ((await readRuleVersion(this.client)) === 2) {
+        const [m2, fee] = await Promise.all([
+          this.client.readContract({
+            address: AGENT_POLICY_ADDRESS,
+            abi: agentPolicyAbi,
+            functionName: "getMandateV2",
+            args: [payer],
+          }),
+          this.client.readContract({
+            address: AGENT_POLICY_ADDRESS,
+            abi: agentPolicyAbi,
+            functionName: "getFeeSpend",
+            args: [payer],
+          }),
+        ]);
+        v2 = {
+          feeSpentToday: fee[0],
+          feeCapSet: m2[1],
+          dailyFeeCap: m2[0].dailyFeeCap,
+          baseFee: block.baseFeePerGas ?? 0n,
+        };
+      }
       const reason = precheckMandate(
-        { mandate, frozen, spentToday, now, payeeHasCode: code !== undefined && code !== "0x" },
-        { to: req.payTo as Address, charge },
+        {
+          mandate,
+          frozen,
+          spentToday,
+          now,
+          payeeHasCode: code !== undefined && code !== "0x",
+          ...(v2 ? { v2 } : {}),
+        },
+        {
+          to: req.payTo as Address,
+          charge,
+          gas: c.gas,
+          data: c.data,
+          maxFeePerGas: c.maxFeePerGas,
+          maxPriorityFeePerGas: c.maxPriorityFeePerGas,
+        },
       );
       if (reason) return { ok: false, reason, payer };
     }
