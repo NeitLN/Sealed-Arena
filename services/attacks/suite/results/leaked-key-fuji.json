@@ -1,11 +1,11 @@
 {
-  "at": "2026-11-18T20:36:36.372Z",
+  "at": "2026-11-19T11:05:14.343Z",
   "results": [
     {
       "name": "control: pay an allowed payee inside the mandate",
       "expected": "succeeded",
       "result": "succeeded",
-      "reason": "included in block 446 (status success)"
+      "reason": "included in block 509 (status success)"
     },
     {
       "name": "transfer to a stranger (legacy)",
@@ -170,7 +170,7 @@
       "name": "20 payments at once past dailyCap",
       "expected": "blocked",
       "result": "blocked",
-      "reason": "12/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000"
+      "reason": "3/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000"
     }
   ],
   "invariant": true,
