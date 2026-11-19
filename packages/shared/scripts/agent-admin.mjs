@@ -112,9 +112,11 @@ async function ruleVersion() {
       2
       ? 2
       : 1;
-  } catch {
-    await pub.getBlockNumber(); // the node answers: the function does not exist before v2
-    return 1;
+  } catch (err) {
+    // Before v2 the node refuses the selector as not active; anything else is a real failure.
+    const text = [err?.message, err?.details, err?.cause?.message, err?.cause?.details].join(" ");
+    if (/invalid (non-activated )?function selector/i.test(text)) return 1;
+    throw err;
   }
 }
 async function domainV2() {

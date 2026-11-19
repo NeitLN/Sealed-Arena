@@ -11,6 +11,7 @@ import {
 } from "viem";
 import type { Mandate } from "./agentPolicy.js";
 import { CHAIN_ID } from "./chain.js";
+import { AGENT_MAX_TIP, agentPaymentGas } from "./policyCalls.js";
 
 /**
  * x402 payment with a signed native-coin transaction (docs/ARCHITECTURE.md section 4, docs/decisions/D5.md).
@@ -56,7 +57,16 @@ export type ExpectedPayment = {
 };
 
 export type PaymentCheck =
-  | { ok: true; payer: Address; hash: Hex; nonce: number; gas: bigint; maxFeePerGas: bigint }
+  | {
+      ok: true;
+      payer: Address;
+      hash: Hex;
+      nonce: number;
+      gas: bigint;
+      maxFeePerGas: bigint;
+      maxPriorityFeePerGas: bigint;
+      data: Hex;
+    }
   | { ok: false; reason: string; payer?: Address };
 
 /**
@@ -106,6 +116,8 @@ export async function checkSignedNativeTx(raw: Hex, want: ExpectedPayment): Prom
     nonce: tx.nonce ?? 0,
     gas: tx.gas ?? 0n,
     maxFeePerGas: tx.maxFeePerGas ?? 0n,
+    maxPriorityFeePerGas: tx.maxPriorityFeePerGas ?? 0n,
+    data: tx.data ?? "0x",
   };
 }
 
@@ -122,6 +134,15 @@ export type AgentState = {
   /** Unix seconds the payment is checked at. */
   now: bigint;
   payeeHasCode: boolean;
+  /** Set when agent rule v2 is in force (ruleVersion() answers 2). */
+  v2?: {
+    /** getFeeSpend() of today, and the mandate's daily fee cap when it has one (getMandateV2). */
+    feeSpentToday: bigint;
+    feeCapSet: boolean;
+    dailyFeeCap: bigint;
+    /** Base fee of the latest block. */
+    baseFee: bigint;
+  };
 };
 
 /**
@@ -131,7 +152,15 @@ export type AgentState = {
  */
 export function precheckMandate(
   s: AgentState,
-  p: { to: Address; charge: bigint },
+  p: {
+    to: Address;
+    charge: bigint;
+    /** Needed for the rule v2 checks (s.v2 set). */
+    gas?: bigint;
+    data?: Hex;
+    maxFeePerGas?: bigint;
+    maxPriorityFeePerGas?: bigint;
+  },
 ): string | undefined {
   if (!s.mandate.payees.some((a) => isAddressEqual(a, p.to))) return "agent_payee_not_allowed";
   if (s.payeeHasCode) return "agent_payee_has_code";
@@ -139,5 +168,21 @@ export function precheckMandate(
   if (s.now >= s.mandate.expiry) return "agent_mandate_expired";
   if (p.charge > s.mandate.perTxCap) return "agent_budget_exceeded";
   if (s.spentToday + p.charge > s.mandate.dailyCap) return "agent_budget_exceeded";
+  if (s.v2) {
+    // Rule v2, after every v1 condition, in the order of core.checkAgentTxV2 (the transaction
+    // type and access list are checked by checkSignedNativeTx; the payee is the seller).
+    const data = p.data ?? "0x";
+    const size = (data.length - 2) / 2;
+    if (size !== 0 && size !== 32) return "agent_call_data_must_be_empty_or_32_bytes";
+    if (p.gas !== agentPaymentGas(data)) return "agent_gas_limit_must_be_21000_plus_the_data_cost";
+    const feeCap = p.maxFeePerGas ?? 0n;
+    const headroom = feeCap - s.v2.baseFee;
+    const tipCap = p.maxPriorityFeePerGas ?? 0n;
+    let tip = tipCap; // bigint: no Math.min
+    if (headroom < tip) tip = headroom;
+    if (tip > AGENT_MAX_TIP) return "agent_tip_too_high";
+    if (s.v2.feeCapSet && s.v2.feeSpentToday + (p.gas ?? 0n) * feeCap > s.v2.dailyFeeCap)
+      return "agent_fee_budget_exceeded";
+  }
   return undefined;
 }

@@ -113,20 +113,21 @@ describe("readRuleVersion", () => {
   it("2 when ruleVersion() answers 2", async () => {
     expect(await readRuleVersion(client(async () => 2n, ok))).toBe(2);
   });
-  it("1 when the call fails but the node answers (the function does not exist before v2)", async () => {
-    expect(
-      await readRuleVersion(
-        client(async () => {
-          throw new Error("invalid function selector");
-        }, ok),
-      ),
-    ).toBe(1);
-  });
-  it("throws when the node does not answer", async () => {
-    const down = async () => {
-      throw new Error("fetch failed");
+  it("1 when the node refuses the selector as not active (the answer of the Fuji node before v2)", async () => {
+    const notActive = async () => {
+      throw new Error("x", {
+        cause: { details: "invalid non-activated function selector: 0x7593a0eb" },
+      });
     };
-    await expect(readRuleVersion(client(down, down))).rejects.toThrow("fetch failed");
+    expect(await readRuleVersion(client(notActive, ok))).toBe(1);
+  });
+  it("throws on any other failure, even when the node answers other calls (rate limit, down)", async () => {
+    for (const msg of ["fetch failed", "HTTP request failed. Status: 429", "execution reverted"]) {
+      const fail = async () => {
+        throw new Error(msg);
+      };
+      await expect(readRuleVersion(client(fail, ok))).rejects.toThrow(msg);
+    }
   });
 });
 
