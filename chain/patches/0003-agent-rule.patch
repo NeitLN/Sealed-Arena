@@ -160,10 +160,10 @@ index 0000000..7d6c426
 +}
 diff --git a/graft/subnet-evm/core/agent_rule.go b/graft/subnet-evm/core/agent_rule.go
 new file mode 100644
-index 0000000..05a4053
+index 0000000..5c37aab
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule.go
-@@ -0,0 +1,261 @@
+@@ -0,0 +1,282 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -196,8 +196,8 @@ index 0000000..05a4053
 +	ErrAgentTxTypeNotAllowed = errors.New("agent: transaction type not allowed")
 +
 +	// Rule v2 (from agentRuleV2Config's activation time).
-+	ErrAgentGasLimit          = errors.New("agent: gas limit must be 21000")
-+	ErrAgentCallData          = errors.New("agent: call data or access list not allowed")
++	ErrAgentGasLimit          = errors.New("agent: gas limit must be 21000 plus the cost of the payment data")
++	ErrAgentCallData          = errors.New("agent: call data must be empty or 32 bytes, and no access list")
 +	ErrAgentPayeeIsPrecompile = errors.New("agent: payee is a precompile")
 +	ErrAgentTipTooHigh        = errors.New("agent: tip too high")
 +	ErrAgentSetCodeAuthority  = errors.New("agent: set-code authority is a registered agent")
@@ -241,8 +241,29 @@ index 0000000..05a4053
 +	TxType        uint8
 +	GasTipCap     *big.Int // for types 0 and 1, the gas price
 +	BaseFee       *big.Int // base fee of the block (pool: of the head); nil before London
-+	DataLen       int
++	Data          []byte
 +	AccessListLen int
++}
++
++// AgentPaymentDataLen is the only non-empty call data rule v2 allows an agent payment: 32 bytes,
++// the size of the x402 payment reference keccak256(abi.encode(resourceUrl, requestId)). The
++// payee is an account without code, so the data is not executed; it only records on chain which
++// request the payment is for.
++const AgentPaymentDataLen = 32
++
++// AgentPaymentGas is the gas limit rule v2 requires of an agent payment with this call data:
++// exactly its intrinsic gas (21000 plus 16 per non-zero and 4 per zero byte), so the payment
++// cannot buy gas it does not use.
++func AgentPaymentGas(data []byte) uint64 {
++	gas := AgentTransferGas
++	for _, b := range data {
++		if b == 0 {
++			gas += 4
++		} else {
++			gas += 16
++		}
++	}
++	return gas
 +}
 +
 +// IsNativePrecompile reports whether addr is one of the EVM's native precompiles at the pinned
@@ -281,11 +302,11 @@ index 0000000..05a4053
 +	if tx.TxType > 2 {
 +		return ErrAgentTxTypeNotAllowed
 +	}
-+	if tx.GasLimit != AgentTransferGas {
-+		return fmt.Errorf("%w: %d", ErrAgentGasLimit, tx.GasLimit)
-+	}
-+	if tx.DataLen != 0 || tx.AccessListLen != 0 {
++	if (len(tx.Data) != 0 && len(tx.Data) != AgentPaymentDataLen) || tx.AccessListLen != 0 {
 +		return ErrAgentCallData
++	}
++	if want := AgentPaymentGas(tx.Data); tx.GasLimit != want {
++		return fmt.Errorf("%w: %d, want %d", ErrAgentGasLimit, tx.GasLimit, want)
 +	}
 +	if tx.To != nil && IsNativePrecompile(*tx.To) {
 +		return fmt.Errorf("%w: %s", ErrAgentPayeeIsPrecompile, tx.To.Hex())
@@ -1156,10 +1177,10 @@ index 0000000..fdb5199
 +}
 diff --git a/graft/subnet-evm/core/agent_rule_v2_test.go b/graft/subnet-evm/core/agent_rule_v2_test.go
 new file mode 100644
-index 0000000..f30b51c
+index 0000000..93401b4
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule_v2_test.go
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,219 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -1207,7 +1228,7 @@ index 0000000..f30b51c
 +func TestAgentRuleV2GasDataAndAccessList(t *testing.T) {
 +	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
 +	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer+1, arTip, nil, nil)), ErrAgentGasLimit)
-+	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, 30_000, arTip, []byte{0x01}, nil)), ErrAgentGasLimit)
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, 30_000, arTip, []byte{0x01}, nil)), ErrAgentCallData)
 +	// Gas below the transfer cost: the agent check in preCheck refuses it before the intrinsic
 +	// gas check; either way the transaction is invalid and nothing is charged.
 +	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer-1, arTip, nil, nil)), ErrAgentGasLimit)
@@ -1356,8 +1377,31 @@ index 0000000..f30b51c
 +	})
 +	require.ErrorIs(t, err, ErrAgentTipTooHigh)
 +}
++
++// An agent payment may carry exactly 32 bytes of data (the x402 payment reference) when its gas
++// is exactly the intrinsic gas of that data; other sizes, or other gas, are refused.
++func TestAgentRuleV2PaymentData(t *testing.T) {
++	e := newArEnvWith(t, arBigMandate(), arConfigV2At(0), dummy.NewCoinbaseFaker())
++	ref := common.HexToHash("0x00ff00ff00000000000000000000000000000000000000000000000000000001").Bytes()
++	want := AgentPaymentGas(ref)
++	require.Equal(t, uint64(21_000+16*3+4*29), want)
++
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, want+1, arTip, ref, nil)), ErrAgentGasLimit)
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, ref, nil)), ErrAgentGasLimit)
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, AgentPaymentGas(ref[:31]), arTip, ref[:31], nil)), ErrAgentCallData)
++	long := append(append([]byte{}, ref...), 0x01)
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, AgentPaymentGas(long), arTip, long, nil)), ErrAgentCallData)
++	al := types.AccessList{{Address: arStranger}}
++	require.ErrorIs(t, e.bad(e.agentTx2(&arPayee, common.Big1, want+2400, arTip, ref, al)), ErrAgentCallData)
++	require.Equal(t, 0, e.spend().TotalCharged.Sign())
++
++	receipts := e.good(10, e.agentTx2(&arPayee, common.Big1, want, arTip, ref, nil))
++	require.Equal(t, types.ReceiptStatusSuccessful, receipts[0].Status)
++	require.Equal(t, want, receipts[0].GasUsed)
++	e.checkInvariant()
++}
 diff --git a/graft/subnet-evm/core/state_transition.go b/graft/subnet-evm/core/state_transition.go
-index 415a986..7cc1514 100644
+index 415a986..ba5ba2a 100644
 --- a/graft/subnet-evm/core/state_transition.go
 +++ b/graft/subnet-evm/core/state_transition.go
 @@ -33,6 +33,7 @@ import (
@@ -1427,7 +1471,7 @@ index 415a986..7cc1514 100644
 +				TxType:        msg.TxType,
 +				GasTipCap:     msg.GasTipCap,
 +				BaseFee:       st.evm.Context.BaseFee,
-+				DataLen:       len(msg.Data),
++				Data:          msg.Data,
 +				AccessListLen: len(msg.AccessList),
 +			})
 +			if err != nil {
@@ -1467,7 +1511,7 @@ index 415a986..7cc1514 100644
  
  // TransitionDb will transition the state by applying the current message and
 diff --git a/graft/subnet-evm/core/txpool/legacypool/legacypool.go b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
-index cb2602f..6cb651a 100644
+index cb2602f..ad8afb6 100644
 --- a/graft/subnet-evm/core/txpool/legacypool/legacypool.go
 +++ b/graft/subnet-evm/core/txpool/legacypool/legacypool.go
 @@ -43,6 +43,8 @@ import (
@@ -1571,7 +1615,7 @@ index cb2602f..6cb651a 100644
 +				TxType:        t,
 +				GasTipCap:     tx.GasTipCap(),
 +				BaseFee:       head.BaseFee,
-+				DataLen:       len(tx.Data()),
++				Data:          tx.Data(),
 +				AccessListLen: len(tx.AccessList()),
 +			}
 +			_, applies, err := core.CheckAgentTx(pool.currentState, now, agentTx)
@@ -1598,7 +1642,7 @@ index cb2602f..6cb651a 100644
  	// Iterate over all accounts and demote any non-executable transactions
  	gasLimit := pool.currentHead.Load().GasLimit
 diff --git a/graft/subnet-evm/core/txpool/validation.go b/graft/subnet-evm/core/txpool/validation.go
-index 1827192..a96bbc3 100644
+index 1827192..58a9fa9 100644
 --- a/graft/subnet-evm/core/txpool/validation.go
 +++ b/graft/subnet-evm/core/txpool/validation.go
 @@ -31,10 +31,13 @@ import (
@@ -1675,7 +1719,7 @@ index 1827192..a96bbc3 100644
 +			TxType:        tx.Type(),
 +			GasTipCap:     tx.GasTipCap(),
 +			BaseFee:       opts.AgentBaseFee,
-+			DataLen:       len(tx.Data()),
++			Data:          tx.Data(),
 +			AccessListLen: len(tx.AccessList()),
 +		}); err != nil {
 +			return err
