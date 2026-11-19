@@ -728,7 +728,7 @@
       "t0": 0,
       "t1": 0,
       "txs": [],
-      "note": "12/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000"
+      "note": "3/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000"
     }
   ],
   "benign": [
@@ -803,5 +803,5 @@
       ]
     }
   ],
-  "leakedKeyAt": "2026-11-18T20:36:36.372Z"
+  "leakedKeyAt": "2026-11-19T11:05:14.343Z"
 }

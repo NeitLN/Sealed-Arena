@@ -142,7 +142,7 @@ The leaked-key suite plays someone who holds the agent's key. It uses its own ma
 
 | Network | Run | Cases | Ended inside the mandate | Coins outside the mandate |
 | --- | --- | --- | --- | --- |
-| Sealed L1 on Fuji (one validator, through the operator's node) | 2026-11-18T20:36:36.372Z | 24 | 24/24 | 0 cases |
+| Sealed L1 on Fuji (one validator, through the operator's node) | 2026-11-19T11:05:14.343Z | 24 | 24/24 | 0 cases |
 | local Sealed L1 (3 nodes, scripts/localnet.sh) | 2026-11-18T06:35:59.802Z | 26 | 26/26 | 0 cases |
 
 ## Agent tier
@@ -461,7 +461,7 @@ FiatTokenV2: invalid signature |
 | 9.L21 | leaked-key suite: pay an allowed payee while frozen | blocked | 0.000 | 0.000 | RPC rejected: agent: frozen |
 | 9.L22 | leaked-key suite: pay an allowed payee after the mandate expired | blocked | 0.000 | 0.000 | RPC rejected: agent: mandate expired |
 | 9.L23 | leaked-key suite: repeated payments past dailyCap | blocked | 0.000 | 0.000 | spentToday 2802100000000000000 <= dailyCap 3000000000000000000; next payment: RPC rejected: agent: budget exceeded |
-| 9.L24 | leaked-key suite: 20 payments at once past dailyCap | blocked | 0.000 | 0.000 | 12/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000 |
+| 9.L24 | leaked-key suite: 20 payments at once past dailyCap | blocked | 0.000 | 0.000 | 3/20 accepted by the pool, 2 included, spentToday 3803150000000000000 <= dailyCap 4802100000000000000 |
 
 </details>
 
