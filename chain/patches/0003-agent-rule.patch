@@ -1,9 +1,9 @@
 diff --git a/graft/subnet-evm/core/agent_policy_v2_test.go b/graft/subnet-evm/core/agent_policy_v2_test.go
 new file mode 100644
-index 0000000..2e86701
+index 0000000..7d6c426
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_policy_v2_test.go
-@@ -0,0 +1,136 @@
+@@ -0,0 +1,154 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -117,12 +117,14 @@ index 0000000..2e86701
 +
 +	r := e.good(10, e.relayerCall(preSigned, 300_000))
 +	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	require.Len(t, r[0].Logs, 1, "Frozen event")
 +	_, frozen := e.mandate()
 +	require.True(t, frozen)
 +	require.ErrorIs(t, e.bad(e.pay2()), ErrAgentFrozen)
 +	// Freezing again with the same proof succeeds and changes nothing.
 +	r = e.good(10, e.relayerCall(preSigned, 300_000))
 +	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
++	require.Empty(t, r[0].Logs, "no second Frozen event")
 +
 +	r = e.good(10, e.relayerCall(e.freezeData(false), 300_000)) // unfreeze: epoch 0 -> 1
 +	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
@@ -139,6 +141,22 @@ index 0000000..2e86701
 +// pay2 is a v2-conformant payment of 1 wei to the listed payee.
 +func (e *arEnv) pay2() *types.Transaction {
 +	return e.agentTx2(&arPayee, common.Big1, arTransfer, arTip, nil, nil)
++}
++
++// dailyFeeCap may not exceed dailyCap: such a setMandateV2 fails and changes nothing.
++func TestAgentPolicyV2FeeCapAboveDailyRefused(t *testing.T) {
++	e := newArEnvWith(t, nil, arConfigV2At(0), dummy.NewCoinbaseFaker())
++	m := arBigMandate()
++	v2 := agentpolicy.IAgentPolicyMandateV2{Payees: m.Payees, PerTxCap: m.PerTxCap, DailyCap: m.DailyCap, DailyFeeCap: new(big.Int).Add(m.DailyCap, common.Big1), Expiry: m.Expiry}
++	r := e.good(10, e.relayerCall(e.setMandateV2Data(v2), 1_000_000))
++	require.Equal(t, types.ReceiptStatusFailed, r[0].Status)
++	e.ownerNo-- // the proof was not used
++	got, _ := e.mandate()
++	require.Empty(t, got.Payees)
++	// Equal to dailyCap is allowed.
++	v2.DailyFeeCap = m.DailyCap
++	r = e.good(10, e.relayerCall(e.setMandateV2Data(v2), 1_000_000))
++	require.Equal(t, types.ReceiptStatusSuccessful, r[0].Status)
 +}
 diff --git a/graft/subnet-evm/core/agent_rule.go b/graft/subnet-evm/core/agent_rule.go
 new file mode 100644
