@@ -155,7 +155,7 @@ async function main() {
     );
 
     await page.getByLabel("Allowed payees").fill(`${LOCAL_PAYEES[0]}\n${LOCAL_PAYEES[1]}`);
-    await page.getByLabel("Per payment (USDC)").fill("0.1");
+    await page.getByLabel("Per payment, maximum fee included (USDC)").fill("0.1");
     await page.getByLabel("Per day (USDC)").fill("0.3");
     await page.getByLabel("Valid (days)").fill("1");
     await page.getByRole("button", { name: "Sign and set mandate" }).click();
