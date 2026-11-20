@@ -19,8 +19,8 @@ import {
   isAddress,
   isHex,
   parseEther,
+  recoverAddress,
 } from "viem";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 /** The owner actions the relayer sends. Each carries the owner's passkey proof, checked by the precompile. */
 export const RELAYED = new Set(["register", "setMandate", "setMandateV2", "freeze", "unfreeze"]);
@@ -246,10 +246,8 @@ export function createRelayerApp(o: RelayerOptions) {
     }
   });
 
-  // Demo agents for visitors to the owner console. The relayer makes a new key, registers the agent
-  // to the visitor's passkey FIRST (from then on the rule binds it: no mandate, nothing allowed),
-  // and only then allows it to send and funds it. A key that may send but is bound by nothing never
-  // exists. The key goes back to this visitor only and is not kept.
+  // The browser signs registration with its own new key. Register FIRST, then allow and fund:
+  // an enabled key without an owner-bound policy must never exist. No private key crosses this API.
   const demoLast = new Map<string, number>();
   const demoDays = new Map<number, number>();
   app.post("/demo/claim", async (c) => {
@@ -259,12 +257,17 @@ export function createRelayerApp(o: RelayerOptions) {
     if (!(await demo.issuer.ready().catch(() => false)))
       return c.json({ ok: false, error: "demo-disabled" }, 503);
     const body = (await c.req.json().catch(() => undefined)) as
-      | { ownerX?: unknown; ownerY?: unknown }
+      | { agent?: unknown; ownerX?: unknown; ownerY?: unknown; agentSig?: unknown }
       | undefined;
+    const agent = body?.agent;
+    const sig = body?.agentSig;
     const x = body?.ownerX;
     const y = body?.ownerY;
     const word = (v: unknown): v is Hex => isHex(v) && v.length === 66;
     if (!word(x) || !word(y)) return c.json({ ok: false, error: "passkey_invalid" }, 400);
+
+    if (typeof agent !== "string" || !isAddress(agent) || !isHex(sig) || sig.length !== 132)
+      return c.json({ ok: false, error: "signature_invalid" }, 400);
 
     const ip = client(c);
     const now = clock();
@@ -277,8 +280,6 @@ export function createRelayerApp(o: RelayerOptions) {
     demoLast.set(ip, now);
     demoDays.set(day, (demoDays.get(day) ?? 0) + 1);
 
-    const privateKey = generatePrivateKey();
-    const agent = privateKeyToAccount(privateKey);
     let policy: { version: RuleVersion; ids: PolicyIds };
     try {
       policy = await o.chain.policy();
@@ -288,10 +289,17 @@ export function createRelayerApp(o: RelayerOptions) {
         502,
       );
     }
-    const sig = await agent.sign({
-      hash: registerDigestFor(policy.version, policy.ids, agent.address, x, y),
-    });
-    const data = registerData(agent.address, x, y, sig);
+    try {
+      const signer = await recoverAddress({
+        hash: registerDigestFor(policy.version, policy.ids, agent, x, y),
+        signature: sig,
+      });
+      if (signer.toLowerCase() !== agent.toLowerCase())
+        return c.json({ ok: false, error: "signature_invalid" }, 400);
+    } catch {
+      return c.json({ ok: false, error: "signature_invalid" }, 400);
+    }
+    const data = registerData(agent, x, y, sig);
     try {
       await o.chain.simulate(data);
     } catch (e) {
@@ -316,18 +324,17 @@ export function createRelayerApp(o: RelayerOptions) {
       );
     }
     try {
-      const enable = await demo.issuer.enable(agent.address);
-      const fund = await demo.issuer.fund(agent.address, demo.funding ?? parseEther("0.05"));
+      const enable = await demo.issuer.enable(agent);
+      const fund = await demo.issuer.fund(agent, demo.funding ?? parseEther("0.05"));
       return c.json({
         ok: true,
-        agent: agent.address,
-        privateKey,
+        agent: agent,
         transactions: { register, enable, fund },
       });
     } catch (e) {
       // Registered but not (yet) allowed: it can send nothing, which is safe.
       return c.json(
-        { ok: false, error: "issue_failed", agent: agent.address, reason: revertReason(e) },
+        { ok: false, error: "issue_failed", agent: agent, reason: revertReason(e) },
         502,
       );
     }

@@ -7,16 +7,16 @@ import { Heading, Text } from "@astryxdesign/core/Text";
 import { type ReactNode, useState } from "react";
 import { type Address, type Hex, type PublicClient, parseEther } from "viem";
 import { designText } from "./designText.js";
-import { StatusPill } from "./Evidence.js";
 import { type SendOutcome, sendAsAgent } from "./forbiddenSend.js";
 import type { Lang, T } from "./i18n.js";
-import { type Passkey, RELAYER_URL } from "./owner.js";
+import { type Passkey, prepareDemoClaim, RELAYER_URL, relayerInfo } from "./owner.js";
+import { StatusPill } from "./StatusPill.js";
 
 /** An address nobody holds a key for; never on a mandate. */
 const STRANGER: Address = "0x000000000000000000000000000000000000dEaD";
 const STORE = "sealed.demoKeys";
 
-/** Demo agent keys this browser was given, by address (lower case). */
+/** Demo agent keys generated in this browser, by address (lower case). */
 function storedKeys(): Record<string, Hex> {
   try {
     return JSON.parse(localStorage.getItem(STORE) ?? "{}") as Record<string, Hex>;
@@ -32,11 +32,7 @@ function storeKey(agent: Address, key: Hex) {
   }
 }
 
-/**
- * A demo agent for visitors (POST /demo/claim on the relayer): the relayer makes a new agent,
- * registers it to this browser's passkey and only then lets it send, with a little test USDC.
- * Its key comes back to this browser only. Once it is yours, two buttons send real payments with it.
- */
+/** Browser-generated demo keys: register with the relayer before allowing or funding. */
 export function DemoAgents(o: {
   t: T;
   lang: Lang;
@@ -53,13 +49,14 @@ export function DemoAgents(o: {
 }) {
   const { t, client } = o;
   const d = designText(o.lang);
+  const [keys, setKeys] = useState(storedKeys);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string>();
   const [trying, setTrying] = useState<"stranger" | "payee">();
   const [tried, setTried] = useState<{ to: "stranger" | "payee"; out: SendOutcome }>();
-  // The key this browser was given for the agent on screen. It does not wait for the next chain
+  // The key this browser generated for the agent on screen. It does not wait for the next chain
   // read, so the "Get a demo agent" button cannot come back (and spend a second claim) meanwhile.
-  const myKey = o.current ? storedKeys()[o.current.toLowerCase()] : undefined;
+  const myKey = o.current ? keys[o.current.toLowerCase()] : undefined;
   const out = tried?.out;
 
   const claim = async () => {
@@ -67,22 +64,24 @@ export function DemoAgents(o: {
     setClaiming(true);
     setClaimError(undefined);
     try {
+      const { privateKey, request } = await prepareDemoClaim(o.passkey, await relayerInfo());
+      // Persist before sending: a lost response must not discard a funded agent's key.
+      storeKey(request.agent, privateKey);
+      setKeys((old) => ({ ...old, [request.agent.toLowerCase()]: privateKey }));
       const res = await fetch(`${RELAYER_URL}/demo/claim`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ownerX: o.passkey.x, ownerY: o.passkey.y }),
+        body: JSON.stringify(request),
       });
       const body = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         agent?: Address;
-        privateKey?: Hex;
         error?: string;
       };
-      if (!body.ok || !body.agent || !body.privateKey) {
+      if (!body.ok || !body.agent || body.agent.toLowerCase() !== request.agent.toLowerCase()) {
         setClaimError(t(body.error ?? "demoFailed"));
         return;
       }
-      storeKey(body.agent, body.privateKey);
       o.onClaimed(body.agent);
     } catch {
       setClaimError(t("demoFailed"));

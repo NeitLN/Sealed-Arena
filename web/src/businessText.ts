@@ -10,13 +10,23 @@ const en = {
   title: "Give your agent a card, not the wallet.",
   lead: "Sealed Arena is for teams whose AI agents pay for data and APIs. The owner sets the payees, a cap per payment, a cap per day and an expiry with a passkey. The Sealed L1 checks every transaction the agent's key signs against them.",
   hypothesisBadge: "Hypothesis · no customers yet",
+  hypothesisNote: "This business model has not been validated with customers.",
+  paymentFlow: ["Buying agent", "Payment on the Sealed L1", "Marketplace seller"],
+  subscriptionFlow: "Marketplace → Sealed: subscription per agent under a mandate",
+  subscriptionNote:
+    "Hypothesis · the platform pays per agent; this is not a deduction from the seller’s payment.",
+  partnerTitle: "Design partnership — closed marketplace",
+  partnerBody:
+    "Marketplace and what it sells:\n\nHow you run or host buying agents:\n\nHow you settle with your sellers:\n\nSpending limits you need:\n\nWhat you would like to test together:\n\nPlease do not include private keys, credentials or personal data. This issue is public.\n",
+  partnerPrivacy:
+    "Opens a pre-filled public GitHub issue. Do not include personal data or secrets.",
   ctaConsole: "Open the owner console",
   ctaEvaluation: "Read the evaluation",
   whoTitle: "Who it is for",
   who: [
     [
       "Closed marketplaces",
-      "Operators with a known seller network, where agents buy APIs and data. Each owner sets a mandate; the node refuses payments outside it. This is the first-customer hypothesis.",
+      "Our first-customer hypothesis: a closed marketplace that runs or hosts buying agents and settles with its own sellers. Each owner sets a mandate; the node refuses payments outside it.",
     ],
     [
       "Developers",
@@ -42,7 +52,7 @@ const en = {
   money: [
     [
       "A fee per agent under a mandate",
-      "Paid by the platforms that hold wallets for their agents.",
+      "A per-agent subscription paid by the marketplace platform. This pricing model is a hypothesis, not a validated offer.",
     ],
     [
       "Transaction fees on the L1",
@@ -81,13 +91,23 @@ const vi: BusinessText = {
   title: "Đưa agent một chiếc thẻ, không phải cả ví.",
   lead: "Sealed Arena dành cho các đội có agent AI tự trả tiền mua dữ liệu và API. Chủ đặt danh sách người nhận, hạn mức mỗi lần trả, hạn mức mỗi ngày và ngày hết hạn bằng passkey. Sealed L1 kiểm mọi giao dịch mà key của agent ký theo các điều đó.",
   hypothesisBadge: "Giả thuyết · chưa có khách hàng",
+  hypothesisNote: "Mô hình kinh doanh này chưa được kiểm chứng với khách hàng.",
+  paymentFlow: ["Agent mua hàng", "Thanh toán trên Sealed L1", "Người bán của marketplace"],
+  subscriptionFlow: "Marketplace → Sealed: phí thuê bao theo mỗi agent có uỷ quyền",
+  subscriptionNote:
+    "Giả thuyết · nền tảng trả phí theo agent; không trừ phí này vào khoản thanh toán cho người bán.",
+  partnerTitle: "Hợp tác thử nghiệm — marketplace khép kín",
+  partnerBody:
+    "Marketplace và sản phẩm đang bán:\n\nCách bạn vận hành hoặc lưu trú agent mua hàng:\n\nCách bạn thanh toán với người bán của mình:\n\nGiới hạn chi tiêu cần có:\n\nNội dung muốn cùng thử nghiệm:\n\nVui lòng không ghi private key, thông tin đăng nhập hay dữ liệu cá nhân. Issue này là công khai.\n",
+  partnerPrivacy:
+    "Mở GitHub issue công khai với nội dung điền sẵn. Không đưa dữ liệu cá nhân hay thông tin bí mật vào issue.",
   ctaConsole: "Mở bảng điều khiển chủ sở hữu",
   ctaEvaluation: "Đọc kết quả đánh giá",
   whoTitle: "Dành cho ai",
   who: [
     [
       "Marketplace khép kín",
-      "Bên vận hành mạng lưới người bán đã biết, nơi agent mua API và dữ liệu. Từng chủ sở hữu đặt uỷ quyền; node từ chối khoản trả ngoài phạm vi đó. Đây là giả thuyết khách hàng đầu tiên.",
+      "Giả thuyết khách hàng đầu tiên: marketplace khép kín tự vận hành hoặc lưu trú agent mua hàng và thanh toán với người bán của mình. Từng chủ sở hữu đặt uỷ quyền; node từ chối khoản trả ngoài phạm vi đó.",
     ],
     [
       "Lập trình viên",
@@ -111,7 +131,10 @@ const vi: BusinessText = {
   ],
   moneyTitle: "Cách có doanh thu",
   money: [
-    ["Phí theo mỗi agent có uỷ quyền", "Do các nền tảng giữ ví cho agent trả."],
+    [
+      "Phí theo mỗi agent có uỷ quyền",
+      "Phí thuê bao theo agent do nền tảng marketplace trả. Đây là giả thuyết về cách tính phí, chưa được kiểm chứng.",
+    ],
     [
       "Phí giao dịch trên L1",
       "Nguồn thứ hai. Genesis hiện tại chưa bật người nhận phí, nên muốn thu cần nâng cấp mạng.",

@@ -9,7 +9,7 @@ import { landingText } from "./landingText.js";
 import "./landing.css";
 import "./routes.css";
 
-export type Current = "home" | "owner" | "arena" | "rules" | "compare" | "business";
+export type Current = "home" | "owner" | "arena" | "rules" | "compare" | "business" | "live";
 export function SiteShell({
   lang,
   setLang,
@@ -34,10 +34,12 @@ export function SiteShell({
     compare: d.compare,
     business: d.business,
     owner: d.console,
+    live: d.live.nav,
   };
   const path = location.pathname.replace(/\/+$/, "") || "/";
   const nav = [
     ["/arena", a.navArena],
+    ["/live", d.live.nav],
     ["/compare", lang === "vi" ? "Bằng chứng" : "Evidence"],
     ["/#how-it-works", t.navHow],
     ["/business", d.business],

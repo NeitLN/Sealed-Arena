@@ -6,23 +6,6 @@ import rows from "./evalSummary.json";
 import type { Lang } from "./i18n.js";
 import leakedKey from "./leakedKeySummary.json";
 
-export function StatusPill({
-  state,
-  children,
-}: {
-  state: "refused" | "passed" | "breach" | "caution" | "neutral";
-  children: React.ReactNode;
-}) {
-  return (
-    <span className={`status-pill status-${state}`}>
-      <span aria-hidden="true">
-        {state === "refused" ? "⊣" : state === "passed" ? "✓" : state === "breach" ? "×" : "·"}
-      </span>
-      {children}
-    </span>
-  );
-}
-
 export function EvidenceMatrix({ lang, detailed = false }: { lang: Lang; detailed?: boolean }) {
   const t = designText(lang);
   const fuji = rows.filter((r) => !r.network.startsWith("local"));
