@@ -8,6 +8,7 @@ const ArenaPage = lazy(() => import("./ArenaPage.js"));
 const BusinessPage = lazy(() => import("./BusinessPage.js"));
 const ComparePage = lazy(() => import("./ComparePage.js"));
 const LandingPage = lazy(() => import("./LandingPage.js"));
+const LivePage = lazy(() => import("./LivePage.js"));
 const OwnerPage = lazy(() => import("./OwnerPage.js"));
 const RulesPage = lazy(() => import("./RulesPage.js"));
 
@@ -36,6 +37,7 @@ function Page() {
   if (path === "/arena") return <ArenaPage />;
   if (path === "/compare") return <ComparePage />;
   if (path === "/business") return <BusinessPage />;
+  if (path === "/live") return <LivePage />;
   if (path === "/console") return <OwnerPage />;
   return <LandingPage />;
 }

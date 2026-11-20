@@ -4,10 +4,11 @@ import { ARENA } from "./arena.config.js";
 import result from "./compare-result.json";
 import { compareText, type EvalRow, type Result, whyText } from "./compareText.js";
 import { designText } from "./designText.js";
-import { AgentEvidence, EvidenceMatrix, StatusPill } from "./Evidence.js";
+import { AgentEvidence, EvidenceMatrix } from "./Evidence.js";
 import evalSummary from "./evalSummary.json";
 import { useI18n } from "./i18n.js";
 import { SiteShell } from "./SiteShell.js";
+import { StatusPill } from "./StatusPill.js";
 
 const r = result as unknown as Result;
 

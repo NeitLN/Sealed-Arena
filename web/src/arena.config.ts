@@ -8,6 +8,7 @@ import type { Address, Hex } from "viem";
  * other chain. The owner key that sets the mandate is not public.
  */
 export const ARENA = {
+  url: "https://sealed-arena.vercel.app/arena",
   agent: "0x30b01562945BB3cE72241b0EaaEB3F41660982F6" as Address,
   agentPrivateKey: "0x440d3721e44d7bbac6c584089dc7abe2f87eb1188dc0bbdb98aae2a613da6833" as Hex,
   recorder: "0x60d046fa32a101229f78d69b655a91193cdf4f77" as Address,

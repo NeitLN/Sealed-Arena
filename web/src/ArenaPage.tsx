@@ -23,9 +23,9 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
 import { designText } from "./designText.js";
-import { StatusPill } from "./Evidence.js";
 import { useI18n } from "./i18n.js";
 import { PublishedKey } from "./PublishedKey.js";
+import { StatusPill } from "./StatusPill.js";
 
 const survivalHours = (score: bigint) => Number(score / 10n ** 15n) / 1000 / 3600;
 

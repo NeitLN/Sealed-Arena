@@ -1,6 +1,12 @@
-import { agentPolicyAbi, domainV2, registerDigest, registerDigestV2 } from "@sealed-arena/shared";
+import {
+  agentPolicyAbi,
+  domainV2,
+  registerDigest,
+  registerDigestFor,
+  registerDigestV2,
+} from "@sealed-arena/shared";
 import { type Address, decodeFunctionData, type Hex, recoverAddress } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
 import { createRelayerApp, type DemoIssuer, type RelayChain } from "./app.js";
 
@@ -53,12 +59,29 @@ function setup(
   return { app, steps, sent };
 }
 
-const claim = (app: ReturnType<typeof createRelayerApp>, body: unknown, ip = "1.2.3.4") =>
-  app.request("/demo/claim", {
+// Emulates the browser: key generation and raw digest signing happen before the request.
+async function browserClaim(version: 1 | 2 = 1) {
+  const key = privateKeyToAccount(generatePrivateKey());
+  return {
+    agent: key.address,
+    ownerX: X,
+    ownerY: Y,
+    agentSig: await key.sign({ hash: registerDigestFor(version, IDS, key.address, X, Y) }),
+  };
+}
+const claim = async (app: ReturnType<typeof createRelayerApp>, body: unknown, ip = "1.2.3.4") => {
+  let request = body;
+  const b = body as Record<string, unknown>;
+  if (b.ownerX === X && b.ownerY === Y && !("agentSig" in b)) {
+    const info = (await (await app.request("/info")).json()) as { ruleVersion?: 1 | 2 };
+    request = await browserClaim(info.ruleVersion ?? 1);
+  }
+  return app.request("/demo/claim", {
     method: "POST",
     headers: { "content-type": "application/json", "x-forwarded-for": ip },
-    body: JSON.stringify(body),
+    body: JSON.stringify(request),
   });
+};
 
 describe("demo agents", () => {
   it("is off unless configured", async () => {
@@ -66,21 +89,23 @@ describe("demo agents", () => {
     const off = createRelayerApp({
       chain: { ...chain, relayer: "0x0", chainId: 1 } as unknown as RelayChain,
     });
-    expect((await claim(off, { ownerX: X, ownerY: Y })).status).toBe(404);
+    expect((await claim(off, {})).status).toBe(404);
   });
 
   it("registers a new agent to the visitor's passkey first, then allows and funds it", async () => {
     const { app, steps, sent } = setup();
-    const res = await claim(app, { ownerX: X, ownerY: Y });
+    const request = await browserClaim();
+    const res = await claim(app, request);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       ok: boolean;
       agent: Address;
-      privateKey: Hex;
+      privateKey?: Hex;
       transactions: Record<string, string>;
     };
     expect(body.ok).toBe(true);
-    expect(privateKeyToAccount(body.privateKey).address).toBe(body.agent);
+    expect(body.agent).toBe(request.agent);
+    expect(body).not.toHaveProperty("privateKey");
     expect(steps).toEqual(["register", `enable ${body.agent}`, `fund ${body.agent} 5`]);
     expect(body.transactions).toEqual({ register: "0xaaa", enable: "0xbbb", fund: "0xccc" });
 
@@ -97,6 +122,25 @@ describe("demo agents", () => {
       signature: sig,
     });
     expect(signer).toBe(body.agent);
+  });
+
+  it.each([1, 2] as const)("refuses another key's signature under rule v%s", async (version) => {
+    const { app, steps } = setup({ version });
+    const request = await browserClaim(version);
+    const other = privateKeyToAccount(generatePrivateKey());
+    request.agentSig = await other.sign({
+      hash: registerDigestFor(version, IDS, request.agent, X, Y),
+    });
+    const res = await claim(app, request);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "signature_invalid" });
+    expect(steps).toEqual([]);
+  });
+
+  it("refuses a signature for the wrong rule version", async () => {
+    const { app, steps } = setup({ version: 2 });
+    expect((await claim(app, await browserClaim(1))).status).toBe(400);
+    expect(steps).toEqual([]);
   });
 
   it("refuses a malformed passkey without sending anything", async () => {

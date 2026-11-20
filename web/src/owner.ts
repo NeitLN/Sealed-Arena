@@ -6,6 +6,7 @@ import {
   type Mandate,
   type RuleVersion,
   readRuleVersion,
+  registerDigestFor,
   spkiToXY,
 } from "@sealed-arena/shared";
 import {
@@ -19,6 +20,8 @@ import {
   type PublicClient,
 } from "viem";
 
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+
 /** Where the relayer runs. Its /info tells the RPC URL. */
 export const RELAYER_URL: string = import.meta.env.VITE_RELAYER_URL ?? "http://127.0.0.1:4040";
 
@@ -28,6 +31,7 @@ export type RelayerInfo = {
   target: Address;
   rpc: string;
   /** Ids a v2 owner proof is bound to (relayers from rule v2 on). */
+  ruleVersion?: RuleVersion;
   networkId?: number;
   blockchainId?: Hex;
 };
@@ -36,6 +40,32 @@ export async function relayerInfo(): Promise<RelayerInfo> {
   const res = await fetch(`${RELAYER_URL}/info`);
   if (!res.ok) throw new Error("relayer_down");
   return (await res.json()) as RelayerInfo;
+}
+
+/** Generate and sign locally. Only `request` is sent; `privateKey` stays in this browser. */
+export async function prepareDemoClaim(passkey: Passkey, info: RelayerInfo) {
+  if (info.chainId !== CHAIN_ID) throw new Error("chain_mismatch");
+  if ((info.ruleVersion !== 1 && info.ruleVersion !== 2) || !info.networkId || !info.blockchainId)
+    throw new Error("demoFailed");
+  const privateKey = generatePrivateKey();
+  const account = privateKeyToAccount(privateKey);
+  const agentSig = await account.sign({
+    hash: registerDigestFor(
+      info.ruleVersion,
+      {
+        chainId: BigInt(info.chainId),
+        networkId: info.networkId,
+        blockchainId: info.blockchainId,
+      },
+      account.address,
+      passkey.x,
+      passkey.y,
+    ),
+  });
+  return {
+    privateKey,
+    request: { agent: account.address, ownerX: passkey.x, ownerY: passkey.y, agentSig },
+  };
 }
 
 /**

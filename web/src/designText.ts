@@ -1,6 +1,41 @@
 import type { Lang } from "./i18n.js";
 
 const en = {
+  live: {
+    title: "Follow the payment boundary.",
+    nav: "Live monitor",
+    intro:
+      "The open challenge agent, read from the public RPC and gateway. Gateway acceptance is not block inclusion.",
+    lanes: ["AGENT KEY", "TXPOOL", "BLOCK", "PAYEE"],
+    publicKey: "Published challenge key",
+    gateway: "Gateway · off-chain records",
+    rpc: "Public RPC · chain state",
+    latestBlock: "Latest block",
+    balance: "Agent balance",
+    accepted: "Accepted by node",
+    refused: "Refused on arrival",
+    included: "Confirmed in block",
+    reverted: "Reverted in block",
+    pending: "No receipt yet",
+    unknown: "Receipt unavailable",
+    notIncluded: "Not admitted by this request",
+    noPayment: "No confirmed payment",
+    paid: "Payment confirmed",
+    waiting: "Connecting…",
+    empty: "No recent attempts recorded for this agent.",
+    stale: "Update failed · last successful data shown",
+    updated: "Last successful read",
+    pendingNote:
+      "No receipt does not prove a transaction is still in the pool. It may be pending or have been dropped. The feed covers only requests seen by this gateway.",
+    fullscreen: "Full screen",
+    exit: "Exit full screen",
+    scan: "Scan to open the arena",
+    qrAlt: "QR code linking to the Sealed Arena challenge",
+    open: "Open the arena",
+    recent: "Recent attempts",
+    noData: "No data yet",
+  },
+
   trust: "Fuji testnet · one validator, run by the team",
   risk: "If the key leaks, whoever holds it can still spend inside the mandate: at most your daily cap per UTC day, fees included, until you freeze it.",
   mechanism:
@@ -58,6 +93,18 @@ const en = {
   console: "Owner console",
   arena: "Open challenge",
   workflow: ["Passkey", "Link agent", "Set limits", "Try a payment"],
+  consoleSteps: ["Passkey", "Agent", "Link (register)", "Mandate"],
+  stepStates: { done: "Done", current: "Current", pending: "Pending" },
+  useSaved: "Use the passkey saved on this device",
+  savedNote: "This passkey is selected. Continue with your agent below; no new passkey is needed.",
+  createPreview:
+    "Create an owner passkey for this site. This does not send a payment or set a mandate.",
+  confirmSign: "Continue to passkey",
+  cancelSign: "Cancel",
+  maximumLoss: "Maximum loss if this key leaks",
+  maximumFormula:
+    "Daily cap × {days} days (remaining time rounded up) + daily cap × {boundary} for the 00:00 UTC boundary. Fees included; a conservative upper bound until expiry.",
+  policyLabel: "SEALED / AGENT POLICY",
   next: "Your next step",
   emptyAgent:
     "Your agent’s spending card will appear here. Create a passkey, then get a demo agent or link your own.",
@@ -72,17 +119,17 @@ const en = {
     "Using your own agent? Send a payment with your own client. These test buttons become available when this browser holds a demo agent key.",
   privateDemo: "Inspect the demo private key",
   privateDemoNote:
-    "This is a testnet key provided by the relayer and stored in this browser. It is separate from your owner passkey. Never fund it on another chain.",
+    "This testnet key is generated and stored in this browser. The relayer receives only its address, owner public key and registration signature. It is separate from your owner passkey. Never fund it on another chain.",
   businessTitle: "Known sellers. Defined spending.",
   businessLead:
     "A working prototype for marketplaces where agents buy data and APIs from approved sellers. The marketplace onboards sellers; each owner sets the spending boundary.",
   flow: ["Agent platform", "Owner-signed mandate", "Approved seller"],
   flowNote:
     "Proposed model · a fee per agent under a mandate. No pricing or customer traction claimed.",
-  partner: "Explore a design partnership",
+  partner: "Become a design partner",
   partnerNote:
     "Run a closed marketplace? Tell the team about your seller network and agent payment needs in a GitHub issue.",
-  partnerAction: "Start a conversation on GitHub",
+  partnerAction: "Become a design partner",
   compareTitle: "Same attacks. Different boundaries.",
   burst: "Where a payment stops matters.",
   burstIntro:
@@ -98,6 +145,41 @@ const en = {
 };
 
 const vi: typeof en = {
+  live: {
+    title: "Theo dõi giới hạn của khoản thanh toán.",
+    nav: "Theo dõi trực tiếp",
+    intro:
+      "Agent của thử thách mở, đọc từ RPC và gateway công khai. Được gateway tiếp nhận không có nghĩa là đã vào block.",
+    lanes: ["KHOÁ AGENT", "TXPOOL", "BLOCK", "NGƯỜI NHẬN"],
+    publicKey: "Khoá thử thách đã công bố",
+    gateway: "Gateway · bản ghi ngoài chain",
+    rpc: "RPC công khai · trạng thái chain",
+    latestBlock: "Block mới nhất",
+    balance: "Số dư agent",
+    accepted: "Node đã tiếp nhận",
+    refused: "Bị từ chối khi nhận",
+    included: "Đã xác nhận trong block",
+    reverted: "Revert trong block",
+    pending: "Chưa có biên nhận",
+    unknown: "Chưa đọc được biên nhận",
+    notIncluded: "Yêu cầu này không được nhận vào pool",
+    noPayment: "Chưa xác nhận thanh toán",
+    paid: "Đã xác nhận thanh toán",
+    waiting: "Đang kết nối…",
+    empty: "Chưa ghi nhận lần thử gần đây cho agent này.",
+    stale: "Cập nhật thất bại · đang hiện dữ liệu đọc thành công gần nhất",
+    updated: "Lần đọc thành công gần nhất",
+    pendingNote:
+      "Chưa có biên nhận không chứng minh giao dịch vẫn ở trong pool. Giao dịch có thể đang chờ hoặc đã bị loại. Danh sách chỉ gồm yêu cầu gateway này ghi nhận.",
+    fullscreen: "Toàn màn hình",
+    exit: "Thoát toàn màn hình",
+    scan: "Quét mã để mở arena",
+    qrAlt: "Mã QR dẫn tới thử thách Sealed Arena",
+    open: "Mở arena",
+    recent: "Các lần thử gần đây",
+    noData: "Chưa có dữ liệu",
+  },
+
   trust: "Fuji testnet · một validator, do đội vận hành",
   risk: "Nếu khoá lộ, người cầm khoá vẫn chi được trong uỷ quyền: tối đa hạn mức ngày (theo ngày UTC, đã gồm phí), cho tới khi bạn đóng băng.",
   mechanism:
@@ -155,6 +237,18 @@ const vi: typeof en = {
   console: "Bảng điều khiển chủ sở hữu",
   arena: "Thử thách mở",
   workflow: ["Passkey", "Liên kết agent", "Đặt giới hạn", "Thử thanh toán"],
+  consoleSteps: ["Passkey", "Agent", "Liên kết (đăng ký)", "Uỷ quyền"],
+  stepStates: { done: "Hoàn tất", current: "Hiện tại", pending: "Chưa tới" },
+  useSaved: "Dùng passkey đã lưu trên thiết bị này",
+  savedNote: "Passkey này đã được chọn. Tiếp tục với agent bên dưới; không cần tạo passkey mới.",
+  createPreview:
+    "Tạo passkey chủ sở hữu cho trang này. Thao tác này không gửi thanh toán hay đặt uỷ quyền.",
+  confirmSign: "Tiếp tục với passkey",
+  cancelSign: "Huỷ",
+  maximumLoss: "Mức chi tối đa nếu khoá này bị lộ",
+  maximumFormula:
+    "Hạn mức ngày × {days} ngày (thời gian còn lại làm tròn lên) + hạn mức ngày × {boundary} để tính lúc chuyển ngày 00:00 UTC. Đã gồm phí; đây là cận trên thận trọng tới khi hết hạn.",
+  policyLabel: "SEALED / CHÍNH SÁCH AGENT",
   next: "Bước tiếp theo",
   emptyAgent:
     "Thẻ chi tiêu của agent sẽ hiện ở đây. Tạo passkey, rồi lấy agent demo hoặc liên kết agent của bạn.",
@@ -169,17 +263,17 @@ const vi: typeof en = {
     "Bạn dùng agent riêng? Hãy gửi khoản trả bằng client của bạn. Các nút thử ở đây dùng khi trình duyệt giữ private key của agent demo.",
   privateDemo: "Xem private key của agent demo",
   privateDemoNote:
-    "Đây là khoá testnet do relayer cung cấp và lưu trong trình duyệt, tách biệt với passkey của chủ sở hữu. Không nạp tài sản cho khoá này trên chain khác.",
+    "Khoá testnet được tạo và lưu ngay trong trình duyệt. Relayer chỉ nhận địa chỉ agent, khoá công khai của chủ và chữ ký đăng ký. Khoá này tách biệt với passkey của chủ sở hữu. Không nạp tài sản cho khoá này trên chain khác.",
   businessTitle: "Người bán đã duyệt. Chi tiêu có giới hạn.",
   businessLead:
     "Bản mẫu hoạt động dành cho marketplace nơi agent mua dữ liệu và API từ người bán đã duyệt. Marketplace tiếp nhận người bán; từng chủ sở hữu đặt giới hạn chi tiêu.",
   flow: ["Nền tảng agent", "Uỷ quyền do chủ ký", "Người bán đã duyệt"],
   flowNote:
     "Mô hình đề xuất · phí theo mỗi agent có uỷ quyền. Chưa công bố giá hay tín hiệu khách hàng.",
-  partner: "Cùng thử nghiệm một tích hợp",
+  partner: "Trở thành đối tác thử nghiệm",
   partnerNote:
     "Bạn vận hành marketplace khép kín? Chia sẻ mạng lưới người bán và nhu cầu thanh toán của agent qua GitHub issue.",
-  partnerAction: "Trao đổi với đội trên GitHub",
+  partnerAction: "Trở thành đối tác thử nghiệm",
   compareTitle: "Cùng tấn công. Khác ranh giới.",
   burst: "Nơi khoản trả dừng lại có ý nghĩa.",
   burstIntro:

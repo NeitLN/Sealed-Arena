@@ -12,9 +12,9 @@ import { useRef, useState } from "react";
 import { type Address, formatEther, type Hex, parseEther } from "viem";
 import { ARENA } from "./arena.config.js";
 import type { arenaText } from "./arenaText.js";
-import { StatusPill } from "./Evidence.js";
 import { type SendOutcome, sendAsAgent } from "./forbiddenSend.js";
 import { type AgentView, chainClient } from "./owner.js";
+import { StatusPill } from "./StatusPill.js";
 import { RPC } from "./useArenaLive.js";
 import { type Account, curlFor, lookUp, readAccount, type Verdict, verdict } from "./verify.js";
 

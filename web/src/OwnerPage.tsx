@@ -6,7 +6,6 @@ import { Divider } from "@astryxdesign/core/Divider";
 import { Grid } from "@astryxdesign/core/Grid";
 import { useMediaQuery } from "@astryxdesign/core/hooks";
 import { HStack, Stack, StackItem, VStack } from "@astryxdesign/core/Layout";
-import { Step, Stepper } from "@astryxdesign/core/Stepper";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { TextInput } from "@astryxdesign/core/TextInput";
@@ -25,7 +24,7 @@ import {
   setFrozenRequest,
   setMandateRequest,
 } from "@sealed-arena/shared";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { type Address, getAddress, type Hex, isAddress, isHex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { useAgentView } from "./agentView.js";
@@ -46,6 +45,7 @@ import {
   signWithPasskey,
   withCode,
 } from "./owner.js";
+import { maximumLoss, ownerSteps } from "./ownerProgress.js";
 import { SiteShell } from "./SiteShell.js";
 import { RPC } from "./useArenaLive.js";
 
@@ -112,7 +112,8 @@ export default function OwnerPage() {
 
   const [agentInput, setAgentInput] = useState(saved.agent ?? "");
   const agent = isAddress(agentInput) ? (getAddress(agentInput) as Address) : undefined;
-  const { view, failedSince, refresh } = useAgentView(client, agent);
+  const { view: readView, agent: viewedAgent, failedSince, refresh } = useAgentView(client, agent);
+  const view = viewedAgent === agent ? readView : undefined;
 
   const [agentSig, setAgentSig] = useState("");
   const [agentKey, setAgentKey] = useState("");
@@ -126,6 +127,12 @@ export default function OwnerPage() {
   const [warnings, setWarnings] = useState<PayeeWarning[]>();
   const [busy, setBusy] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
+  const [review, setReview] = useState<{ content: ReactNode; confirm: () => void }>();
+  const reviewDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (review) reviewDialog.current?.showModal();
+    else reviewDialog.current?.close();
+  }, [review]);
 
   useEffect(() => {
     relayerInfo()
@@ -133,7 +140,7 @@ export default function OwnerPage() {
         if (info.chainId !== CHAIN_ID) return setBoot("chain_mismatch");
         if (info.rpc !== RPC) setClient(chainClient(info.rpc, { live: true }));
         setLocal(isLocalRpc(info.rpc));
-        if (isLocalRpc(info.rpc) && info.networkId && info.blockchainId)
+        if (info.networkId && info.blockchainId)
           setIds({
             chainId: BigInt(CHAIN_ID),
             networkId: info.networkId,
@@ -153,6 +160,7 @@ export default function OwnerPage() {
       setPayeesText(m.payees.join("\n"));
       setPerTx(formatUsdc(m.perTxCap));
       setDaily(formatUsdc(m.dailyCap));
+      setDailyFee(view.feeCapSet ? formatUsdc(view.dailyFeeCap) : "");
       const left = Math.ceil((Number(m.expiry) - Date.now() / 1000) / 86_400);
       setDays(String(Math.min(365, Math.max(1, left))));
     } else {
@@ -243,6 +251,13 @@ export default function OwnerPage() {
       return registerData(agent, saved.passkey.x, saved.passkey.y, sig);
     });
 
+  const expiry = useMemo(
+    () =>
+      BigInt(Math.floor(Date.now() / 1000)) +
+      BigInt(Number.isInteger(Number(days)) ? Number(days) : 0) * 86_400n,
+    [days],
+  );
+
   /** Mandate from the form, or the key of the first problem. */
   const formMandate = (): MandateInput | string => {
     const list = payeesText
@@ -269,11 +284,61 @@ export default function OwnerPage() {
       perTxCap,
       dailyCap,
       dailyFeeCap,
-      expiry: BigInt(Math.floor(Date.now() / 1000) + d * 86_400),
+      expiry,
     };
   };
   const draft = formMandate();
   const draftError = typeof draft === "string" ? draft : undefined;
+
+  const lossPreview = (m: MandateInput) => {
+    const loss = maximumLoss(m.dailyCap, m.expiry, BigInt(Math.floor(Date.now() / 1000)));
+    return (
+      <div className="maximum-loss">
+        <strong>
+          {d.maximumLoss}: {formatUsdc(loss.amount)} USDC
+        </strong>
+        <small>
+          {d.maximumFormula
+            .replace("{days}", String(loss.days))
+            .replace("{boundary}", String(loss.boundaryDays))}
+        </small>
+      </div>
+    );
+  };
+  const mandatePreview = (m: MandateInput, target: Address, v: number) => (
+    <>
+      <p className="caption">{d.previewNote}</p>
+      <code>{target}</code>
+      <dl>
+        <div>
+          <dt>{d.perPayment}</dt>
+          <dd>{formatUsdc(m.perTxCap)} USDC</dd>
+        </div>
+        <div>
+          <dt>{d.perDay}</dt>
+          <dd>{formatUsdc(m.dailyCap)} USDC</dd>
+        </div>
+        {v === 2 && (
+          <div>
+            <dt>{t("dailyFeeCap")}</dt>
+            <dd>{formatUsdc(m.dailyFeeCap ?? 0n)} USDC</dd>
+          </div>
+        )}
+        <div>
+          <dt>{t("expires")}</dt>
+          <dd>
+            {new Date(Number(m.expiry) * 1000).toLocaleString(lang)} · UTC{" "}
+            {new Date(Number(m.expiry) * 1000).toISOString()}
+          </dd>
+        </div>
+      </dl>
+      <p className="caption">{t("payees")}</p>
+      {m.payees.map((p) => (
+        <code key={p}>{p}</code>
+      ))}
+      {lossPreview(m)}
+    </>
+  );
 
   const onSetMandate = () =>
     void (async () => {
@@ -287,9 +352,15 @@ export default function OwnerPage() {
       setWarnings(undefined);
       setUnchecked([]);
       const passkey = saved.passkey;
-      await act("setMandate", async () => {
-        const req = setMandateRequest(view.version, ids, agent, draft, view.nonce);
-        return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
+      setReview({
+        content: mandatePreview(draft, agent, view.version),
+        confirm: () => {
+          setReview(undefined);
+          void act("setMandate", async () => {
+            const req = setMandateRequest(view.version, ids, agent, draft, view.nonce);
+            return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
+          });
+        },
       });
     })();
 
@@ -297,12 +368,24 @@ export default function OwnerPage() {
     if (!agent || !saved.passkey || !view) return;
     const passkey = saved.passkey;
     const freeze = !view.frozen;
-    void act(freeze ? "freeze" : "unfreeze", async () => {
-      const req = setFrozenRequest(view.version, ids, agent, freeze, {
-        ownerNonce: view.nonce,
-        freezeEpoch: view.freezeEpoch,
-      });
-      return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
+    setReview({
+      content: (
+        <>
+          <p>{freeze ? t("freeze") : t("unfreeze")}</p>
+          <code>{agent}</code>
+          <p>{t("freezeHelp")}</p>
+        </>
+      ),
+      confirm: () => {
+        setReview(undefined);
+        void act(freeze ? "freeze" : "unfreeze", async () => {
+          const req = setFrozenRequest(view.version, ids, agent, freeze, {
+            ownerNonce: view.nonce,
+            freezeEpoch: view.freezeEpoch,
+          });
+          return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
+        });
+      },
     });
   };
 
@@ -318,7 +401,7 @@ export default function OwnerPage() {
     <Card padding={5}>
       <div className="summary-emblem">
         <BrandMark size={32} />
-        <span className="micro-label">SEALED / AGENT POLICY</span>
+        <span className="micro-label">{d.policyLabel}</span>
       </div>
       <VStack gap={4}>
         <HStack gap={2} hAlign="between" vAlign="center">
@@ -360,6 +443,7 @@ export default function OwnerPage() {
                   label={t("expires")}
                   value={new Date(Number(view.mandate.expiry) * 1000).toLocaleString()}
                 />
+                {lossPreview(view.mandate)}
                 <Row label={t("resetsAt")} value={nextReset()} />
                 <Text type="supporting" color="secondary">
                   {t("resetsNote")}
@@ -416,16 +500,44 @@ export default function OwnerPage() {
           {t("intro")}
         </Text>
 
-        <Stepper
-          activeStep={!saved.passkey ? 0 : !ownedByMe ? 1 : !view?.mandate.payees.length ? 2 : 3}
-          label={d.next}
-          indicatorPosition="on-track"
-          horizontalOptions={{ minimumStepWidth: 140, collapsedVariant: "withLabel" }}
-        >
-          {d.workflow.map((label, index) => (
-            <Step key={label} step={index} label={label} indicator="number" />
+        <ol className="owner-stepper" aria-label={d.next}>
+          {ownerSteps({
+            passkey: !!saved.passkey,
+            agent: !!agent,
+            linked: ownedByMe,
+            mandate:
+              !!view?.mandate.payees.length &&
+              view.mandate.expiry > BigInt(Math.floor(Date.now() / 1000)) &&
+              (view.version === 1 || view.feeCapSet),
+          }).map((state, index) => (
+            <li
+              key={d.consoleSteps[index]}
+              data-state={state}
+              aria-current={state === "current" ? "step" : undefined}
+            >
+              <span className="step-number" aria-hidden="true">
+                {state === "done" ? "✓" : index + 1}
+              </span>
+              <span>
+                {d.consoleSteps[index]}
+                <small>{d.stepStates[state]}</small>
+              </span>
+            </li>
           ))}
-        </Stepper>
+        </ol>
+        <dialog
+          ref={reviewDialog}
+          className="sign-review sign-preview"
+          aria-labelledby="review-title"
+          onCancel={() => setReview(undefined)}
+        >
+          <h2 id="review-title">{d.signPreview}</h2>
+          {review?.content}
+          <div className="hero-actions">
+            <Button label={d.confirmSign} variant="primary" onClick={() => review?.confirm()} />
+            <Button label={d.cancelSign} variant="secondary" onClick={() => setReview(undefined)} />
+          </div>
+        </dialog>
         {boot ? <Banner status="warning" title={t(boot)} /> : null}
         <div ref={outcomeRef} aria-live="polite">
           {outcome ? (
@@ -466,8 +578,16 @@ export default function OwnerPage() {
             <Text type="supporting" color="secondary">
               {t("passkeyHelp")}
             </Text>
+            {!saved.passkey && (
+              <section className="sign-preview">
+                <p className="micro-label">{d.signPreview}</p>
+                <p>{d.createPreview}</p>
+              </section>
+            )}
             {saved.passkey ? (
               <VStack gap={2}>
+                <strong>{d.useSaved}</strong>
+                <p className="caption">{d.savedNote}</p>
                 <HStack gap={2} vAlign="center" wrap="wrap">
                   <Badge variant="success" label={t("passkeyReady")} />
                   <Text type="supporting" color="secondary" style={mono}>
@@ -651,45 +771,10 @@ export default function OwnerPage() {
                     ))}
                     <section className="sign-preview" aria-label={d.signPreview}>
                       <p className="micro-label">{d.signPreview}</p>
-                      <p className="caption">{d.previewNote}</p>
-                      <code>{agent}</code>
-                      <dl>
-                        <div>
-                          <dt>{d.perPayment}</dt>
-                          <dd>{perTx || "—"} USDC</dd>
-                        </div>
-                        <div>
-                          <dt>{d.perDay}</dt>
-                          <dd>{daily || "—"} USDC</dd>
-                        </div>
-                        {view?.version === 2 && typeof draft !== "string" ? (
-                          <div>
-                            <dt>{t("dailyFeeCap")}</dt>
-                            <dd>{formatUsdc(draft.dailyFeeCap ?? 0n)} USDC</dd>
-                          </div>
-                        ) : null}
-                        <div>
-                          <dt>{t("validDays")}</dt>
-                          <dd>{days || "—"}</dd>
-                        </div>
-                      </dl>
-                      {typeof draft !== "string" && (
-                        <>
-                          <p className="caption">{t("payees")}</p>
-                          {draft.payees.map((payee) => (
-                            <code key={payee}>{payee}</code>
-                          ))}
-                          <p>
-                            {d.capRisk
-                              .replace("{cap}", daily)
-                              .replace("{payees}", String(draft.payees.length))
-                              .replace(
-                                "{expiry}",
-                                new Date(Number(draft.expiry) * 1000).toLocaleDateString(lang),
-                              )}
-                          </p>
-                        </>
-                      )}
+                      {typeof draft !== "string" &&
+                        agent &&
+                        view &&
+                        mandatePreview(draft, agent, view.version)}
                     </section>
                     <HStack gap={2}>
                       <Button
