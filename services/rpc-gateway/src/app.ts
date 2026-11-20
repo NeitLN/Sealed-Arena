@@ -110,7 +110,8 @@ export function createGatewayApp(o: GatewayOptions) {
   const hits = new Map<string, number[]>();
   const sends = new Map<string, number[]>();
   const app = new Hono();
-  app.use("*", cors({ origin: o.origins ?? "*" }));
+  // Pages send X-Sealed-Source, so each POST needs a preflight; let browsers reuse it for 10 min.
+  app.use("*", cors({ origin: o.origins ?? "*", maxAge: 600 }));
   app.use("*", bodyLimit({ maxSize: 256 * 1024 }));
 
   const ipHashOf = (c: Parameters<typeof getConnInfo>[0]) => {

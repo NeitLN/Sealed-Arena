@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countReasons, lastSeen } from "./refusals.js";
+import { REFUSAL_LIMIT, countReasons, lastSeen, refusalCount } from "./refusals.js";
 
 const agent = "0x30b01562945BB3cE72241b0EaaEB3F41660982F6";
 
@@ -18,6 +18,12 @@ describe("refusals since the last visit", () => {
     expect(lastSeen(agent, 5000, s)).toBe(1000);
     expect(lastSeen(agent.toLowerCase() as typeof agent, 9000, s)).toBe(1000);
     expect(lastSeen("0x0000000000000000000000000000000000000001", 7000, s)).toBe(7000);
+  });
+
+  it("the count says 'or more' once the page reaches the fetch limit", () => {
+    expect(refusalCount(0)).toBe("0");
+    expect(refusalCount(REFUSAL_LIMIT - 1)).toBe(String(REFUSAL_LIMIT - 1));
+    expect(refusalCount(REFUSAL_LIMIT)).toBe(`${REFUSAL_LIMIT}+`);
   });
 
   it("counts reasons, most frequent first", () => {
