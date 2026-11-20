@@ -1,0 +1,32 @@
+{
+  "comment": "Rule v3 digests (docs/ARCHITECTURE.md 3.6); checked by Go and TypeScript tests.",
+  "input": {
+    "domain": "0x7a6b5c4d3e2f1001122334455667788990aabbccddeeff00112233445566778a",
+    "agent": "0x19e7e376e7c213b7e7e7e46cc70a5dd086daff2a",
+    "guardian": "0x00000000000000000000000000000000000a11ce",
+    "to": "0x000000000000000000000000000000000000b0b0",
+    "nonce": "7",
+    "epoch": "3",
+    "mandate": {
+      "payees": [
+        "0x00000000000000000000000000000000000000a1",
+        "0x00000000000000000000000000000000000000b2"
+      ],
+      "payeeDailyCaps": [
+        "400000000000000000",
+        "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      ],
+      "perTxCap": "100000000000000000",
+      "dailyCap": "1000000000000000000",
+      "dailyFeeCap": "50000000000000000",
+      "maxPaymentsPerDay": 25,
+      "expiry": "4102444800"
+    }
+  },
+  "mandateHash": "0x2413c4f913b1744657c8e1f1b3d6146753a0d22a3972e46fd7f8077a4fa88b80",
+  "setMandateV3": "0xfe6a685679ba162ce6aa1bf1d16963dc233775533d710c5e2d253beb947471a4",
+  "cancelPending": "0x955e6ddc897b6c818d4e3e351d0a4e230fc60b475e83fe7fc30bc26c90a00487",
+  "setGuardian": "0x2dd57dae2e42ebfb430c79bb45dc9131389f3299a561dc928233908983c4a269",
+  "sweep": "0x1cf20c65dac95cc377f76df55fac472aeceab2536019ef73256edd3ac4934de2",
+  "guardianFreeze": "0x93d66878d046950e5f761aac093df884928d707938698f8b0e44db3eea9c3d22"
+}
