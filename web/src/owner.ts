@@ -73,14 +73,27 @@ export async function prepareDemoClaim(passkey: Passkey, info: RelayerInfo) {
  * gateway's batch limit), and a failed request is not retried (a rate-limited page waits for its
  * next poll instead of sending more).
  */
-export function chainClient(rpc: string, o: { live?: boolean } = {}): PublicClient {
+export function chainClient(
+  rpc: string,
+  o: {
+    live?: boolean /** X-Sealed-Source label for the gateway's attempt log. */;
+    source?: string;
+  } = {},
+): PublicClient {
   const chain = defineChain({
     id: CHAIN_ID,
     name: "Sealed",
     nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
     rpcUrls: { default: { http: [rpc] } },
   });
-  const transport = o.live ? http(rpc, { batch: { batchSize: 20 }, retryCount: 0 }) : http(rpc);
+  const fetchOptions = o.source ? { headers: { "x-sealed-source": o.source } } : undefined;
+  const transport = o.live
+    ? http(rpc, {
+        batch: { batchSize: 20 },
+        retryCount: 0,
+        ...(fetchOptions ? { fetchOptions } : {}),
+      })
+    : http(rpc, fetchOptions ? { fetchOptions } : {});
   return createPublicClient({ chain, transport }) as PublicClient;
 }
 

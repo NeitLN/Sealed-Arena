@@ -131,6 +131,10 @@ describe("source label and recent() filters", () => {
       expect(
         (await s.recent(10, undefined, { result: "rejected", since: 25 })).map((r) => r.ts),
       ).toEqual([30]);
+      // `since` is inclusive: an attempt at exactly that time is listed.
+      expect(
+        (await s.recent(10, undefined, { result: "rejected", since: 20 })).map((r) => r.ts),
+      ).toEqual([30, 20]);
       expect((await s.recent(10, undefined, { result: "accepted" })).map((r) => r.ts)).toEqual([
         10,
       ]);
