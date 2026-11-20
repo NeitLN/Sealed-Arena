@@ -20,6 +20,8 @@ describe("heightsToCheck", () => {
     expect(heightsToCheck(0, 10, 4)).toEqual([0, 4, 8, 10]);
     expect(heightsToCheck(5, 5)).toEqual([5]);
     expect(heightsToCheck(6, 5)).toEqual([]);
+    // `to` exactly on a step is listed once.
+    expect(heightsToCheck(0, 8, 4)).toEqual([0, 4, 8]);
   });
 });
 

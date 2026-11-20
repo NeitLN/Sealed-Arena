@@ -7,8 +7,8 @@ export function heightsToCheck(from: number, to: number, step = 1): number[] {
   const out: number[] = [];
   if (to < from) return out;
   const s = Math.max(1, Math.floor(step));
-  for (let h = from; h <= to; h += s) out.push(h);
-  if (out.at(-1) !== to) out.push(to);
+  for (let h = from; h < to; h += s) out.push(h);
+  out.push(to);
   return out;
 }
 
