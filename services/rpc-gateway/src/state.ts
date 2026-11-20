@@ -21,6 +21,10 @@ export type ArenaState = {
   spentToday: string;
   totalCharged: string;
   balance: string;
+  /** Rule v2: whether the mandate has a daily fee cap, the cap, and the fees counted today. */
+  feeCapSet: boolean;
+  dailyFeeCap: string;
+  feeSpentToday: string;
   recorder: { funded: string; required: string; score: string; breached: boolean };
   summary: unknown;
   recent: unknown;
@@ -80,6 +84,19 @@ export async function arenaState(
     store.recent(15, agent),
   ]);
   const [m, frozen] = mf;
+  // Rule v2: the daily fee cap and today's fees (these functions exist only under v2).
+  let v2 = { feeCapSet: false, dailyFeeCap: "0", feeSpentToday: "0" };
+  if (ruleVersion === 2) {
+    const [m2, fee] = await Promise.all([
+      policy("getMandateV2") as Promise<readonly [{ dailyFeeCap: bigint }, boolean, boolean]>,
+      policy("getFeeSpend") as Promise<readonly [bigint, bigint]>,
+    ]);
+    v2 = {
+      feeCapSet: m2[1],
+      dailyFeeCap: m2[0].dailyFeeCap.toString(),
+      feeSpentToday: fee[0].toString(),
+    };
+  }
   return {
     at: now(),
     agent,
@@ -95,6 +112,7 @@ export async function arenaState(
     spentToday: spend[0].toString(),
     totalCharged: spend[2].toString(),
     balance: balance.toString(),
+    ...v2,
     recorder: {
       funded: funded.toString(),
       required: required.toString(),
