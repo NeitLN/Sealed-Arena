@@ -24,6 +24,24 @@ describe("chain-config proxy", () => {
     });
   });
 
+  it("drops the rule v3 entry (with its loosening delay) as well", () => {
+    const withV3 = {
+      ...config,
+      upgrades: {
+        precompileUpgrades: [
+          ...config.upgrades.precompileUpgrades,
+          { agentRuleV3Config: { blockTimestamp: 1810000000, loosenDelay: 86400 } },
+        ],
+      },
+    };
+    expect(stripSealedUpgrades(withV3)).toEqual({
+      ...config,
+      upgrades: {
+        precompileUpgrades: [{ warpConfig: { blockTimestamp: 1800000000, quorumNumerator: 70 } }],
+      },
+    });
+  });
+
   it("rewrites eth_getChainConfig answers only, single and batch, matched by id", () => {
     const single = rewriteResponse(
       JSON.stringify({ jsonrpc: "2.0", id: 7, method: "eth_getChainConfig", params: [] }),

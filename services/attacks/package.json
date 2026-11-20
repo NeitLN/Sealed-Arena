@@ -11,6 +11,8 @@
     "seed": "tsx src/seed.ts",
     "measure": "tsx src/measure.ts",
     "rule-v2-switch": "tsx src/rule-v2-switch.ts",
+    "rule-v3-switch": "tsx src/rule-v3-switch.ts",
+    "export-clientdata-corpus": "tsx src/export-clientdata-corpus.ts",
     "leaked-key": "tsx src/leaked-key.ts",
     "byzantine": "tsx src/byzantine.ts",
     "typecheck": "tsc --noEmit -p .",

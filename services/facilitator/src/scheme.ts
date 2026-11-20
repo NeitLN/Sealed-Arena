@@ -3,7 +3,10 @@ import {
   type AgentState,
   agentPolicyAbi,
   checkSignedNativeTx,
+  effectiveMandateV3,
+  type MandateV3,
   NATIVE_ASSET,
+  NO_PAYEE_CAP,
   paymentCharge,
   precheckMandate,
   readRuleVersion,
@@ -167,7 +170,7 @@ export class SignedNativeTxFacilitator implements SchemeNetworkFacilitator {
       } as never);
     const isAgent = (await read("isAgent")) as boolean;
     if (isAgent) {
-      const [[mandate, frozen], [spentToday], block, code] = await Promise.all([
+      const [[activeMandate, frozen], [spentToday], block, code] = await Promise.all([
         read("getMandate") as Promise<
           readonly [
             { payees: readonly Address[]; perTxCap: bigint; dailyCap: bigint; expiry: bigint },
@@ -179,8 +182,11 @@ export class SignedNativeTxFacilitator implements SchemeNetworkFacilitator {
         this.client.getCode({ address: req.payTo as Address }),
       ]);
       const now = BigInt(Math.max(Number(block.timestamp), Math.floor(Date.now() / 1000)));
+      let mandate = activeMandate;
       let v2: AgentState["v2"];
-      if ((await readRuleVersion(this.client)) === 2) {
+      let v3: AgentState["v3"];
+      const version = await readRuleVersion(this.client);
+      if (version >= 2) {
         const [m2, fee] = await Promise.all([
           this.client.readContract({
             address: AGENT_POLICY_ADDRESS,
@@ -202,6 +208,45 @@ export class SignedNativeTxFacilitator implements SchemeNetworkFacilitator {
           baseFee: block.baseFeePerGas ?? 0n,
         };
       }
+      if (version === 3) {
+        // Rule v3: the mandate in force at `now` (a scheduled loosening counts from its eta, judged
+        // by this clock: on an idle chain the head still shows the old one), and its counters.
+        const call = <F extends "getMandateV3" | "getPending" | "getCounters">(functionName: F) =>
+          this.client.readContract({
+            address: AGENT_POLICY_ADDRESS,
+            abi: agentPolicyAbi,
+            functionName,
+            args: [payer],
+          } as never);
+        const [[m3], pending, counters, payeeSpend] = await Promise.all([
+          call("getMandateV3") as Promise<readonly [MandateV3, boolean]>,
+          call("getPending") as Promise<readonly [MandateV3, bigint, Address, bigint]>,
+          call("getCounters") as Promise<readonly [number, bigint, bigint, bigint]>,
+          this.client.readContract({
+            address: AGENT_POLICY_ADDRESS,
+            abi: agentPolicyAbi,
+            functionName: "getPayeeSpend",
+            args: [payer, req.payTo as Address],
+          }),
+        ]);
+        const m = effectiveMandateV3(m3, pending[0], pending[1], now);
+        mandate = {
+          payees: m.payees,
+          perTxCap: m.perTxCap,
+          dailyCap: m.dailyCap,
+          expiry: m.expiry,
+        };
+        if (v2) v2 = { ...v2, feeCapSet: true, dailyFeeCap: m.dailyFeeCap };
+        const today = now / 86400n;
+        const i = m.payees.findIndex((p) => p.toLowerCase() === req.payTo.toLowerCase());
+        const cap = i >= 0 ? m.payeeDailyCaps[i] : undefined;
+        v3 = {
+          paymentsToday: counters[1] === today ? counters[0] : 0,
+          maxPaymentsPerDay: m.maxPaymentsPerDay,
+          payeeSpentToday: payeeSpend[1] === today ? payeeSpend[0] : 0n,
+          ...(cap !== undefined && cap !== NO_PAYEE_CAP ? { payeeDailyCap: cap } : {}),
+        };
+      }
       const reason = precheckMandate(
         {
           mandate,
@@ -210,10 +255,12 @@ export class SignedNativeTxFacilitator implements SchemeNetworkFacilitator {
           now,
           payeeHasCode: code !== undefined && code !== "0x",
           ...(v2 ? { v2 } : {}),
+          ...(v3 ? { v3 } : {}),
         },
         {
           to: req.payTo as Address,
           charge,
+          value: BigInt(req.amount),
           gas: c.gas,
           data: c.data,
           maxFeePerGas: c.maxFeePerGas,

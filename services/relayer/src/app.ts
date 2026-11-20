@@ -22,8 +22,26 @@ import {
   recoverAddress,
 } from "viem";
 
-/** The owner actions the relayer sends. Each carries the owner's passkey proof, checked by the precompile. */
-export const RELAYED = new Set(["register", "setMandate", "setMandateV2", "freeze", "unfreeze"]);
+/**
+ * The AgentPolicy calls the relayer sends. Each owner action carries the owner's passkey proof and
+ * guardianFreeze the guardian key's signature, both checked by the precompile; executeSweep needs
+ * no proof but does only what the owner scheduled (after the timelock). The rule v3 calls exist
+ * on the chain only from its activation; before, the simulation refuses them.
+ */
+export const RELAYED = new Set([
+  "register",
+  "setMandate",
+  "setMandateV2",
+  "freeze",
+  "unfreeze",
+  // rule v3
+  "setMandateV3",
+  "cancelPending",
+  "setGuardian",
+  "guardianFreeze",
+  "sweep",
+  "executeSweep",
+]);
 
 /** What the relayer needs from the chain; the real one is in chain.ts. */
 export type RelayChain = {

@@ -3,10 +3,14 @@ import {
   agentPolicyAbi,
   assertionToAuth,
   CHAIN_ID,
+  challengeToBase64Url,
+  clientDataAcceptedV3,
   type Mandate,
+  type OwnerAction,
   type RuleVersion,
   readRuleVersion,
   registerDigestFor,
+  requiresUserVerification,
   spkiToXY,
 } from "@sealed-arena/shared";
 import {
@@ -136,24 +140,57 @@ export async function createPasskey(): Promise<Passkey> {
   return { credentialId: b64url(new Uint8Array(cred.rawId)), ...spkiToXY(new Uint8Array(spki)) };
 }
 
-/** Signs a 32-byte challenge with the passkey and returns the `auth` bytes the precompile checks. */
-export async function signWithPasskey(challenge: Hex, credentialId: string): Promise<Hex> {
+/**
+ * What rule v3 asks of an assertion before it is sent: user verification for every owner action
+ * except freeze, and a clientDataJSON inside the strict grammar. Returns the error code, or
+ * undefined when the chain would accept it (the signature itself is checked by the chain).
+ */
+export function assertionProblem(
+  version: RuleVersion,
+  action: OwnerAction,
+  challenge: Hex,
+  a: { authenticatorData: Uint8Array; clientDataJSON: Uint8Array },
+): string | undefined {
+  if (version < 3) return undefined;
+  if (requiresUserVerification(version, action) && ((a.authenticatorData[32] ?? 0) & 0x04) === 0)
+    return "passkey_no_user_verification";
+  if (!clientDataAcceptedV3(a.clientDataJSON, challengeToBase64Url(challenge)))
+    return "passkey_client_data_refused";
+  return undefined;
+}
+
+/**
+ * Signs a 32-byte challenge with the passkey and returns the `auth` bytes the precompile checks.
+ * Under rule v3 (`rule` given) it asks for user verification where the chain requires it and
+ * refuses to return an assertion the chain would refuse.
+ */
+export async function signWithPasskey(
+  challenge: Hex,
+  credentialId: string,
+  rule?: { version: RuleVersion; action: OwnerAction },
+): Promise<Hex> {
+  const uv = rule && requiresUserVerification(rule.version, rule.action) ? "required" : "preferred";
   const cred = (await navigator.credentials.get({
     publicKey: {
       challenge: new Uint8Array(hexToBytes(challenge)),
       rpId: location.hostname,
       allowCredentials: [{ type: "public-key", id: fromB64url(credentialId) }],
-      userVerification: "preferred",
+      userVerification: uv,
       timeout: 120_000,
     },
   })) as PublicKeyCredential | null;
   if (!cred) throw new Error("passkey_cancelled");
   const r = cred.response as AuthenticatorAssertionResponse;
-  return assertionToAuth({
+  const a = {
     authenticatorData: new Uint8Array(r.authenticatorData),
     clientDataJSON: new Uint8Array(r.clientDataJSON),
     signature: new Uint8Array(r.signature),
-  });
+  };
+  if (rule) {
+    const problem = assertionProblem(rule.version, rule.action, challenge, a);
+    if (problem) throw new Error(problem);
+  }
+  return assertionToAuth(a);
 }
 
 // ---- saved state (this browser only) ---------------------------------------------------
@@ -216,7 +253,7 @@ export async function readAgent(c: PublicClient, agent: Address): Promise<AgentV
     readRuleVersion(c),
   ]);
   let v2 = { freezeEpoch: 0n, feeCapSet: false, dailyFeeCap: 0n, feeSpentToday: 0n };
-  if (version === 2) {
+  if (version >= 2) {
     const [epoch, m2, fee] = await Promise.all([
       read("freezeEpoch") as Promise<bigint>,
       read("getMandateV2") as Promise<readonly [{ dailyFeeCap: bigint }, boolean, boolean]>,

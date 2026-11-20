@@ -253,6 +253,15 @@ describe("normalizeReason", () => {
     ["agent: payee not allowed: 0xabc", "agent: payee not allowed"],
     ["agent: budget exceeded: charge 5 above perTxCap 1", "agent: budget exceeded"],
     ["agent: frozen", "agent: frozen"],
+    // rule v3
+    [
+      "agent: daily payment count exceeded: 3 today (pooled included), limit 3",
+      "agent: daily payment count exceeded",
+    ],
+    [
+      "agent: payee budget exceeded: paid today 600 + pooled 0 + value 500 above payee cap 1000",
+      "agent: payee budget exceeded",
+    ],
     ["nonce too low: next nonce 3, tx nonce 2", "nonce too low"],
     ["", ""],
   ])("%j → %j", (raw, want) => {
