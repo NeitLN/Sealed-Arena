@@ -132,7 +132,8 @@ export const whyText = (lang: Lang, x: Result, rows: EvalRow[]) => {
           "Khi O+ là lựa chọn tốt hơn: agent trả bằng USDC trên C-Chain, người bán dùng x402 chuẩn, và bạn muốn một chain do nhiều validator độc lập vận hành ngay hôm nay.",
         whenS:
           "Khi Sealed đáng cái giá của nó: bạn muốn hạn mức ràng buộc chính khoá, tính cả phí, không cần code ví cho từng agent, và chấp nhận một L1 riêng. Chúng tôi chưa chứng minh được khách hàng thấy điều này đáng giá.",
-        note: "O+ không có trong lần chạy cùng lúc ở trên; kết quả 45 ca của nó nằm trong docs/EVALUATION.md.",
+        note: "O+ được đo riêng ngày 20/11 với cùng phép gửi cùng lúc và cho cùng kết quả như O: 2 settle, 18 revert trong block. Kết quả 45 ca của nó nằm trong docs/EVALUATION.md.",
+        noteLink: "Lần chạy O+ trong docs/MEASUREMENTS.md",
       }
     : {
         title: "Why not a contract wallet?",
@@ -192,7 +193,8 @@ export const whyText = (lang: Lang, x: Result, rows: EvalRow[]) => {
           "When O+ is the better choice: your agents pay in USDC on the C-Chain, your sellers use standard x402, and you want a chain run by many independent validators today.",
         whenS:
           "When Sealed is worth its price: you want the limit to hold for the key itself, fees included, with no wallet code per agent, and you accept a separate L1. We have not yet shown that customers find this worth the price.",
-        note: "O+ was not part of the burst run above; its 45-case results are in docs/EVALUATION.md.",
+        note: "O+ was measured separately on 20/11 with the same burst and the same result as O: 2 settled, 18 reverted in blocks. Its 45-case results are in docs/EVALUATION.md.",
+        noteLink: "O+ burst run in docs/MEASUREMENTS.md",
       };
 };
 

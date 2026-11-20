@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -10,7 +10,7 @@ import { designText } from "./designText.js";
 import { KEYS, useI18n } from "./i18n.js";
 import { landingText } from "./landingText.js";
 import leakedKey from "./leakedKeySummary.json";
-import { limitationsText } from "./limitationsText.js";
+import { limitationSources, limitationsText } from "./limitationsText.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -167,9 +167,24 @@ describe("page wording", () => {
     expect(compareText("vi", result as unknown as Result).notes[0]).toMatch(/dựng tay/);
   });
 
-  it("states all fifteen limitations in both languages", () => {
-    expect(arenaText("en").limits).toHaveLength(15);
-    expect(arenaText("vi").limits).toHaveLength(15);
+  it("states all sixteen limitations in both languages", () => {
+    expect(arenaText("en").limits).toHaveLength(16);
+    expect(arenaText("vi").limits).toHaveLength(16);
+  });
+
+  it("gives every limitation on the rules page a source file, and no extra one", () => {
+    for (const lang of ["en", "vi"] as const)
+      expect(limitationSources.length).toBe(limitationsText(lang).length);
+    for (const source of limitationSources) {
+      const file = source.split("#")[0] ?? "";
+      expect(existsSync(resolve(ROOT, file)), `${file} exists`).toBe(true);
+    }
+  });
+
+  it("README states as many numbered limitations as the site", () => {
+    const readme = readFileSync(resolve(ROOT, "README.md"), "utf8");
+    const section = readme.split("## Security model and limitations")[1]?.split("\n## ")[0] ?? "";
+    expect(section.match(/^\d+\. \*\*/gm)).toHaveLength(limitationsText("en").length);
   });
 
   it.each([

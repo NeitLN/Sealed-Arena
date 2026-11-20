@@ -60,7 +60,7 @@ const en = {
   followed: "runs followed the note",
   refused: "payments to the attacker refused",
   memoryNote:
-    "One model, local Sealed L1. The task asked the agent to read its notes. Sealed limits where the payment can go; the agent can still be tricked.",
+    "One model, local Sealed L1. The task asked the agent to read its notes. Sealed limits where the payment can go; the agent can still be tricked. On the Fuji C-Chain the limit wallet with a payee list (O+) also refused every tip to the attacker: 15/15 in a replay of these runs and 13/13 in live runs (docs/MEASUREMENTS.md).",
   pages: "Separate injected-page runs followed (two models, local network)",
   liveLoad: "Try a real payment",
   liveHint: "Opens the public-key transaction controls. Test assets only.",
@@ -204,7 +204,7 @@ const vi: typeof en = {
   followed: "lượt làm theo ghi chú",
   refused: "khoản trả cho kẻ tấn công bị từ chối",
   memoryNote:
-    "Một model, Sealed L1 cục bộ. Tác vụ yêu cầu agent đọc ghi chú. Sealed giới hạn nơi khoản trả có thể đến; agent vẫn có thể bị lừa.",
+    "Một model, Sealed L1 cục bộ. Tác vụ yêu cầu agent đọc ghi chú. Sealed giới hạn nơi khoản trả có thể đến; agent vẫn có thể bị lừa. Trên Fuji C-Chain, ví hạn mức có danh sách người nhận (O+) cũng từ chối mọi khoản tip cho kẻ tấn công: 15/15 khi chạy lại các lượt này và 13/13 ở các lượt chạy thật (docs/MEASUREMENTS.md).",
   pages: "Lượt làm theo trang chèn lệnh trong phép thử riêng (hai model, mạng cục bộ)",
   liveLoad: "Thử giao dịch thật",
   liveHint: "Mở các nút gửi giao dịch bằng private key đã công bố. Chỉ dùng tài sản thử.",

@@ -6,7 +6,9 @@
 
 **An Avalanche L1 where a payment from an AI agent's key is valid only if it stays inside the mandate its owner set with a passkey.**
 
-Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction: it is an **invalid** transaction: the chain's validator does not accept a block that contains it.
+[Live demo](https://sealed-arena.vercel.app) · [Try a forbidden payment](https://sealed-arena.vercel.app/arena) · Video: (link added on submission) · Slides: (link added on submission)
+
+Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction. It is an **invalid** transaction, and the chain's validator does not accept a block that contains it.
 
 > **Today:** one validator, run by the team, on the Fuji testnet. The claim is about where the rule is checked (transaction validity), not about who operates the chain. See [Security model and limitations](#security-model-and-limitations).
 
@@ -38,6 +40,7 @@ flowchart LR
 1. The owner registers an agent key with a P-256 **passkey** and sets a **mandate**: allowed payees (up to 16), a per-transaction cap, a daily cap and an expiry. Every change needs a fresh WebAuthn proof from that passkey, bound to the chain id, the agent and a nonce, so the agent key alone can never change it.
 2. For every transaction **sent by a registered agent**, the node checks, in the transaction pool and again in `preCheck` (the step that decides whether a transaction can be part of a block):
    no contract creation · payee in the mandate · payee has no code · agent not frozen · `block.timestamp < expiry` · `value + gasLimit × gasFeeCap ≤ perTxCap` · `spentToday + charge ≤ dailyCap`.
+   Under agent rule v2 (in force on Fuji from block 491) it also checks: transaction type 0, 1 or 2, with no access list · call data empty or exactly 32 bytes · gas limit equal to the payment's intrinsic gas · payee not a native precompile · tip of at most 1 gwei · `feeSpentToday + gasLimit × gasFeeCap ≤ dailyFeeCap` when the mandate sets a daily fee cap · no set-code authority that is a registered agent. Full list: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 3.5 (Vietnamese).
 3. A transaction that fails is rejected by the RPC and makes any block that contains it invalid. A transaction that passes is charged at its maximum cost before it executes, so the counter never falls below what actually left the account.
 
 Transactions from other senders are not affected. Details and the exact contracts between components: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (Vietnamese).
@@ -54,7 +57,7 @@ We have no customers yet; this is a hypothesis we have not tested.
 
 - **Who pays.** Agent platforms that hold wallets for their agents pay a fee per protected agent.
 - **Fees on the L1.** Transaction fees on the Sealed L1 are a second source. The current genesis does not enable fee recipients, so collecting them would need a network upgrade.
-- **How money moves.** Users deposit USDC from the C-Chain through ICTT (see [D6](docs/decisions/D6.md)); sellers withdraw to the C-Chain through the same bridge.
+- **How money moves.** Users deposit USDC from the C-Chain through ICTT (see [D6](docs/decisions/D6.md), Vietnamese); sellers withdraw to the C-Chain through the same bridge.
 
 ## Avalanche components used
 
@@ -69,7 +72,7 @@ We have no customers yet; this is a hypothesis we have not tested.
 | ICM (Teleporter) and the ICM relayer                                 | Carries the open challenge's survival record to the C-Chain                                                             |
 | ERC-8004 registries on the Fuji C-Chain                              | Public identity and reputation record of the challenge agent                                                            |
 
-**Size of the node change.** Two patch files (`0002-agentpolicy-precompile.patch`, `0003-agent-rule.patch`) on avalanchego `v1.15.3`: 1,912 non-blank lines of code added and 4 removed, plus 1,295 non-blank lines of tests. The rule itself is about 170 lines (`core/agent_rule.go` and its hooks in `core/state_transition.go` and `core/txpool/`); the rest is the `AgentPolicy` precompile, including WebAuthn verification and its ABI. An earlier spike patch (`0001-spike-agent-rule.patch`), cited in D1, was removed once the rule was written; D1's evidence can be re-run at commit `8d42e78`.
+**Size of the node change.** Two patch files (`0002-agentpolicy-precompile.patch`, `0003-agent-rule.patch`) on avalanchego `v1.15.3`, rule v1 and v2 together: 2,887 lines added outside tests and 1 upstream line removed, plus 2,246 lines of tests. How it was counted: in both patch files, the non-blank lines (comments included) that start with `+`, minus the non-blank lines that start with `-` where `0003` edits a file that `0002` adds; a test file is a file whose name ends in `_test.go`. The rule itself is 460 of those lines: `core/agent_rule.go` (259) and its hooks in `core/state_transition.go` (60) and `core/txpool/` (141). Most of the rest is the `AgentPolicy` precompile (v1 and v2), including WebAuthn verification and its ABI (518 lines of JSON). An earlier spike patch (`0001-spike-agent-rule.patch`), cited in D1, was removed once the rule was written; D1's evidence can be re-run at commit `8d42e78`.
 
 ## Status
 
@@ -77,7 +80,7 @@ We have no customers yet; this is a hypothesis we have not tested.
 | -------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                                                 | Done   |
 | `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters                                 | Done   |
-| Validity rule in `preCheck` and the txpool (all seven conditions, daily budget, concurrent payments)                                         | Done   |
+| Validity rule in `preCheck` and the txpool (mandate, daily budget, concurrent payments; rule v2: type, gas, tip, call data, daily fee cap)   | Done   |
 | Genesis with allow-lists, 3-node network, leaked-key attack suite                                                                            | Done   |
 | x402 payments with a signed native transaction: facilitator, sample seller, client                                                           | Done   |
 | `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                                                 | Done   |
@@ -88,7 +91,7 @@ We have no customers yet; this is a hypothesis we have not tested.
 | Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages                                 | Done   |
 | Comparison on Fuji with a plain wallet (P) and two minimal spending-limit contract wallets written by the team (O, and O+ with a payee list) | Done   |
 
-Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions):
+Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions) (Vietnamese; D1 opens with an English summary):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
 [D2](docs/decisions/D2.md) the rule stays in the node (tier 1) ·
 [D3](docs/decisions/D3.md) how the local L1 is built ·
@@ -135,7 +138,7 @@ A contract wallet is the obvious alternative, and in our measurements a good one
 | Payments                | x402 with EIP-3009, which sellers already accept                                                                                                                  | Our x402 method `signed-native-tx`; sellers add the network and our facilitator                         |
 | Cost to adopt           | Deploy a wallet per agent                                                                                                                                         | Bridge USDC to a separate L1; the team must keep a Subnet-EVM fork up to date                           |
 
-The burst run is `services/attacks/compare/results/fuji-2026-11-17T06-00-03-128Z.json` (the `/compare` page); the 45-case numbers are in [`docs/EVALUATION.md`](docs/EVALUATION.md).
+The burst run is `services/attacks/compare/results/fuji-2026-11-17T06-00-03-128Z.json` (the `/compare` page). O+ was run through the same burst on 20/11 with the same result as O, 2 settled and 18 reverted ([`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md#o-in-the-burst-comparison-fuji-c-chain)); the 45-case numbers are in [`docs/EVALUATION.md`](docs/EVALUATION.md).
 
 **When O+ is the better choice.** Your agents pay in USDC on the C-Chain, your sellers use standard x402, and you want a chain run by many independent validators today.
 
@@ -147,10 +150,10 @@ The burst run is `services/attacks/compare/results/fuji-2026-11-17T06-00-03-128Z
 - Overview with live numbers: https://sealed-arena.vercel.app
 - Owner console (passkey): https://sealed-arena.vercel.app/console. "Get a demo agent" gives a visitor a new agent on the Sealed L1, linked to their passkey before it may send, with 0.05 test USDC; then set a mandate and try a payment and a freeze
 - Open red-team challenge: https://sealed-arena.vercel.app/arena (rules: [/arena/rules](https://sealed-arena.vercel.app/arena/rules))
-- Comparison of P, O and S: https://sealed-arena.vercel.app/compare
+- Comparison of P, O, O+ and S: https://sealed-arena.vercel.app/compare
 - Who it is for and the business model (hypothesis): https://sealed-arena.vercel.app/business
 - Every address and transaction: [`services/fuji-ops/deployments/fuji.json`](services/fuji-ops/deployments/fuji.json)
-- Agent rule v2 ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 3.5: fixed gas, tip of at most 1 gwei, a daily cap on fees, owner proofs bound to this chain) is in force on the Sealed L1 on Fuji from block 491 (19/11/2026, 11:00 UTC). The challenge agent's mandate was set again with a daily fee cap after the switch, and the leaked-key suite and the live console test were run again under v2.
+- Agent rule v2 ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 3.5, Vietnamese: fixed gas, tip of at most 1 gwei, a daily cap on fees, owner proofs bound to this chain) is in force on the Sealed L1 on Fuji from block 491 (19/11/2026, 11:00 UTC). The challenge agent's mandate was set again with a daily fee cap after the switch, and the leaked-key suite and the live console test were run again under v2.
 
 | What                                    | Where                       | Address or ID                                                                                             |
 | --------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -197,7 +200,7 @@ pnpm --filter attacks x402       # x402 purchase end to end, and the payments it
 bash scripts/localnet.sh down    # stop and delete the local network
 ```
 
-More, including logs and troubleshooting: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+More, including logs and troubleshooting: [`docs/RUNBOOK.md`](docs/RUNBOOK.md) (Vietnamese).
 
 ## Repository layout
 
@@ -248,6 +251,7 @@ What it does not give, stated plainly:
 13. **The relayer host can allow senders.** For demo agents the relayer holds a second key with the TxAllowList manager role. It registers each demo agent to the visitor's passkey before allowing it, but whoever takes over the host could allow any address to send, outside any mandate. The admin can remove the role (`setNone`).
 14. **Under rule v1 the block-level check filtered transaction types more loosely than the pool.** The pool accepts only types 0, 1 and 2 from an agent; under v1 the block-validity check (`preCheck`) refuses only a transaction that carries blob hashes. At the pinned node version no type above 3 can be decoded, and tests cover a blob transaction in a hand-built block and types 3 and 4 over RPC. Agent rule v2 (docs/ARCHITECTURE.md 3.5, on Fuji from block 491) checks the type explicitly in both places and refuses a set-code authority that is an agent. Its list of native precompiles an agent may not pay (0x01 to 0x0a, 0x100) is fixed and does not follow later EVM upgrades.
 15. **The bridge relayer reads the chain config through a filter.** The ICM relayer (`icm-relayer` v1.8.4) cannot decode the Sealed precompile entries in the L1's `eth_getChainConfig` answer and does not start once rule v2 is scheduled. On Fuji it reaches the node through a small proxy run by the operator (`services/fuji-ops/src/chain-config-proxy.ts`) that removes those entries from that one answer. The Warp configuration and the messages are unchanged, and the destination still checks the Warp signatures; anyone running another relayer for this L1 needs the same filter.
+16. **The pool can briefly admit a payment that no block includes.** Close to a mandate's expiry, or when two pooled payments of one agent together go over the daily fee cap, the transaction pool can accept a payment that the block-validity check (`preCheck`) then refuses, so the block builder leaves it out. Such a payment is never confirmed and no coin moves, but it shows as pending (on an idle chain, until another transaction makes a new block). The fix belongs in the pool (no change to block validity) and is not done yet.
 
 Found a problem? See [SECURITY.md](SECURITY.md).
 
