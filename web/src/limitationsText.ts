@@ -15,7 +15,7 @@ const en = [
   ],
   [
     "Spending inside the mandate",
-    "A leaked key can still pay allowed sellers within the caps until frozen or expired. The daily cap resets at 00:00 UTC, not on a rolling window: spending around that boundary can use two days’ budgets within minutes.",
+    "A leaked key can still pay allowed sellers within the caps until frozen or expired. The daily cap resets at 00:00 UTC, not on a rolling window: spending around that boundary can use two days’ budgets within minutes. Under rule v2 (on Fuji from block 491) gas is fixed, the tip is at most 1 gwei, and mandates set with setMandateV2 also cap fees per day; older mandates have no fee cap until set again.",
   ],
   [
     "Griefing is possible",
@@ -39,7 +39,7 @@ const en = [
   ],
   [
     "Passkey proof scope",
-    "Owner proofs bind the chain ID, agent and nonce, not a particular deployment. Local and Fuji networks share a chain ID, so each deployment must use its own owner key. Binding to the blockchain ID is planned.",
+    "Under rule v1, owner proofs bind the chain ID, agent and nonce, and the local and Fuji networks share a chain ID. Under rule v2 (on Fuji from block 491) they also bind the network and blockchain IDs, so a proof for one deployment is refused on the other. A v2 freeze can be signed ahead of time but must still be sent by an allowed address.",
   ],
   [
     "A limited WebAuthn check",
@@ -55,7 +55,11 @@ const en = [
   ],
   [
     "Transaction-type coverage",
-    "The pool accepts agent transaction types 0, 1 and 2. The block check rejects blob hashes but filters types less strictly. The pinned node cannot decode types above 3. Before enabling new types, the block check must be tightened.",
+    "The pool accepts agent transaction types 0, 1 and 2. Under rule v1 the block check rejects only blob hashes; rule v2 (on Fuji from block 491) checks the type in both places and refuses a set-code authority that is an agent. Its list of native precompiles an agent may not pay is fixed.",
+  ],
+  [
+    "The bridge relayer needs a filter",
+    "The ICM relayer cannot decode the Sealed precompile entries in the chain config. On Fuji it reads the node through an operator-run proxy that removes those entries from that one answer. Warp settings and messages are unchanged; the destination still checks Warp signatures.",
   ],
 ];
 
@@ -74,7 +78,7 @@ const vi: typeof en = [
   ],
   [
     "Vẫn chi được trong uỷ quyền",
-    "Khoá lộ vẫn trả được cho người bán được phép trong hạn mức, cho tới khi đóng băng hoặc hết hạn. Hạn mức ngày đặt lại lúc 00:00 UTC (07:00 Việt Nam), không tính theo cửa sổ trượt: có thể dùng ngân sách của hai ngày trong vài phút quanh mốc này.",
+    "Khoá lộ vẫn trả được cho người bán được phép trong hạn mức, cho tới khi đóng băng hoặc hết hạn. Hạn mức ngày đặt lại lúc 00:00 UTC (07:00 Việt Nam), không tính theo cửa sổ trượt: có thể dùng ngân sách của hai ngày trong vài phút quanh mốc này. Với luật v2 (trên Fuji từ block 491) gas cố định, tip tối đa 1 gwei, và uỷ quyền đặt bằng setMandateV2 có thêm hạn mức phí mỗi ngày; uỷ quyền cũ chưa có hạn mức phí cho tới khi đặt lại.",
   ],
   [
     "Vẫn có thể phá rối",
@@ -98,7 +102,7 @@ const vi: typeof en = [
   ],
   [
     "Phạm vi chứng thực passkey",
-    "Chứng thực gắn với chain ID, agent và nonce, không gắn với một bản triển khai cụ thể. Mạng cục bộ và Fuji dùng cùng chain ID nên mỗi bản triển khai phải dùng khoá chủ riêng. Việc gắn với blockchain ID mới nằm trong kế hoạch.",
+    "Với luật v1, chứng thực gắn với chain ID, agent và nonce, và mạng cục bộ với Fuji dùng cùng chain ID. Với luật v2 (trên Fuji từ block 491) chứng thực gắn thêm network ID và blockchain ID, nên chứng thực cho bản triển khai này bị bản kia từ chối. Lệnh đóng băng v2 ký sẵn được nhưng vẫn phải do một địa chỉ được phép gửi.",
   ],
   [
     "Kiểm WebAuthn có giới hạn",
@@ -114,7 +118,11 @@ const vi: typeof en = [
   ],
   [
     "Phạm vi loại giao dịch",
-    "Pool nhận giao dịch agent loại 0, 1 và 2. Phép kiểm block từ chối blob hash nhưng lọc loại ít chặt hơn. Bản node đã chốt không giải mã loại trên 3. Trước khi bật loại mới, phải siết phép kiểm block.",
+    "Pool nhận giao dịch agent loại 0, 1 và 2. Với luật v1, phép kiểm block chỉ từ chối blob hash; luật v2 (trên Fuji từ block 491) kiểm loại ở cả hai chỗ và từ chối set-code authority là agent. Danh sách precompile gốc agent không được trả tới là cố định.",
+  ],
+  [
+    "Relayer cầu nối cần bộ lọc",
+    "Relayer ICM không giải mã được các mục precompile riêng của Sealed trong cấu hình chain. Trên Fuji nó đọc node qua một proxy do bên vận hành chạy, proxy bỏ các mục đó khỏi đúng câu trả lời này. Cấu hình Warp và thông điệp giữ nguyên; chain đích vẫn kiểm chữ ký Warp.",
   ],
 ];
 
