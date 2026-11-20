@@ -64,9 +64,9 @@ export type RelayerOptions = {
   arenaRecorder?: Address;
   /** Minimum time between two sends of the same arena action for the same agent (default 60 s). */
   arenaCooldownMs?: number;
-  /** Minimum time between two owner actions (/relay) for the same agent (default 15 s). */
+  /** Minimum time between two owner actions (/relay, except freeze) for the same agent (default 15 s). */
   agentGapMs?: number;
-  /** Owner actions (/relay) per agent in any hour (default 20). */
+  /** Owner actions (/relay, except freeze) per agent in any hour (default 20). */
   agentPerHour?: number;
   /** Clock, for tests. */
   now?: () => number;
@@ -178,47 +178,51 @@ export function createRelayerApp(o: RelayerOptions) {
     if (!RELAYED.has(name))
       return c.json({ ok: false, error: "function_not_allowed", function: name }, 400);
 
-    // Every owner action names its agent first. One owner of one agent could otherwise loop
-    // setMandateV2 or freeze/unfreeze and spend the relayer's gas for everyone, so each agent
-    // gets a few sends per hour, whoever asks. Taken before any await, so two requests arriving
-    // together cannot both pass; given back whenever nothing was sent.
-    const key = String(args?.[0]).toLowerCase();
-    const at = clock();
-    const sends = (agentSends.get(key) ?? []).filter((s) => at - s < HOUR);
-    const latest = sends[sends.length - 1];
-    const oldest = sends[0];
-    const wait =
-      latest !== undefined && at - latest < agentGap
-        ? agentGap - (at - latest)
-        : oldest !== undefined && sends.length >= agentPerHour
-          ? HOUR - (at - oldest)
-          : 0;
-    if (wait > 0) {
-      c.header("Retry-After", String(seconds(wait)));
-      return c.json({ ok: false, error: "agent_rate_limited", retryAfter: seconds(wait) }, 429);
-    }
-    sends.push(at);
-    agentSends.set(key, sends);
-    const release = () => {
-      const list = agentSends.get(key);
-      const i = list?.lastIndexOf(at) ?? -1;
-      if (list && i >= 0) list.splice(i, 1);
-      if (list?.length === 0) agentSends.delete(key);
-    };
-
     // A public relayer pays gas for anyone; registering throwaway agents would drain it.
     // Only agents the admin already allowed to send are registered.
     if (name === "register" && !(await o.chain.canSend(args?.[0] as Address).catch(() => false))) {
-      release();
       return c.json({ ok: false, error: "agent_not_allowed", function: name }, 403);
     }
 
     try {
       await o.chain.simulate(data);
     } catch (e) {
-      release();
       return c.json({ ok: false, error: "reverted", function: name, reason: revertReason(e) }, 422);
     }
+
+    // Every owner action names its agent first. One owner of one agent could otherwise loop
+    // setMandateV2 or unfreeze and spend the relayer's gas for everyone, so each agent gets a few
+    // sends per hour, whoever asks. Freezing is never limited: it is the owner's stop button.
+    // The slot is checked and taken only after the simulation passed (so a request with a junk
+    // proof never holds one), with no await in between (so two requests cannot both pass), and
+    // given back if the send fails.
+    let release = () => {};
+    if (name !== "freeze") {
+      const key = String(args?.[0]).toLowerCase();
+      const at = clock();
+      const sends = (agentSends.get(key) ?? []).filter((s) => at - s < HOUR);
+      const latest = sends[sends.length - 1];
+      const oldest = sends[0];
+      const wait =
+        latest !== undefined && at - latest < agentGap
+          ? agentGap - (at - latest)
+          : oldest !== undefined && sends.length >= agentPerHour
+            ? HOUR - (at - oldest)
+            : 0;
+      if (wait > 0) {
+        c.header("Retry-After", String(seconds(wait)));
+        return c.json({ ok: false, error: "agent_rate_limited", retryAfter: seconds(wait) }, 429);
+      }
+      sends.push(at);
+      agentSends.set(key, sends);
+      release = () => {
+        const list = agentSends.get(key);
+        const i = list?.lastIndexOf(at) ?? -1;
+        if (list && i >= 0) list.splice(i, 1);
+        if (list?.length === 0) agentSends.delete(key);
+      };
+    }
+
     try {
       const r = await send(data);
       if (r.status !== "success") {

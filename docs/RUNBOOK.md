@@ -85,7 +85,7 @@ pnpm --filter web e2e              # build trang, tự bật relayer, Chromium v
 ```
 - Web gọi relayer ở `VITE_RELAYER_URL` (mặc định `http://127.0.0.1:4040`), lấy URL RPC từ `/info` của relayer (`RELAYER_PUBLIC_RPC`, mặc định là `SEALED_RPC_URL`).
 - Ngoài mạng local, relayer cần `RELAYER_PRIVATE_KEY` (địa chỉ phải có trong TxAllowList và có coin trả gas).
-- Giới hạn thao tác của chủ ví qua `POST /relay` theo từng agent: `RELAYER_AGENT_GAP_MS` (khoảng cách tối thiểu giữa hai thao tác cho cùng một agent, mặc định `15000`) và `RELAYER_AGENT_PER_HOUR` (mặc định `20`). Vượt giới hạn trả 429 `agent_rate_limited` kèm `retryAfter` (giây). Giới hạn 10 yêu cầu/phút theo IP vẫn giữ.
+- Giới hạn thao tác của chủ ví qua `POST /relay` theo từng agent: `RELAYER_AGENT_GAP_MS` (khoảng cách tối thiểu giữa hai thao tác cho cùng một agent, mặc định `15000`) và `RELAYER_AGENT_PER_HOUR` (mặc định `20`). Vượt giới hạn trả 429 `agent_rate_limited` kèm `retryAfter` (giây). `freeze` không bị giới hạn này (chủ ví luôn dừng được agent); `setMandate`, `setMandateV2`, `unfreeze` và `register` thì có. Lượt chỉ được tính sau khi chạy thử thành công. Giới hạn 10 yêu cầu/phút theo IP vẫn giữ, kể cả với `freeze`.
 - E2E cần Chromium của Playwright: `pnpm --filter web exec playwright install chromium` nếu máy chưa có.
 
 ## 7. L1 Sealed trên Fuji
