@@ -68,6 +68,10 @@ export type GatewayOptions = {
   summaryCacheMax?: number;
   /** The cache map, for tests. */
   summaryCache?: Map<string, { at: number; value: Promise<unknown> }>;
+  /** Snapshot of the open challenge for GET /state (state.ts); the route is off without it. */
+  state?: () => Promise<unknown>;
+  /** How long one /state answer is reused (default 3 s). */
+  stateTtlMs?: number;
   /** Clock, for tests. */
   now?: () => number;
 };
@@ -224,6 +228,33 @@ export function createGatewayApp(o: GatewayOptions) {
     // A failed read is not cached.
     value.catch(() => summaries.delete(key));
     return c.json(await value);
+  });
+  // One snapshot of the open challenge for every open page: at most one set of chain reads per
+  // TTL, however many tabs poll. A failed snapshot is not cached; the last good one is served
+  // (marked stale) while the node does not answer.
+  const stateTtl = o.stateTtlMs ?? 3000;
+  let snapshot: { at: number; value: Promise<unknown> } | undefined;
+  let lastGood: unknown;
+  app.get("/state", async (c) => {
+    if (!o.state) return c.json({ error: "not configured" }, 404);
+    if (!snapshot || clock() - snapshot.at >= stateTtl) {
+      const value = o.state();
+      snapshot = { at: clock(), value };
+      value.then(
+        (v) => {
+          lastGood = v;
+        },
+        () => {
+          if (snapshot?.value === value) snapshot = undefined;
+        },
+      );
+    }
+    try {
+      return c.json(await snapshot.value);
+    } catch {
+      if (lastGood !== undefined) return c.json({ ...(lastGood as object), stale: true });
+      return c.json({ error: "node unavailable" }, 503);
+    }
   });
   app.get("/attempts/recent", async (c) => {
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 200);
