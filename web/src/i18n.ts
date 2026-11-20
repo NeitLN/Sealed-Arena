@@ -90,6 +90,9 @@ const en = {
   agent_not_allowed:
     "This agent is not allowed to send on this chain yet. Ask the operator to add it, then link it.",
   rate_limited: "Too many requests. Wait a minute and try again.",
+  agent_rate_limited: "Too many owner actions for this agent. Try again in {s} s.",
+  demo_rate_limited:
+    "One demo agent per network every {min} minutes. Try again at {time}, or use the Try buttons on /arena.",
   demoTitle: "Try it with a demo agent",
   demoIntro:
     "We give you a new agent on the Sealed L1 on Fuji, already linked to your passkey, with 0.05 test USDC. Its key stays in this browser.",
@@ -204,6 +207,9 @@ const vi: Record<Key, string> = {
   agent_not_allowed:
     "Agent này chưa được phép gửi giao dịch trên chain. Nhờ người vận hành thêm agent rồi gắn lại.",
   rate_limited: "Quá nhiều yêu cầu. Đợi một phút rồi thử lại.",
+  agent_rate_limited: "Quá nhiều thao tác cho agent này. Thử lại sau {s} giây.",
+  demo_rate_limited:
+    "Mỗi mạng một demo agent mỗi {min} phút. Thử lại lúc {time}, hoặc dùng nút Try trên /arena.",
   demoTitle: "Thử với một agent demo",
   demoIntro:
     "Chúng tôi cấp cho bạn một agent mới trên Sealed L1 ở Fuji, đã gắn sẵn với passkey của bạn, kèm 0,05 USDC thử. Key của agent chỉ nằm trong trình duyệt này.",
@@ -264,6 +270,12 @@ export function useI18n(): { lang: Lang; setLang: (l: Lang) => void; t: T } {
   const t = useCallback<T>((k) => dict[lang][k as Key] ?? k, [lang]);
   return { lang, setLang, t };
 }
+
+/** The lookup function for one language, outside React. */
+export const textFor =
+  (lang: Lang): T =>
+  (k) =>
+    dict[lang][k as Key] ?? k;
 
 /** Both dictionaries have the same keys (checked at type level by `vi: Record<Key, string>`). */
 export const KEYS = Object.keys(en) as Key[];

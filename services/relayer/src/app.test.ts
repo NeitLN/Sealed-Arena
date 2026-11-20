@@ -95,11 +95,88 @@ describe("relayer", () => {
 
   it("limits requests per client address", async () => {
     const { c } = chain();
-    const app = createRelayerApp({ chain: c, trustProxy: true, perMinute: 3 });
+    const app = createRelayerApp({ chain: c, trustProxy: true, perMinute: 3, agentGapMs: 0 });
     const codes = [];
     for (let i = 0; i < 4; i++) codes.push((await post(app, { data: freezeData })).status);
     expect(codes).toEqual([200, 200, 200, 429]);
     expect((await post(app, { data: freezeData }, "5.6.7.8")).status).toBe(200);
+  });
+
+  describe("owner actions per agent", () => {
+    const other = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+    const freezeOf = (who: string) =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "freeze",
+        args: [who as `0x${string}`, 0n, "0x"],
+      });
+
+    it("sends at most one action per agent every 15 s, whoever asks; other agents are not held back", async () => {
+      const { c, sent } = chain();
+      let t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t });
+      expect((await post(app, { data: freezeData }, "1.1.1.1")).status).toBe(200);
+      t += 1_000;
+      const again = await post(app, { data: freezeOf(agent.toLowerCase()) }, "2.2.2.2");
+      expect(again.status).toBe(429);
+      expect(again.headers.get("retry-after")).toBe("14");
+      expect(await again.json()).toEqual({
+        ok: false,
+        error: "agent_rate_limited",
+        retryAfter: 14,
+      });
+      expect((await post(app, { data: freezeOf(other) }, "1.1.1.1")).status).toBe(200);
+      expect(sent).toHaveLength(2);
+      t += 14_000;
+      expect((await post(app, { data: freezeData }, "3.3.3.3")).status).toBe(200);
+    });
+
+    it("sends at most the hourly number of actions per agent", async () => {
+      const { c } = chain();
+      let t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t, agentPerHour: 2 });
+      expect((await post(app, { data: freezeData }, "1.1.1.1")).status).toBe(200);
+      t += 15_000;
+      expect((await post(app, { data: freezeData }, "2.2.2.2")).status).toBe(200);
+      t += 15_000;
+      const third = await post(app, { data: freezeData }, "3.3.3.3");
+      expect(third.status).toBe(429);
+      // The first action leaves the hour at 1_000_000 + 3_600_000.
+      expect(await third.json()).toMatchObject({
+        error: "agent_rate_limited",
+        retryAfter: 3_600 - 30,
+      });
+      t = 1_000_000 + 3_600_000;
+      expect((await post(app, { data: freezeData }, "4.4.4.4")).status).toBe(200);
+    });
+
+    it("does not count an action the chain refuses, so a bad proof cannot hold the owner back", async () => {
+      const { c, sent } = chain();
+      const ok = c.simulate;
+      let refuse = true;
+      c.simulate = async (data, to) => {
+        if (refuse) {
+          refuse = false;
+          throw new Error("execution reverted: agentpolicy: owner signature invalid");
+        }
+        return ok(data, to);
+      };
+      const app = createRelayerApp({ chain: c, trustProxy: true });
+      expect((await post(app, { data: freezeData }, "6.6.6.6")).status).toBe(422);
+      expect((await post(app, { data: freezeData }, "1.1.1.1")).status).toBe(200);
+      expect(sent).toHaveLength(1);
+    });
+
+    it("lets one of two actions for the same agent arriving together through", async () => {
+      const { c, sent } = chain();
+      const app = createRelayerApp({ chain: c, trustProxy: true });
+      const [a, b] = await Promise.all([
+        post(app, { data: freezeData }, "1.1.1.1"),
+        post(app, { data: freezeData }, "2.2.2.2"),
+      ]);
+      expect([a.status, b.status].sort()).toEqual([200, 429]);
+      expect(sent).toHaveLength(1);
+    });
   });
 
   it("says who it is and where it sends", async () => {

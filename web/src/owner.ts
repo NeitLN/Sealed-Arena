@@ -277,7 +277,7 @@ export async function withCode(
 
 export type RelayResult =
   | { ok: true; function: string; transaction: Hex }
-  | { ok: false; error: string; reason?: string; transaction?: Hex };
+  | { ok: false; error: string; reason?: string; transaction?: Hex; retryAfter?: number };
 
 export async function relay(data: Hex): Promise<RelayResult> {
   try {
