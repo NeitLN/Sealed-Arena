@@ -135,7 +135,7 @@ export function createGatewayApp(o: GatewayOptions) {
     return true;
   };
 
-  async function handle(req: RpcRequest, ipHash: string): Promise<RpcResponse> {
+  async function handle(req: RpcRequest, ipHash: string, source = "rpc"): Promise<RpcResponse> {
     if (typeof req !== "object" || req === null || Array.isArray(req))
       return rpcError(null, -32600, "invalid request");
     const method = typeof req.method === "string" ? req.method : "";
@@ -181,6 +181,7 @@ export function createGatewayApp(o: GatewayOptions) {
         hash: typeof res.result === "string" ? res.result : "",
         result: res.error ? "rejected" : "accepted",
         reason: res.error ? normalizeReason(res.error.message) : "",
+        source,
       });
     }
     return res;
@@ -188,6 +189,7 @@ export function createGatewayApp(o: GatewayOptions) {
 
   app.post("/", async (c) => {
     const ipHash = ipHashOf(c);
+    const source = sourceOf(c.req.header("x-sealed-source"));
     const body = (await c.req.json().catch(() => undefined)) as
       | RpcRequest
       | RpcRequest[]
@@ -200,9 +202,9 @@ export function createGatewayApp(o: GatewayOptions) {
     if (Array.isArray(body)) {
       if (body.length === 0 || body.length > MAX_BATCH)
         return c.json(rpcError(null, -32600, `batch of 1 to ${MAX_BATCH}`), 400);
-      return c.json(await Promise.all(body.map((r) => handle(r, ipHash))));
+      return c.json(await Promise.all(body.map((r) => handle(r, ipHash, source))));
     }
-    return c.json(await handle(body, ipHash));
+    return c.json(await handle(body, ipHash, source));
   });
 
   const fromParam = (q: string | undefined) => (q && /^0x[0-9a-fA-F]{40}$/.test(q) ? q : undefined);
@@ -256,12 +258,25 @@ export function createGatewayApp(o: GatewayOptions) {
       return c.json({ error: "node unavailable" }, 503);
     }
   });
+  // result=rejected&since=<ms>: what an owner's console shows as "refused since your last visit".
   app.get("/attempts/recent", async (c) => {
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), 200);
-    return c.json(await o.store.recent(limit, fromParam(c.req.query("from"))));
+    const result = c.req.query("result");
+    const since = Number(c.req.query("since"));
+    return c.json(
+      await o.store.recent(limit, fromParam(c.req.query("from")), {
+        ...(result === "accepted" || result === "rejected" ? { result } : {}),
+        ...(Number.isFinite(since) && since > 0 ? { since } : {}),
+      }),
+    );
   });
 
   return app;
 }
 
 export type { Hex };
+
+/** The client's X-Sealed-Source label ("web:arena"), or "rpc" when absent or not a short label. */
+export function sourceOf(header: string | undefined): string {
+  return header && /^[a-z0-9:-]{1,32}$/.test(header) ? header : "rpc";
+}
