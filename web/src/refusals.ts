@@ -7,6 +7,12 @@ import { poll } from "./poll.js";
 
 export type Refusal = { ts: number; to: string; reason: string; source?: string };
 
+/** Rows fetched per poll; at this many the true count may be higher. */
+export const REFUSAL_LIMIT = 50;
+
+/** The count to show: "50+" once the page is full. */
+export const refusalCount = (n: number) => (n >= REFUSAL_LIMIT ? `${REFUSAL_LIMIT}+` : String(n));
+
 const key = (agent: Address) => `sealed.refusals.seen.${agent.toLowerCase()}`;
 
 /** The time this browser last marked the agent's refusals as seen; the first visit starts now. */
@@ -46,7 +52,7 @@ export function useRefusals(agent: Address | undefined) {
     if (!agent || since === undefined) return true;
     try {
       const r = await fetch(
-        `${GATEWAY_URL}/attempts/recent?limit=50&result=rejected&from=${agent}&since=${since}`,
+        `${GATEWAY_URL}/attempts/recent?limit=${REFUSAL_LIMIT}&result=rejected&from=${agent}&since=${since}`,
       );
       if (!r.ok) return false;
       setRows((await r.json()) as Refusal[]);

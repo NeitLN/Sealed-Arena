@@ -46,7 +46,7 @@ import {
   withCode,
 } from "./owner.js";
 import { maximumLoss, ownerSteps } from "./ownerProgress.js";
-import { countReasons, useRefusals } from "./refusals.js";
+import { countReasons, refusalCount, useRefusals } from "./refusals.js";
 import { SiteShell } from "./SiteShell.js";
 import { RPC } from "./useArenaLive.js";
 
@@ -424,7 +424,7 @@ export default function OwnerPage() {
         {refusals.rows.length > 0 ? (
           <Banner
             status="warning"
-            title={t("refusedSince").replace("{n}", String(refusals.rows.length))}
+            title={t("refusedSince").replace("{n}", refusalCount(refusals.rows.length))}
             description={
               <VStack gap={2}>
                 {countReasons(refusals.rows).map(([reason, n]) => (

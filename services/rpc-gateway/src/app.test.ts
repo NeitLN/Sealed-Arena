@@ -76,6 +76,19 @@ describe("rpc gateway", () => {
     expect(n.calls).toEqual([]);
   });
 
+  it("lets browsers cache the preflight for the source header", async () => {
+    const { app } = setup();
+    const res = await app.request("/", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://example.test",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type, x-sealed-source",
+      },
+    });
+    expect(res.headers.get("access-control-max-age")).toBe("600");
+  });
+
   it("limits eth_getLogs to 2048 blocks", async () => {
     const { app, n } = setup();
     const wide = await rpc(app, {
