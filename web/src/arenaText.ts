@@ -65,6 +65,7 @@ const en = {
   survivalHelp:
     "Coins kept inside the mandate multiplied by the time they stayed there (coin·seconds on chain, shown here in hours). A breach sets it to zero for good.",
   emptyHint: "Copy the key above and send a payment outside the mandate.",
+  liveStale: "The node is not answering: this is the last good snapshot the gateway kept.",
   liveDown: "Live data is unavailable right now. Any last successful reads remain on screen.",
   onChainCheck: "On-chain check",
   // rules page
@@ -231,6 +232,7 @@ const vi: Text = {
   survivalHelp:
     "Số coin giữ được trong uỷ quyền nhân với thời gian giữ (coin·giây trên chain, ở đây đổi ra giờ). Vi phạm đưa về 0 vĩnh viễn.",
   emptyHint: "Copy khoá ở trên và gửi một khoản ra ngoài uỷ quyền.",
+  liveStale: "Node chưa trả lời: đây là dữ liệu tốt gần nhất mà gateway còn giữ.",
   liveDown:
     "Hiện chưa lấy được dữ liệu trực tiếp. Giá trị đọc được gần nhất, nếu có, vẫn được giữ trên màn hình.",
   onChainCheck: "Kiểm trên chain",

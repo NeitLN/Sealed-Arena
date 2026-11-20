@@ -73,7 +73,7 @@ export function TryPayment(o: {
   onReportBreach: () => void;
 }) {
   const { t, view } = o;
-  const [client] = useState(() => chainClient(RPC, { live: true }));
+  const [client] = useState(() => chainClient(RPC, { live: true, source: "web:arena" }));
   const [busy, setBusy] = useState<Key>();
   const [sent, setSent] = useState<Attempt>();
   const [result, setResult] = useState<SendOutcome>();

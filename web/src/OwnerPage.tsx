@@ -46,6 +46,7 @@ import {
   withCode,
 } from "./owner.js";
 import { maximumLoss, ownerSteps } from "./ownerProgress.js";
+import { countReasons, useRefusals } from "./refusals.js";
 import { SiteShell } from "./SiteShell.js";
 import { RPC } from "./useArenaLive.js";
 
@@ -103,7 +104,9 @@ export default function OwnerPage() {
   const [saved, setSaved] = useState(loadSaved);
   // Reads go to the public RPC known at build time, so the page shows the chain even when the
   // relayer is down; the relayer's /info can point to another RPC (the local network).
-  const [client, setClient] = useState<PublicClient>(() => chainClient(RPC, { live: true }));
+  const [client, setClient] = useState<PublicClient>(() =>
+    chainClient(RPC, { live: true, source: "web:console" }),
+  );
   const [local, setLocal] = useState(false);
   const [boot, setBoot] = useState<string>();
   // What a rule v2 owner proof is bound to: the Sealed L1 on Fuji, or the local network the
@@ -138,7 +141,8 @@ export default function OwnerPage() {
     relayerInfo()
       .then((info) => {
         if (info.chainId !== CHAIN_ID) return setBoot("chain_mismatch");
-        if (info.rpc !== RPC) setClient(chainClient(info.rpc, { live: true }));
+        if (info.rpc !== RPC)
+          setClient(chainClient(info.rpc, { live: true, source: "web:console" }));
         setLocal(isLocalRpc(info.rpc));
         if (info.networkId && info.blockchainId)
           setIds({
@@ -389,6 +393,8 @@ export default function OwnerPage() {
     });
   };
 
+  const refusals = useRefusals(view?.registered ? agent : undefined);
+
   const registrationBadge = !view ? null : !view.registered ? (
     <Badge variant="neutral" label={t("notRegistered")} />
   ) : ownedByMe ? (
@@ -415,6 +421,29 @@ export default function OwnerPage() {
             />
           ) : null}
         </HStack>
+        {refusals.rows.length > 0 ? (
+          <Banner
+            status="warning"
+            title={t("refusedSince").replace("{n}", String(refusals.rows.length))}
+            description={
+              <VStack gap={2}>
+                {countReasons(refusals.rows).map(([reason, n]) => (
+                  <Text key={reason} type="supporting">
+                    {n} × {reason}
+                  </Text>
+                ))}
+                <HStack gap={2}>
+                  <Button
+                    label={t("markSeen")}
+                    size="sm"
+                    variant="secondary"
+                    onClick={refusals.markSeen}
+                  />
+                </HStack>
+              </VStack>
+            }
+          />
+        ) : null}
         {view && agent ? (
           <VStack gap={3}>
             <Text type="supporting" color="secondary" style={mono}>

@@ -38,6 +38,8 @@ const en = {
   dailyCap: "Per day (USDC)",
   dailyFeeCap: "Daily fee cap (USDC)",
   feeSpentToday: "Fees today",
+  refusedSince: "{n} payments by this agent were refused by the node since your last visit",
+  markSeen: "Mark as seen",
   feeCapNotSet:
     "This mandate was set before the network's rule v2: it has no daily cap on fees. Set it again to add one.",
   validDays: "Valid (days)",
@@ -152,6 +154,8 @@ const vi: Record<Key, string> = {
   dailyCap: "Mỗi ngày (USDC)",
   dailyFeeCap: "Hạn mức phí/ngày (USDC)",
   feeSpentToday: "Phí hôm nay",
+  refusedSince: "Node đã từ chối {n} khoản trả của agent này kể từ lần bạn vào trước",
+  markSeen: "Đánh dấu đã xem",
   feeCapNotSet:
     "Uỷ quyền này đặt trước khi mạng chuyển sang luật v2 nên chưa có hạn mức phí mỗi ngày. Hãy đặt lại để thêm.",
   validDays: "Hiệu lực (ngày)",

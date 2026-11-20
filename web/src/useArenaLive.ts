@@ -29,6 +29,7 @@ export function useArenaLive(recentLimit = 15) {
   const [summary, setSummary] = useState<Summary>();
   const [recent, setRecent] = useState<Attempt[]>();
   const [fails, setFails] = useState(0);
+  const [stale, setStale] = useState(false);
 
   const refreshChain = useCallback(async () => {
     try {
@@ -100,6 +101,7 @@ export function useArenaLive(recentLimit = 15) {
       setRec(recorderFromState(s));
       setSummary(s.summary as Summary);
       setRecent((s.recent as Attempt[]).slice(0, recentLimit));
+      setStale(s.stale === true);
       setFails(0);
       return true;
     } catch {
@@ -121,5 +123,5 @@ export function useArenaLive(recentLimit = 15) {
     };
   }, [useState_, refreshState, refreshChain, refreshAttempts]);
 
-  return { view, rec, summary, recent, error: fails >= 2, refreshChain };
+  return { view, rec, summary, recent, error: fails >= 2, stale, refreshChain };
 }

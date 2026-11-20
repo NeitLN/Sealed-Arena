@@ -311,6 +311,7 @@ await client.sendTransaction({
           {t.offChain}
         </Text>
         {live.error ? <Banner status="warning" title={t.liveDown} /> : null}
+        {!live.error && live.stale ? <Banner status="warning" title={t.liveStale} /> : null}
         {summary && Object.keys(summary.byReason).length > 0 ? (
           <HStack gap={2} wrap="wrap">
             {Object.entries(summary.byReason)
