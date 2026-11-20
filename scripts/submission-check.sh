@@ -30,7 +30,7 @@ if [ -n "$hits" ]; then echo "$hits" | head -20; fail "forbidden wording"; else 
 
 step "numbered limits in README"
 # Every limit under "Security model and limitations" is numbered; bump this when one is added.
-EXPECTED_LIMITS=14
+EXPECTED_LIMITS=15
 n=$(awk '/^## Security model and limitations/{on=1; next} /^## /{on=0} on && /^[0-9]+\. /' README.md | wc -l | tr -d ' ')
 if [ "$n" = "$EXPECTED_LIMITS" ]; then echo "PASS ($n limits)"; else fail "README has $n numbered limits, expected $EXPECTED_LIMITS: update EXPECTED_LIMITS and docs together"; fi
 

@@ -164,9 +164,9 @@ describe("page wording", () => {
     expect(compareText("vi", result as unknown as Result).notes[0]).toMatch(/dựng tay/);
   });
 
-  it("states all fourteen limitations in both languages", () => {
-    expect(arenaText("en").limits).toHaveLength(14);
-    expect(arenaText("vi").limits).toHaveLength(14);
+  it("states all fifteen limitations in both languages", () => {
+    expect(arenaText("en").limits).toHaveLength(15);
+    expect(arenaText("vi").limits).toHaveLength(15);
   });
 
   it.each([
