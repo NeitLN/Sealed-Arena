@@ -47,6 +47,7 @@ import {
 } from "./owner.js";
 import { maximumLoss, ownerSteps } from "./ownerProgress.js";
 import { countReasons, refusalCount, useRefusals } from "./refusals.js";
+import { relayerErrorText } from "./relayerError.js";
 import { SiteShell } from "./SiteShell.js";
 import { RPC } from "./useArenaLive.js";
 
@@ -204,7 +205,7 @@ export default function OwnerPage() {
       const r: RelayResult = await relay(await build());
       if (r.ok) setOutcome({ kind: "ok", text: t("done"), tx: r.transaction });
       else if (r.reason) setOutcome({ kind: "refused", text: r.reason, tx: r.transaction });
-      else setOutcome({ kind: "error", text: t(r.error), tx: r.transaction });
+      else setOutcome({ kind: "error", text: relayerErrorText(t, r, "failed"), tx: r.transaction });
     } catch (e) {
       if (isCancel(e)) setOutcome({ kind: "cancelled", text: t("passkey_cancelled") });
       else setOutcome({ kind: "error", text: t(e instanceof Error ? e.message : String(e)) });

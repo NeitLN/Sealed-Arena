@@ -10,6 +10,7 @@ import { designText } from "./designText.js";
 import { type SendOutcome, sendAsAgent } from "./forbiddenSend.js";
 import type { Lang, T } from "./i18n.js";
 import { type Passkey, prepareDemoClaim, RELAYER_URL, relayerInfo } from "./owner.js";
+import { type RelayerError, relayerErrorText } from "./relayerError.js";
 import { StatusPill } from "./StatusPill.js";
 
 /** An address nobody holds a key for; never on a mandate. */
@@ -73,13 +74,12 @@ export function DemoAgents(o: {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(request),
       });
-      const body = (await res.json().catch(() => ({}))) as {
+      const body = (await res.json().catch(() => ({}))) as RelayerError & {
         ok?: boolean;
         agent?: Address;
-        error?: string;
       };
       if (!body.ok || !body.agent || body.agent.toLowerCase() !== request.agent.toLowerCase()) {
-        setClaimError(t(body.error ?? "demoFailed"));
+        setClaimError(relayerErrorText(t, body, "demoFailed"));
         return;
       }
       o.onClaimed(body.agent);

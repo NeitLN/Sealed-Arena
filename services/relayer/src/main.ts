@@ -12,10 +12,19 @@ const chain = sealedRelayChain(rpc, relayerKey(rpc));
 // Demo agents for the owner console (POST /demo/claim): a separate key with the TxAllowList
 // manager role. Off unless RELAYER_DEMO_MANAGER_KEY is set.
 const demoKey = process.env.RELAYER_DEMO_MANAGER_KEY as `0x${string}` | undefined;
-const perDayEnv = process.env.RELAYER_DEMO_PER_DAY;
-const perDay = perDayEnv === undefined ? undefined : Number(perDayEnv);
-if (perDay !== undefined && !(Number.isInteger(perDay) && perDay > 0))
-  throw new Error(`RELAYER_DEMO_PER_DAY must be a positive whole number, got "${perDayEnv}"`);
+/** A whole number from the environment; unset or empty means the default. */
+function wholeEnv(name: string, min: number): number | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  const n = Number(raw);
+  if (!(Number.isInteger(n) && n >= min))
+    throw new Error(`${name} must be a whole number of at least ${min}, got "${raw}"`);
+  return n;
+}
+const perDay = wholeEnv("RELAYER_DEMO_PER_DAY", 1);
+const perClientMs = wholeEnv("RELAYER_DEMO_WINDOW_MS", 0);
+const agentGapMs = wholeEnv("RELAYER_AGENT_GAP_MS", 0);
+const agentPerHour = wholeEnv("RELAYER_AGENT_PER_HOUR", 1);
 
 const app = createRelayerApp({
   chain,
@@ -24,7 +33,17 @@ const app = createRelayerApp({
     ? { arenaRecorder: process.env.RELAYER_ARENA_RECORDER as `0x${string}` }
     : {}),
   trustProxy: process.env.RELAYER_TRUST_PROXY === "1",
-  ...(demoKey ? { demo: { issuer: demoIssuer(rpc, demoKey), ...(perDay ? { perDay } : {}) } } : {}),
+  ...(demoKey
+    ? {
+        demo: {
+          issuer: demoIssuer(rpc, demoKey),
+          ...(perDay !== undefined ? { perDay } : {}),
+          ...(perClientMs !== undefined ? { perClientMs } : {}),
+        },
+      }
+    : {}),
+  ...(agentGapMs !== undefined ? { agentGapMs } : {}),
+  ...(agentPerHour !== undefined ? { agentPerHour } : {}),
   ...(origins?.length ? { origins } : {}),
 });
 serve({ fetch: app.fetch, port, hostname: process.env.RELAYER_HOST ?? "127.0.0.1" }, (info) => {
