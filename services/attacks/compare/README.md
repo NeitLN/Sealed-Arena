@@ -41,6 +41,9 @@ bash scripts/forge.sh build
 # SSH tunnel to the Fuji node on 127.0.0.1:19650 (docs/RUNBOOK.md); keys in .env (FUJI_*)
 pnpm --filter attacks compare setup   # fund P, deploy and fund O (recorded in services/fuji-ops/deployments/fuji.json)
 pnpm --filter attacks compare run     # P, O, S; writes results/fuji-<time>.json and web/src/compare-result.json
+pnpm --filter attacks compare run-oplus  # O+ (CapWalletOPlus, same caps, the seller as its only payee); writes results/fuji-Oplus-<time>.json
 ```
+
+O+ (run of 20/11/2026, `results/fuji-Oplus-2026-11-20T19-05-50-438Z.json`, details in `docs/MEASUREMENTS.md`): the injected transfer was refused before settlement (`isValidSignature` false); in the burst, as for O, 20/20 passed verify, 2 settled, 18 reverted in blocks, 0.8 spent.
 
 Each run spends test coins: P loses its balance (setup tops it up to 1 USDC), O pays up to its daily cap to the seller address, and S uses a new agent on the Sealed L1 funded for all 20 payments and their gas (8.1 coins), so only the rule limits what it spends; after the measurement the suite owner key widens the mandate and the rest is paid back to the team-held seller. `compare run-s` runs group S again on its own and merges it into `web/src/compare-result.json` (`atS`). A run before 19/11 funded S with 3 coins, which let the balance, not the rule, refuse the later payments.

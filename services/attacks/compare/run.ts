@@ -6,6 +6,9 @@
 //   pnpm --filter attacks compare run     P: the scripted injected transfer; O and S: 20 payments of 0.4 at once
 //                                         against caps of 0.5 per payment and 1 per day. Writes results/fuji-<time>.json
 //                                         and web/src/compare-result.json.
+//   pnpm --filter attacks compare run-oplus  O+ (CapWalletOPlus: same caps, the seller as its only payee):
+//                                         the injected transfer and the same burst. Writes
+//                                         results/fuji-Oplus-<time>.json (not merged into compare-result.json).
 // Needs: bash scripts/forge.sh build; the SSH tunnel to the Fuji node (127.0.0.1:19650); keys in Sealed-Arena/.env.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -173,7 +176,150 @@ async function setup() {
     ).contractAddress as string;
     save();
   }
+  // O+ for the burst (V12): CapWalletOPlus with the burst's caps (0.5 / 1) and the seller as its
+  // only payee. `run-oplus` funds it before each run.
+  if (!state.burstOPlus) {
+    const plus = JSON.parse(
+      readFileSync(resolve(ROOT, "contracts/out/CapWalletOPlus.sol/CapWalletOPlus.json"), "utf8"),
+    ) as { abi: readonly unknown[]; bytecode: { object: Hex } };
+    const hash = await cWallet().deployContract({
+      abi: plus.abi as never,
+      bytecode: plus.bytecode.object,
+      args: [
+        USDC,
+        oAgent.address,
+        parseUnits(CAPS.perTx, 6),
+        parseUnits(CAPS.daily, 6),
+        [SELLER],
+      ] as never,
+    });
+    state.burstOPlus = (await waitC(hash, "burst O+: deploy CapWalletOPlus (0.5 / 1, seller)"))
+      .contractAddress as string;
+    save();
+  }
   console.log(JSON.stringify(state, null, 2));
+}
+
+/** O+ funding for a burst run: more than the daily cap plus one payment, so the cap refuses first. */
+const OPLUS_FUNDING = parseUnits("1.3", 6);
+
+/**
+ * O+: the injected transfer (an authorization to the attacker) and the same burst as O, on the
+ * burst O+ wallet. What is left after the run goes back to the project wallet.
+ */
+async function runOPlus() {
+  const o = state.burstOPlus as Address | undefined;
+  if (!o) throw new Error("run `compare setup` first (burst O+)");
+  const have = await usdcBalance(o);
+  if (have < OPLUS_FUNDING)
+    await waitC(
+      await cWallet().writeContract({
+        address: USDC,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [o, OPLUS_FUNDING - have],
+      }),
+      `O+: fund to ${formatUnits(OPLUS_FUNDING, 6)} USDC`,
+    );
+  // The injected transfer: the facilitator's checks (isValidSignature, then a simulation of the
+  // settlement) for an authorization of 0.4 to the attacker address.
+  const domain = await usdcDomain();
+  const m = {
+    from: o,
+    to: ATTACKER,
+    value: parseUnits(CAPS.payment, 6),
+    validAfter: 0n,
+    validBefore: BigInt(Math.floor(Date.now() / 1000) + 3600),
+    nonce: generatePrivateKey(),
+  };
+  const sig = await oAgent.signTypedData({
+    domain,
+    primaryType: "TransferWithAuthorization",
+    types: TRANSFER_TYPES,
+    message: m,
+  });
+  const wrapped = encodeAbiParameters(
+    [
+      { type: "address" },
+      { type: "uint256" },
+      { type: "uint256" },
+      { type: "uint256" },
+      { type: "bytes32" },
+      { type: "bytes" },
+    ],
+    [m.to, m.value, m.validAfter, m.validBefore, m.nonce, sig],
+  );
+  const digest = hashTypedData({
+    domain,
+    primaryType: "TransferWithAuthorization",
+    types: TRANSFER_TYPES,
+    message: m,
+  });
+  const valid =
+    (await c.readContract({
+      address: o,
+      abi: oAbi,
+      functionName: "isValidSignature",
+      args: [digest, wrapped] as never,
+    })) === "0x1626ba7e";
+  let simulated = "accepted";
+  try {
+    await c.simulateContract({
+      account: project,
+      address: USDC,
+      abi: SETTLE_ABI,
+      functionName: "transferWithAuthorization",
+      args: [m.from, m.to, m.value, m.validAfter, m.validBefore, m.nonce, wrapped],
+    });
+  } catch (e) {
+    simulated = `refused: ${reason(e)}`;
+  }
+  const injection = {
+    refused: !valid && simulated !== "accepted",
+    isValidSignature: valid,
+    simulated,
+  };
+  console.log(`O+ injected transfer: ${JSON.stringify(injection)}`);
+  const burst = await runO(o);
+  const left = await usdcBalance(o);
+  let returned: string | null = null;
+  if (left > 0n) {
+    const r = await waitC(
+      await cWallet().writeContract({
+        address: o,
+        abi: oAbi,
+        functionName: "withdraw",
+        args: [project.address, left] as never,
+      }),
+      "O+: rest back to the project wallet",
+    );
+    returned = r.transactionHash;
+  }
+  return {
+    ...burst,
+    funding: formatUnits(OPLUS_FUNDING, 6),
+    payees: [SELLER],
+    injection,
+    afterMeasurement: { returned: formatUnits(left, 6), tx: returned },
+  };
+}
+
+async function runOPlusOnly() {
+  const at = new Date().toISOString();
+  console.log("O+ ...");
+  const OPlus = await runOPlus();
+  console.log(JSON.stringify({ ...OPlus, txs: OPlus.txs.length }));
+  const result = {
+    version: 1,
+    at,
+    network: "Fuji C-Chain (O+: CapWalletOPlus)",
+    explorers: { cChain: "https://testnet.snowtrace.io/tx/" },
+    OPlus,
+  };
+  const file = resolve(HERE, `results/fuji-Oplus-${at.replace(/[:.]/g, "-")}.json`);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`);
+  console.log(`results: ${file}`);
 }
 
 /** P: the send_payment the injected page asks for (scripted transcript of T08), from a plain wallet. */
@@ -199,14 +345,9 @@ async function runP() {
   };
 }
 
-/** O: 20 EIP-3009 authorizations signed at once, each checked off-chain, then settled concurrently. */
-async function runO() {
-  const o = state.capWallet as Address;
-  await waitC(
-    await cWallet().writeContract({ address: o, abi: oAbi, functionName: "startDay" }),
-    "O: startDay",
-  );
-  const domain = {
+/** EIP-712 domain of Circle USDC on Fuji (its name read from the token). */
+async function usdcDomain() {
+  return {
     name: (await c.readContract({
       address: USDC,
       abi: [
@@ -224,6 +365,36 @@ async function runO() {
     chainId: avalancheFuji.id,
     verifyingContract: USDC,
   };
+}
+
+const SETTLE_ABI = [
+  {
+    name: "transferWithAuthorization",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "value", type: "uint256" },
+      { name: "validAfter", type: "uint256" },
+      { name: "validBefore", type: "uint256" },
+      { name: "nonce", type: "bytes32" },
+      { name: "signature", type: "bytes" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+/**
+ * O: 20 EIP-3009 authorizations signed at once, each checked off-chain, then settled concurrently.
+ * `o` is CapWalletO, or the burst O+ (CapWalletOPlus: same caps and functions, plus a payee list).
+ */
+async function runO(o: Address = state.capWallet as Address) {
+  await waitC(
+    await cWallet().writeContract({ address: o, abi: oAbi, functionName: "startDay" }),
+    "O: startDay",
+  );
+  const domain = await usdcDomain();
   const value = parseUnits(CAPS.payment, 6);
   const now = BigInt(Math.floor(Date.now() / 1000));
   const auths = await Promise.all(
@@ -275,30 +446,13 @@ async function runO() {
     ),
   );
   const before = await usdcBalance(o);
-  const settleAbi = [
-    {
-      name: "transferWithAuthorization",
-      type: "function",
-      stateMutability: "nonpayable",
-      inputs: [
-        { name: "from", type: "address" },
-        { name: "to", type: "address" },
-        { name: "value", type: "uint256" },
-        { name: "validAfter", type: "uint256" },
-        { name: "validBefore", type: "uint256" },
-        { name: "nonce", type: "bytes32" },
-        { name: "signature", type: "bytes" },
-      ],
-      outputs: [],
-    },
-  ] as const;
   // Guard against a wrong EIP-712 domain: the real USDC must accept the first one in a simulation.
   const first = auths[0];
   if (!first) throw new Error("no authorizations");
   await c.simulateContract({
     account: project,
     address: USDC,
-    abi: settleAbi,
+    abi: SETTLE_ABI,
     functionName: "transferWithAuthorization",
     args: [
       first.m.from,
@@ -317,7 +471,7 @@ async function runO() {
     auths.map((a, i) =>
       cWallet().writeContract({
         address: USDC,
-        abi: settleAbi,
+        abi: SETTLE_ABI,
         functionName: "transferWithAuthorization",
         args: [a.m.from, a.m.to, a.m.value, a.m.validAfter, a.m.validBefore, a.m.nonce, a.wrapped],
         nonce: startNonce + i,
@@ -599,7 +753,12 @@ async function runSOnly() {
   console.log(`results: ${out}`);
 }
 
-const fns: Record<string, () => Promise<void>> = { setup, run, "run-s": runSOnly };
+const fns: Record<string, () => Promise<void>> = {
+  setup,
+  run,
+  "run-s": runSOnly,
+  "run-oplus": runOPlusOnly,
+};
 const fn = cmd ? fns[cmd] : undefined;
 if (!fn) {
   console.error(`usage: compare <${Object.keys(fns).join("|")}>`);
