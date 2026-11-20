@@ -45,6 +45,16 @@ import {
   sendAndWait,
 } from "./localnet.js";
 import { describe, inPool, type Sent, sendRaw, sign, waitFor } from "./probe.js";
+import {
+  boundaryRoundOk,
+  boundaryVerdict,
+  freezeRaceVerdict,
+  highFeeCapVerdict,
+  payeeGetsCodeVerdict,
+  refusedWith,
+  type Verdict,
+  verdictOf,
+} from "./verdicts.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const n = nodes()[0] as Node;
@@ -56,7 +66,6 @@ const PER_TX = coin(1);
 const DAILY = coin(3);
 const DAILY_FEE = DAILY / 20n;
 
-type Verdict = "PASS" | "FAIL" | "NOT RUN";
 type CaseResult = {
   id: string;
   title: string;
@@ -74,7 +83,7 @@ function record(
   ok: boolean | "not run",
   steps: string[],
 ) {
-  const verdict: Verdict = ok === "not run" ? "NOT RUN" : ok ? "PASS" : "FAIL";
+  const verdict: Verdict = verdictOf(ok);
   results.push({ id, title, verdict, expected, steps });
   console.log(`${verdict} ${id} ${title}`);
   for (const s of steps) console.log(`     ${s}`);
@@ -85,7 +94,6 @@ const fees = async () => {
   return { maxFeePerGas: f.maxFeePerGas };
 };
 const baseFee = async () => (await n.client.getBlock()).baseFeePerGas ?? 0n;
-const refusedWith = (s: Sent, text: string) => s.status === "refused" && s.reason.includes(text);
 
 async function agent(payees: Address[] = [PAYEE]) {
   const a = await freshAgent(n, payees, { funding: FUNDING, perTxCap: PER_TX, dailyCap: DAILY });
@@ -185,11 +193,15 @@ async function feeCases() {
       `fee paid ${formatEther(paidFee)} (effective gas price ${r.effectiveGasPrice} wei = base fee ${block.baseFeePerGas} + tip ${effTip}); maximum fee allowed by the fee cap ${formatEther(21_000n * maxFee)}`,
       `balance drop ${formatEther(drop)} = value ${formatEther(value)} + fee paid; counted toward dailyCap ${formatEther(spentAfter - spentBefore)} (value + gas limit x fee cap)`,
     );
-    pass =
-      r.status === "success" &&
-      effTip <= GWEI &&
-      drop === value + paidFee &&
-      spentAfter - spentBefore === value + 21_000n * maxFee;
+    pass = highFeeCapVerdict({
+      success: r.status === "success",
+      effectiveTip: effTip,
+      balanceDrop: drop,
+      paidFee,
+      value,
+      counted: spentAfter - spentBefore,
+      maxFeePerGas: maxFee,
+    });
   }
   record(
     "b5",
@@ -204,6 +216,7 @@ async function feeCases() {
 
 async function freezeRace(trials = 5) {
   const steps: string[] = [];
+  const trialResults: { beforeFreeze: boolean; payment: Sent }[] = [];
   let raced = 0;
   let included = 0;
   let stillPooled = 0;
@@ -247,6 +260,7 @@ async function freezeRace(trials = 5) {
     const pay = await waitFor(n, payHash, 4_000);
     const payBlock = pay.status === "included" ? pay.block : undefined;
     const beforeFreeze = payBlock !== undefined && payBlock < fr.blockNumber;
+    trialResults.push({ beforeFreeze, payment: pay });
     if (!beforeFreeze) raced++;
     if (!beforeFreeze && pay.status === "included") included++;
     if (pay.status === "not included" && pay.inPool) stillPooled++;
@@ -261,7 +275,7 @@ async function freezeRace(trials = 5) {
     "c",
     "payment in the pool when the owner freezes",
     "not included once the freeze is in a block, and not kept in the pool",
-    raced > 0 && included === 0 && stillPooled === 0,
+    freezeRaceVerdict(trialResults),
     steps,
   );
 }
@@ -296,10 +310,7 @@ async function payeeGetsCode() {
     "d",
     "listed payee that gets code after it was listed",
     "first payment included; after the deploy refused: agent: payee has code",
-    first.status === "included" &&
-      !!code &&
-      code !== "0x" &&
-      refusedWith(second, "agent: payee has code"),
+    payeeGetsCodeVerdict(first, code, second),
     steps,
   );
 }
@@ -393,9 +404,7 @@ async function utcBoundary(enabled: boolean) {
     steps.push(
       `${label}: ${out.map(describe).join(" | ")}; block days ${days.map((d) => d ?? "-").join(",")}; spentToday ${formatEther(spent)} on day ${day}`,
     );
-    const ok =
-      out.slice(0, 3).every((s) => s.status === "included") &&
-      refusedWith(out[3] as Sent, "agent: budget exceeded");
+    const ok = boundaryRoundOk(out);
     return { ok, day: days[0], sameDay: new Set(days.slice(0, 3).map(String)).size === 1 };
   };
   const before = await round("before 00:00 UTC");
@@ -405,13 +414,7 @@ async function utcBoundary(enabled: boolean) {
     await nextBlock();
   }
   const after = await round("after 00:00 UTC");
-  record(
-    "a",
-    title,
-    expected,
-    before.ok && before.sameDay && after.ok && after.sameDay && after.day !== before.day,
-    steps,
-  );
+  record("a", title, expected, boundaryVerdict(before, after), steps);
 }
 
 // ---- invariant ------------------------------------------------------------------------------------------
