@@ -71,7 +71,8 @@
     "oFunded": "3",
     "sink": "0x851b1924b0af889d7e4956ce5c9fa33ffda70ece",
     "suiteO": "0xbb1fe13f1d5c93adfc1e1275f691afa3380f9e81",
-    "suiteOPlus": "0x7bf677ac0301bf65a2a4a30e59ea59b6387d7489"
+    "suiteOPlus": "0x7bf677ac0301bf65a2a4a30e59ea59b6387d7489",
+    "burstOPlus": "0xb81193bc6511343b8f655e7eee4a8c1a36996740"
   },
   "demoManager": {
     "address": "0x225e93A231eD527B6C898197d10B8922A0f46668",

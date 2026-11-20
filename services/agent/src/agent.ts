@@ -21,6 +21,8 @@ export type Transcript = {
   /** The model's text replies, in order. */
   notes: string[];
   finished: boolean;
+  /** Tokens the model used in this run, when the provider reports them. */
+  usage?: { inputTokens: number; outputTokens: number };
 };
 
 /**
@@ -73,6 +75,7 @@ export async function runAgent(o: {
     }
     turns.push({ role: "tool", results });
   }
+  if (o.model.usage) t.usage = { ...o.model.usage };
   return t;
 }
 

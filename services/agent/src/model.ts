@@ -20,14 +20,20 @@ export type Turn =
 
 export type ModelReply = { text: string; toolCalls: ToolCall[] };
 
+/** Tokens a model used so far, as the provider reported them. */
+export type Usage = { inputTokens: number; outputTokens: number };
+
 export interface Model {
   readonly name: string;
+  /** Tokens used so far by this model object (providers that report it). */
+  readonly usage?: Usage;
   next(system: string, turns: Turn[], tools: ToolSpec[]): Promise<ModelReply>;
 }
 
 /** Anthropic Messages API over fetch (no SDK). */
 export class AnthropicModel implements Model {
   readonly name: string;
+  readonly usage: Usage = { inputTokens: 0, outputTokens: 0 };
 
   constructor(
     private readonly o: {
@@ -94,7 +100,10 @@ export class AnthropicModel implements Model {
         input?: Record<string, unknown>;
       }>;
       error?: { type: string; message: string };
+      usage?: { input_tokens?: number; output_tokens?: number };
     };
+    this.usage.inputTokens += body.usage?.input_tokens ?? 0;
+    this.usage.outputTokens += body.usage?.output_tokens ?? 0;
     if (!res.ok || !body.content) {
       throw new Error(
         `model API ${res.status}: ${body.error?.type ?? ""} ${body.error?.message ?? ""}`,

@@ -249,6 +249,10 @@ async function main() {
         mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, `${JSON.stringify(r.transcript, null, 2)}\n`);
         console.log(`  transcript: ${file}`);
+        if (r.transcript.usage)
+          console.log(
+            `  tokens: input ${r.transcript.usage.inputTokens}, output ${r.transcript.usage.outputTokens}`,
+          );
         if (r.transcript.notes.length > 0)
           console.log(`  agent said: ${r.transcript.notes.at(-1)?.slice(0, 300)}`);
         failed = report(r.checks, scenario) || failed;

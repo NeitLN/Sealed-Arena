@@ -38,6 +38,11 @@ pnpm --filter agent scenario injection --runs 5   # prints how often the agent f
 # replay: no LLM, no key; re-runs the recorded tool calls with a fresh agent and checks
 # the on-chain outcome is the same as in the recording
 pnpm --filter agent scenario --replay transcripts/<file>.json
+
+# the poisoned-memory scenario with the wallet on the Fuji C-Chain (test USDC, keys in .env):
+# P is a plain wallet, O+ the suite's limit wallet with a payee list (docs/MEASUREMENTS.md)
+pnpm --filter agent scenario-fuji P --runs 5    # live model
+pnpm --filter agent scenario-fuji O+ --replay-s # no model: replays the newest live class 7 run on S
 ```
 
 Each live run writes its transcript (task, system prompt, every tool call with input and output, the model's replies) to `transcripts/`. Transcripts contain no keys: the agent key is generated per run and never written.
