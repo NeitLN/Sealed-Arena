@@ -99,6 +99,9 @@ describe("a: the 00:00 UTC boundary", () => {
   const round = [included(), included(), included(), budget];
   it("a round is three included then a budget refusal", () => {
     expect(boundaryRoundOk(round)).toBe(true);
+    // A round is exactly four payments: a fifth one (included or not) is not this case.
+    expect(boundaryRoundOk([...round, budget])).toBe(false);
+    expect(boundaryRoundOk(round.slice(0, 3))).toBe(false);
     expect(boundaryRoundOk([included(), included(), included(), included()])).toBe(false);
     expect(boundaryRoundOk([included(), dropped(), included(), budget])).toBe(false);
     expect(boundaryRoundOk([included(), included(), included(), refused("agent: frozen")])).toBe(
