@@ -1,8 +1,8 @@
-import { formatUsdc } from "@sealed-arena/shared";
 import { useEffect, useRef, useState } from "react";
 import { ArenaQr } from "./ArenaQr.js";
 import { ARENA } from "./arena.config.js";
 import { designText } from "./designText.js";
+import { usdcApprox } from "./format.js";
 import { useI18n } from "./i18n.js";
 import { useLiveMonitor } from "./liveMonitor.js";
 import { SiteShell } from "./SiteShell.js";
@@ -61,7 +61,7 @@ export default function LivePage() {
             <dl>
               <div>
                 <dt>{t.balance}</dt>
-                <dd>{chain.data ? `${formatUsdc(chain.data.agent.balance)} USDC` : "—"}</dd>
+                <dd>{chain.data ? `${usdcApprox(chain.data.agent.balance)} USDC` : "—"}</dd>
               </div>
               <div>
                 <dt>{t.latestBlock}</dt>

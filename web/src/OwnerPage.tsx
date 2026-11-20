@@ -28,9 +28,12 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useStat
 import { type Address, getAddress, type Hex, isAddress, isHex, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { useAgentView } from "./agentView.js";
+import { ARENA } from "./arena.config.js";
 import { BrandMark } from "./BrandMark.js";
+import { classifyRelay, explain, formErrorVisible } from "./consoleUi.js";
 import { DemoAgents } from "./DemoAgents.js";
 import { designText } from "./designText.js";
+import { plural, shortAddress, usdcApprox } from "./format.js";
 import { useI18n } from "./i18n.js";
 import {
   chainClient,
@@ -64,20 +67,15 @@ const mono: CSSProperties = {
   wordBreak: "break-all",
 };
 
-/** USDC for display: at most 6 decimals, "≈" when digits were dropped. */
-function usdc(wei: bigint): string {
-  const step = 10n ** 12n;
-  const kept = wei - (wei % step);
-  return `${kept === wei ? "" : "≈"}${formatUsdc(kept)}`;
-}
+const usdc = usdcApprox;
 
 const short = (h: string) => `${h.slice(0, 10)}…${h.slice(-8)}`;
 
-/** The next 00:00 UTC, shown in the viewer's local time. */
-function nextReset(): string {
+/** The next 00:00 UTC, shown in the viewer's local time and the page language. */
+function nextReset(lang: string): string {
   const d = new Date();
   d.setUTCHours(24, 0, 0, 0);
-  return d.toLocaleString();
+  return d.toLocaleString(lang);
 }
 
 /**
@@ -85,7 +83,12 @@ function nextReset(): string {
  * `cancelled`: the owner closed the passkey prompt. `error`: the action did not get through.
  */
 type Outcome =
-  | { kind: "ok" | "refused" | "cancelled" | "error"; text: string; tx?: Hex | undefined }
+  | {
+      kind: "ok" | "refused" | "cancelled" | "error";
+      text: string;
+      detail?: string | undefined;
+      tx?: Hex | undefined;
+    }
   | undefined;
 
 /** The browser's WebAuthn errors when the prompt is closed or times out. */
@@ -127,6 +130,14 @@ export default function OwnerPage() {
   const [dailyFee, setDailyFee] = useState("");
   const [days, setDays] = useState(DEFAULTS.days);
   const [unchecked, setUnchecked] = useState<string[]>([]);
+  // The form's first problem shows once the owner has changed a field.
+  const [touched, setTouched] = useState(false);
+  const touch =
+    <A extends unknown[]>(set: (...a: A) => void) =>
+    (...a: A) => {
+      setTouched(true);
+      set(...a);
+    };
   const outcomeRef = useRef<HTMLDivElement>(null);
   const [warnings, setWarnings] = useState<PayeeWarning[]>();
   const [busy, setBusy] = useState<string>();
@@ -176,14 +187,17 @@ export default function OwnerPage() {
     }
   }, [agent, view]);
 
+  // The banner sits below the sticky header (scroll-margin-top in routes.css); focus moves to it
+  // so keyboard and screen-reader users land on the result.
   useEffect(() => {
-    if (outcome)
-      outcomeRef.current?.scrollIntoView({
-        block: "nearest",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "instant"
-          : "smooth",
-      });
+    if (!outcome) return;
+    outcomeRef.current?.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+    outcomeRef.current?.focus({ preventScroll: true });
   }, [outcome]);
 
   const remember = (s: typeof saved) => {
@@ -203,12 +217,24 @@ export default function OwnerPage() {
     setOutcome(undefined);
     try {
       const r: RelayResult = await relay(await build());
-      if (r.ok) setOutcome({ kind: "ok", text: t("done"), tx: r.transaction });
-      else if (r.reason) setOutcome({ kind: "refused", text: r.reason, tx: r.transaction });
-      else setOutcome({ kind: "error", text: relayerErrorText(t, r, "failed"), tx: r.transaction });
+      const c = classifyRelay(r);
+      if (c.kind === "ok") setOutcome({ kind: "ok", text: t("done"), tx: c.tx });
+      else if (c.kind === "refused") setOutcome({ kind: "refused", text: c.reason, tx: c.tx });
+      else
+        setOutcome({
+          kind: "error",
+          // Rate limits carry retryAfter: say how long to wait.
+          text:
+            !r.ok && r.error?.endsWith("rate_limited")
+              ? relayerErrorText(t, r, "failed")
+              : explain(t, c.code),
+          detail: c.detail,
+          tx: c.tx,
+        });
     } catch (e) {
       if (isCancel(e)) setOutcome({ kind: "cancelled", text: t("passkey_cancelled") });
-      else setOutcome({ kind: "error", text: t(e instanceof Error ? e.message : String(e)) });
+      else
+        setOutcome({ kind: "error", text: explain(t, e instanceof Error ? e.message : String(e)) });
     } finally {
       // The next action signs the nonce on chain: read it before the buttons come back.
       await refresh();
@@ -235,7 +261,10 @@ export default function OwnerPage() {
         setOutcome(
           isCancel(e)
             ? { kind: "cancelled", text: t("passkey_cancelled") }
-            : { kind: "error", text: t(e instanceof Error ? e.message : "passkey_unsupported") },
+            : {
+                kind: "error",
+                text: explain(t, e instanceof Error ? e.message : "passkey_unsupported"),
+              },
         );
       }
     })();
@@ -378,7 +407,7 @@ export default function OwnerPage() {
         <>
           <p>{freeze ? t("freeze") : t("unfreeze")}</p>
           <code>{agent}</code>
-          <p>{t("freezeHelp")}</p>
+          <p>{freeze ? t("freezeHelp") : t("unfreezeHelp")}</p>
         </>
       ),
       confirm: () => {
@@ -425,7 +454,10 @@ export default function OwnerPage() {
         {refusals.rows.length > 0 ? (
           <Banner
             status="warning"
-            title={t("refusedSince").replace("{n}", refusalCount(refusals.rows.length))}
+            title={t(plural(refusals.rows.length, "refusedSinceOne", "refusedSince")).replace(
+              "{n}",
+              refusalCount(refusals.rows.length),
+            )}
             description={
               <VStack gap={2}>
                 {countReasons(refusals.rows).map(([reason, n]) => (
@@ -471,10 +503,10 @@ export default function OwnerPage() {
                 <Row label={t("balance")} value={`${usdc(view.balance)} USDC`} />
                 <Row
                   label={t("expires")}
-                  value={new Date(Number(view.mandate.expiry) * 1000).toLocaleString()}
+                  value={new Date(Number(view.mandate.expiry) * 1000).toLocaleString(lang)}
                 />
                 {lossPreview(view.mandate)}
-                <Row label={t("resetsAt")} value={nextReset()} />
+                <Row label={t("resetsAt")} value={nextReset(lang)} />
                 <Text type="supporting" color="secondary">
                   {t("resetsNote")}
                 </Text>
@@ -505,7 +537,7 @@ export default function OwnerPage() {
                   onClick={onToggleFreeze}
                 />
                 <Text type="supporting" color="secondary">
-                  {t("freezeHelp")}
+                  {view.frozen ? t("unfreezeHelp") : t("freezeHelp")}
                 </Text>
               </VStack>
             ) : null}
@@ -569,7 +601,7 @@ export default function OwnerPage() {
           </div>
         </dialog>
         {boot ? <Banner status="warning" title={t(boot)} /> : null}
-        <div ref={outcomeRef} aria-live="polite">
+        <div ref={outcomeRef} className="console-outcome" tabIndex={-1} aria-live="polite">
           {outcome ? (
             <Banner
               status={
@@ -588,7 +620,13 @@ export default function OwnerPage() {
                     ? `${t("failed")}: ${outcome.text}`
                     : outcome.text
               }
-              description={outcome.tx ? `${t("tx")} ${outcome.tx}` : undefined}
+              description={
+                outcome.detail || outcome.tx
+                  ? [outcome.detail, outcome.tx ? `${t("tx")} ${outcome.tx}` : ""]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : undefined
+              }
               isDismissable
               onDismiss={() => setOutcome(undefined)}
             />
@@ -741,29 +779,50 @@ export default function OwnerPage() {
                       description={t("payeesHelp")}
                       value={payeesText}
                       onChange={(v: string) => {
+                        setTouched(true);
                         setPayeesText(v);
                         setWarnings(undefined);
                       }}
                       placeholder={"0x…\n0x…"}
                     />
+                    <HStack gap={2} vAlign="center" wrap="wrap">
+                      <Button
+                        label={t("useDemoSeller")}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setTouched(true);
+                          setWarnings(undefined);
+                          setPayeesText((text) =>
+                            text.toLowerCase().includes(ARENA.demoSeller.toLowerCase())
+                              ? text
+                              : [text.trim(), ARENA.demoSeller].filter(Boolean).join("\n"),
+                          );
+                        }}
+                      />
+                      <Text type="supporting" color="secondary">
+                        {t("demoSellerNote").replace("{address}", shortAddress(ARENA.demoSeller))}
+                      </Text>
+                    </HStack>
                     <Grid columns={isMobile ? 1 : view?.version === 2 ? 4 : 3} gap={3}>
                       <TextInput
                         label={t("perTxCapFee")}
                         value={perTx}
-                        onChange={setPerTx}
+                        onChange={touch(setPerTx)}
                         inputMode="decimal"
                       />
                       <TextInput
                         label={t("dailyCap")}
                         value={daily}
-                        onChange={setDaily}
+                        onChange={touch(setDaily)}
                         inputMode="decimal"
                       />
                       {view?.version === 2 ? (
                         <TextInput
-                          label={t("dailyFeeCap")}
+                          label={t("dailyFeeCapOptional")}
+                          description={t("dailyFeeCapHelp")}
                           value={dailyFee}
-                          onChange={setDailyFee}
+                          onChange={touch(setDailyFee)}
                           placeholder={
                             typeof draft !== "string"
                               ? formatUsdc(defaultDailyFeeCap(draft.dailyCap))
@@ -775,13 +834,10 @@ export default function OwnerPage() {
                       <TextInput
                         label={t("validDays")}
                         value={days}
-                        onChange={setDays}
+                        onChange={touch(setDays)}
                         inputMode="numeric"
                       />
                     </Grid>
-                    {draftError && payeesText ? (
-                      <Banner status="error" title={t(draftError)} />
-                    ) : null}
                     {typeof draft !== "string" && draft.perTxCap > draft.dailyCap ? (
                       <Banner status="warning" title={t("capWarning")} />
                     ) : null}
@@ -799,13 +855,12 @@ export default function OwnerPage() {
                         title={`${w.address} ${t(w.reason)}`}
                       />
                     ))}
-                    <section className="sign-preview" aria-label={d.signPreview}>
-                      <p className="micro-label">{d.signPreview}</p>
-                      {typeof draft !== "string" &&
-                        agent &&
-                        view &&
-                        mandatePreview(draft, agent, view.version)}
-                    </section>
+                    {typeof draft !== "string" && agent && view ? (
+                      <section className="sign-preview" aria-label={d.signPreview}>
+                        <p className="micro-label">{d.signPreview}</p>
+                        {mandatePreview(draft, agent, view.version)}
+                      </section>
+                    ) : null}
                     <HStack gap={2}>
                       <Button
                         label={
@@ -817,6 +872,9 @@ export default function OwnerPage() {
                         onClick={onSetMandate}
                       />
                     </HStack>
+                    {draftError && formErrorVisible(draftError, { touched, payeesText }) ? (
+                      <Banner status="error" title={t(draftError)} />
+                    ) : null}
                   </VStack>
                 ) : (
                   <section className="pending-step">

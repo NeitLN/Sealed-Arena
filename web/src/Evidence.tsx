@@ -28,7 +28,7 @@ export function EvidenceMatrix({ lang, detailed = false }: { lang: Lang; detaile
           >
             <div className="wallet-heading">
               <span className="wallet-code">{r.group}</span>
-              <h3>{t.wallets[i]}</h3>
+              <h2>{t.wallets[i]}</h2>
             </div>
             <p className="matrix-number">
               {r.t0}
@@ -110,7 +110,9 @@ export function AgentEvidence({ lang }: { lang: Lang }) {
         </div>
         <p>{t.memoryNote}</p>
         <p className="caption">
-          {t.pages}: {evidence.pages}.
+          {t.pages
+            .replace("{followed}", evidence.pages.split("/")[0] ?? "")
+            .replace("{runs}", evidence.pages.split("/")[1] ?? "")}
         </p>
       </article>
     </div>

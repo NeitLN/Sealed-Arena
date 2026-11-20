@@ -387,6 +387,7 @@
 }
 .hero-transaction {
   padding-block: 0 40px;
+  scroll-margin-top: 96px;
 }
 .hero-transaction .astryx-card {
   padding: 24px;
@@ -491,7 +492,7 @@
   border-radius: 6px;
   font: 12px var(--mono);
 }
-.wallet-heading h3 {
+.wallet-heading h2 {
   font-size: 15px;
   font-weight: 600;
   line-height: 1.5;

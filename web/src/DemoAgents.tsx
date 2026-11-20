@@ -139,7 +139,7 @@ export function DemoAgents(o: {
             <Text type="body" color="secondary">
               {t("demoTryHint")}
             </Text>
-            {!o.payee && <p className="caption">{d.pendingMandate}</p>}
+            {!o.payee && <p className="caption">{d.pendingPayee}</p>}
             <HStack gap={3} wrap="wrap">
               <Button
                 label={t("demoTry")}
