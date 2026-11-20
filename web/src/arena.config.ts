@@ -12,6 +12,8 @@ export const ARENA = {
   agent: "0x30b01562945BB3cE72241b0EaaEB3F41660982F6" as Address,
   agentPrivateKey: "0x440d3721e44d7bbac6c584089dc7abe2f87eb1188dc0bbdb98aae2a613da6833" as Hex,
   recorder: "0x60d046fa32a101229f78d69b655a91193cdf4f77" as Address,
+  /** The demo data seller run by the team (the challenge agent's allowed payee). */
+  demoSeller: "0x67d4a4664ff232e84FA89135EeFEb42DF3660819" as Address,
   chainIdHex: "0x3fc06",
   chainName: "Sealed (Fuji testnet)",
   validators: ["NodeID-6TgSfU7azciZHPtkWZ6qnc8wsqMHyTTGL"],

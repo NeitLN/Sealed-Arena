@@ -1,41 +1,4 @@
 /* Shared route surfaces extend the spending-card system from the landing. */
-@media (prefers-color-scheme: dark) {
-  :root:has(.page-business, .page-owner, .page-live) {
-    color-scheme: dark;
-    --paper: #111b2b;
-    --surface: #19263a;
-    --ink: #e4ecfa;
-    --muted: #a7b7cf;
-    --line: #33445e;
-    --line-strong: #687e9f;
-    --surface-sunk: #111b2b;
-    --seal: #a0baff;
-    --seal-soft: #233655;
-    --success: #8bd6b7;
-    --caution: #edcb88;
-    --signal: #ffaaaa;
-    --on-ink-muted: #ced9eb;
-  }
-  .page-business .business-model h2 {
-    color: var(--ink);
-  }
-  .page-business .business-model {
-    background: var(--surface);
-    color: var(--ink);
-    border: 1px solid var(--line);
-  }
-  :is(.page-business, .page-owner, .page-live) .status-caution {
-    background: var(--seal-soft);
-  }
-  :is(.page-business, .page-owner, .page-live) .status-neutral {
-    background: var(--surface-sunk);
-  }
-  body:has(.page-owner) [data-astryx-theme="neutral"] {
-    --color-background-muted: var(--surface-sunk);
-    --color-warning-muted: var(--surface-sunk);
-    --color-success-muted: var(--surface-sunk);
-  }
-}
 .owner-stepper {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -782,4 +745,10 @@
     flex-direction: column;
     align-items: start;
   }
+}
+.console-outcome {
+  scroll-margin-top: 96px;
+}
+.console-outcome:focus {
+  outline: none;
 }

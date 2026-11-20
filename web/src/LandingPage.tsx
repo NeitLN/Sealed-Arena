@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ARENA, GATEWAY_URL } from "./arena.config.js";
 import { BrandMark } from "./BrandMark.js";
 import r from "./compare-result.json";
@@ -18,6 +18,13 @@ export default function LandingPage() {
   const t = landingText(lang);
   const d = designText(lang);
   const [trying, setTrying] = useState(false);
+  const panel = useRef<HTMLElement>(null);
+  // The panel opens below the hero: bring it into view so the click visibly does something.
+  useEffect(() => {
+    if (!trying) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    panel.current?.scrollIntoView({ behavior: reduce ? "instant" : "smooth", block: "start" });
+  }, [trying]);
   const [counts, setCounts] = useState<LiveCounts>();
   const [failed, setFailed] = useState(false);
   useEffect(
@@ -135,7 +142,7 @@ export default function LandingPage() {
         <p className="hero-risk">{d.risk}</p>
       </section>
       {trying && (
-        <section id="hero-transaction" className="landing-container hero-transaction">
+        <section ref={panel} id="hero-transaction" className="landing-container hero-transaction">
           <Suspense fallback={<p role="status">{t.loading}</p>}>
             <HeroChallenge lang={lang} />
           </Suspense>

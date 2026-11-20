@@ -18,11 +18,12 @@ import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Heading, Text } from "@astryxdesign/core/Text";
 import { Timestamp } from "@astryxdesign/core/Timestamp";
 import { Token } from "@astryxdesign/core/Token";
-import { formatUsdc } from "@sealed-arena/shared";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
+import { explain } from "./consoleUi.js";
 import { designText } from "./designText.js";
+import { shortAddress, usdcApprox } from "./format.js";
 import { useI18n } from "./i18n.js";
 import { PublishedKey } from "./PublishedKey.js";
 import { StatusPill } from "./StatusPill.js";
@@ -36,12 +37,8 @@ import { RPC, useArenaLive } from "./useArenaLive.js";
 
 const colBasis: CSSProperties = { flexBasis: 0 };
 
-const short = (a: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "-");
-/** USDC with the 18-decimal native coin cut to 6 decimals ("≈" when that drops digits). */
-const usdc = (wei: bigint) => {
-  const kept = wei - (wei % 10n ** 12n);
-  return `${kept === wei ? "" : "≈"}${formatUsdc(kept)}`;
-};
+const short = (a: string) => (a ? shortAddress(a) : "-");
+const usdc = usdcApprox;
 const asNumber = (wei: bigint) => Number(wei / 10n ** 12n) / 1e6;
 
 function Tile(o: { label: ReactNode; children: ReactNode }) {
@@ -65,7 +62,8 @@ const big = (v: number | undefined) =>
 
 export default function ArenaPage() {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { lang, setLang } = useI18n();
+  const isNarrow = useMediaQuery("(max-width: 599px)");
+  const { lang, setLang, t: tr } = useI18n();
   const t = arenaText(lang);
   const d = designText(lang);
   const live = useArenaLive(15);
@@ -116,7 +114,7 @@ export default function ArenaPage() {
           ? { ok: true, text: `${t.done}: ${body.transaction ?? ""}` }
           : body.reason
             ? { ok: false, text: `${t.failed}: ${body.reason}` }
-            : { ok: false, text: `${body.error ?? res.status}` },
+            : { ok: false, text: explain(tr, body.error ?? "errorGeneric") },
       );
     } catch {
       // No answer is not a refusal.
@@ -219,7 +217,7 @@ await client.sendTransaction({
               hasValueLabel
               formatValueLabel={(v, m) => `${v} / ${m} USDC`}
             />
-            <MetadataList>
+            <MetadataList label={{ position: isNarrow ? "top" : "start" }}>
               <MetadataListItem
                 label={t.perTx}
               >{`${usdc(view.mandate.perTxCap)} USDC`}</MetadataListItem>
@@ -232,7 +230,7 @@ await client.sendTransaction({
               <MetadataListItem label={t.payees}>
                 <VStack gap={1}>
                   {view.mandate.payees.map((p) => (
-                    <Code key={p}>{p}</Code>
+                    <CopyAddress key={p} address={p} copy={t.copy} copied={t.copied} />
                   ))}
                 </VStack>
               </MetadataListItem>
@@ -449,5 +447,29 @@ await client.sendTransaction({
         </Stack>
       </VStack>
     </SiteShell>
+  );
+}
+
+/** A payee shown as 0x1234…abcd with a button that copies the full address. */
+function CopyAddress(o: { address: string; copy: string; copied: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <HStack gap={2} vAlign="center" wrap="wrap">
+      <Code>
+        <span title={o.address}>{shortAddress(o.address)}</span>
+      </Code>
+      <Button
+        label={done ? o.copied : o.copy}
+        variant="ghost"
+        size="sm"
+        aria-label={`${done ? o.copied : o.copy} ${o.address}`}
+        onClick={() =>
+          void navigator.clipboard
+            .writeText(o.address)
+            .then(() => setDone(true))
+            .catch(() => setDone(false))
+        }
+      />
+    </HStack>
   );
 }
