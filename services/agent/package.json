@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "scenario": "tsx src/scenario.ts",
+    "scenario-fuji": "tsx src/scenario-fuji.ts",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run"
   },
