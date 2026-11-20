@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 import { decodeFunctionData, encodeFunctionResult, type Hex, parseEther, toHex } from "viem";
 import result from "../src/compare-result.json" with { type: "json" };
 import leakedKey from "../src/leakedKeySummary.json" with { type: "json" };
+import { limitationSources } from "../src/limitationsText.js";
 
 const site = new Hono();
 site.use("/*", serveStatic({ root: "./dist" }));
@@ -126,7 +127,8 @@ try {
   );
   await page.goto(`${base}/arena/rules?lang=en`);
   await page.locator(".limits-ledger").waitFor();
-  assert.equal(await page.locator(".limits-ledger li").count(), 14);
+  // As many as the limitations list (every limit has a source, tested in limitationsText).
+  assert.equal(await page.locator(".limits-ledger li").count(), limitationSources.length);
   await page.goto(`${base}/?lang=en`);
   await page.locator("h1").waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -216,6 +218,13 @@ try {
             abi: agentPolicyAbi,
             data: call.params[0].data,
           });
+          // A rule v1 node does not know ruleVersion(): it answers the way the precompile does.
+          if (functionName === "ruleVersion")
+            return {
+              jsonrpc: "2.0",
+              id: call.id,
+              error: { code: -32000, message: "execution reverted: invalid function selector" },
+            };
           return {
             jsonrpc: "2.0",
             id: call.id,
@@ -233,7 +242,14 @@ try {
   });
   for (const lang of ["en", "vi"]) {
     await fixture.goto(`${base}/console?lang=${lang}`);
-    await fixture.locator(".sign-preview").waitFor();
+    // Populated: the mandate form for the linked agent is shown (the sign preview itself only
+    // appears once the form is valid).
+    await fixture
+      .getByRole("button", {
+        name: lang === "en" ? "Sign and set mandate" : "Ký và đặt uỷ quyền",
+        exact: true,
+      })
+      .waitFor();
     for (const width of [360, 768, 1440]) {
       await fixture.setViewportSize({ width, height: 1000 });
       assert.ok(
@@ -258,7 +274,10 @@ try {
         true,
       );
       await fixture.getByLabel("Per day (USDC)", { exact: true }).fill("0.75");
-      assert.match((await fixture.locator(".sign-preview").textContent()) ?? "", /0.75 USDC/);
+      assert.match(
+        (await fixture.locator("section.sign-preview").textContent()) ?? "",
+        /0.75 USDC/,
+      );
       assert.equal(await fixture.getByText("Linked to this passkey", { exact: true }).count(), 1);
     }
   }
