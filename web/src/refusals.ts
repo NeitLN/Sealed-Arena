@@ -11,8 +11,7 @@ export type Refusal = { ts: number; to: string; reason: string; source?: string 
 export const REFUSAL_LIMIT = 50;
 
 /** The count to show: "50+" once the page is full. */
-export const refusalCount = (n: number) =>
-  n >= REFUSAL_LIMIT ? `${REFUSAL_LIMIT}+` : String(n);
+export const refusalCount = (n: number) => (n >= REFUSAL_LIMIT ? `${REFUSAL_LIMIT}+` : String(n));
 
 const key = (agent: Address) => `sealed.refusals.seen.${agent.toLowerCase()}`;
 

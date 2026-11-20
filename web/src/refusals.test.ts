@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REFUSAL_LIMIT, countReasons, lastSeen, refusalCount } from "./refusals.js";
+import { countReasons, lastSeen, REFUSAL_LIMIT, refusalCount } from "./refusals.js";
 
 const agent = "0x30b01562945BB3cE72241b0EaaEB3F41660982F6";
 
