@@ -35,6 +35,7 @@ import {
   sendAndWait,
 } from "./localnet.js";
 import { describe, reasonOf, type Sent, type Shape, sendRaw, sign, waitFor } from "./probe.js";
+import { mandateChecks } from "./verdicts.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ALL = nodes();
@@ -401,29 +402,40 @@ async function main() {
   const lateRace = attempts.filter((a) =>
     a.variant.includes("INCLUDED AT OR AFTER THE FREEZE"),
   ).length;
+  const verdicts = mandateChecks({
+    funded: FUNDING,
+    daily: DAILY,
+    balance,
+    totalCharged,
+    spentToday,
+    strangerBalances,
+    toPayees,
+    lateIncluded: lateRace,
+    hashes,
+  });
   const checks = {
     invariant: {
-      ok: balance >= FUNDING - totalCharged,
+      ok: verdicts.invariant,
       detail: `balance ${formatEther(balance)} >= funded ${formatEther(FUNDING)} - totalCharged ${formatEther(totalCharged)}`,
     },
     dailyCap: {
-      ok: spentToday <= DAILY,
+      ok: verdicts.dailyCap,
       detail: `spentToday ${formatEther(spentToday)} <= dailyCap ${formatEther(DAILY)}`,
     },
     strangers: {
-      ok: strangerBalances.every((b) => b === 0n),
+      ok: verdicts.strangers,
       detail: `stranger balances ${strangerBalances.map((b) => formatEther(b)).join(", ")}`,
     },
     payees: {
-      ok: toPayees <= DAILY,
+      ok: verdicts.payees,
       detail: `sellers A and B received ${formatEther(toPayees)} in total`,
     },
     freeze: {
-      ok: lateRace === 0,
+      ok: verdicts.freeze,
       detail: `${lateRace} payments included at or after the freeze block`,
     },
     nodesAgree: {
-      ok: hashes.every((h) => h === hashes[0]),
+      ok: verdicts.nodesAgree,
       detail: `block ${common}: ${hashes.map((h) => h.slice(0, 10)).join(", ")}`,
     },
   };
