@@ -102,6 +102,9 @@ describe("page wording", () => {
   });
 
   it("business page labels the model a hypothesis with no customers, and states the limits", () => {
+    expect(businessText("en").who[0]?.[1]).toMatch(/runs or hosts buying agents/);
+    expect(businessText("en").subscriptionFlow).toMatch(/subscription per agent under a mandate/);
+    expect(businessText("en").partnerBody).toMatch(/issue is public/);
     expect(businessText("en").hypothesisBadge).toMatch(/hypothesis.*no customers/i);
     expect(businessText("vi").hypothesisBadge).toMatch(/giả thuyết.*chưa có khách hàng/i);
     expect(businessText("en").useTitle).toMatch(/not tested/);
@@ -200,6 +203,12 @@ describe("page wording", () => {
   });
 
   it("owner console keys exist", () => {
+    expect(designText("en").consoleSteps).toEqual([
+      "Passkey",
+      "Agent",
+      "Link (register)",
+      "Mandate",
+    ]);
     expect(KEYS.length).toBeGreaterThan(10);
     expect(typeof useI18n).toBe("function");
   });

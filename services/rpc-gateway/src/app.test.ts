@@ -1,6 +1,6 @@
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
-import { createGatewayApp, normalizeReason } from "./app.js";
+import { createGatewayApp, normalizeReason, sourceOf } from "./app.js";
 import { MemoryStore } from "./store.js";
 
 const agent = privateKeyToAccount(generatePrivateKey());
@@ -74,6 +74,19 @@ describe("rpc gateway", () => {
     };
     expect(body.error?.code).toBe(-32601);
     expect(n.calls).toEqual([]);
+  });
+
+  it("lets browsers cache the preflight for the source header", async () => {
+    const { app } = setup();
+    const res = await app.request("/", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://example.test",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type, x-sealed-source",
+      },
+    });
+    expect(res.headers.get("access-control-max-age")).toBe("600");
   });
 
   it("limits eth_getLogs to 2048 blocks", async () => {
@@ -372,5 +385,14 @@ describe("GET /state", () => {
       () => 0,
     );
     expect((await app.request("/state")).status).toBe(503);
+  });
+});
+
+describe("source label", () => {
+  it("accepts short lower-case labels and falls back to rpc", () => {
+    expect(sourceOf("web:arena")).toBe("web:arena");
+    expect(sourceOf(undefined)).toBe("rpc");
+    expect(sourceOf("Web Arena")).toBe("rpc");
+    expect(sourceOf("x".repeat(33))).toBe("rpc");
   });
 });

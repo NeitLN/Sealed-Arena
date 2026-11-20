@@ -30,7 +30,7 @@ const en = {
   registeredToYou: "Linked to this passkey",
   registeredToOther: "Linked to another passkey",
   notRegistered: "Not linked yet",
-  mandateSection: "3. Mandate",
+  mandateSection: "4. Mandate",
   payees: "Allowed payees",
   payeesHelp: "One address per line, up to 16.",
   perTxCap: "Per payment (USDC)",
@@ -38,6 +38,8 @@ const en = {
   dailyCap: "Per day (USDC)",
   dailyFeeCap: "Daily fee cap (USDC)",
   feeSpentToday: "Fees today",
+  refusedSince: "{n} payments by this agent were refused by the node since your last visit",
+  markSeen: "Mark as seen",
   feeCapNotSet:
     "This mandate was set before the network's rule v2: it has no daily cap on fees. Set it again to add one.",
   validDays: "Valid (days)",
@@ -93,7 +95,7 @@ const en = {
     "We give you a new agent on the Sealed L1 on Fuji, already linked to your passkey, with 0.05 test USDC. Its key stays in this browser.",
   demoStep1: "Create a passkey (step 1 below).",
   demoStep2: "Get a demo agent: it is linked to your passkey before it may send anything.",
-  demoStep3: "Set a mandate: payees, a cap per payment and per day (step 3).",
+  demoStep3: "Set a mandate: payees, a cap per payment and per day (step 4).",
   demoStep4:
     "Try a payment to a stranger (refused), pay an allowed payee (goes through), then freeze the agent and pay the payee again (refused).",
   demoGet: "Get a demo agent",
@@ -144,7 +146,7 @@ const vi: Record<Key, string> = {
   registeredToYou: "Đã gắn với passkey này",
   registeredToOther: "Đã gắn với một passkey khác",
   notRegistered: "Chưa gắn",
-  mandateSection: "3. Uỷ quyền",
+  mandateSection: "4. Uỷ quyền",
   payees: "Người nhận được phép",
   payeesHelp: "Mỗi dòng một địa chỉ, tối đa 16.",
   perTxCap: "Mỗi lần (USDC)",
@@ -152,6 +154,8 @@ const vi: Record<Key, string> = {
   dailyCap: "Mỗi ngày (USDC)",
   dailyFeeCap: "Hạn mức phí/ngày (USDC)",
   feeSpentToday: "Phí hôm nay",
+  refusedSince: "Node đã từ chối {n} khoản trả của agent này kể từ lần bạn vào trước",
+  markSeen: "Đánh dấu đã xem",
   feeCapNotSet:
     "Uỷ quyền này đặt trước khi mạng chuyển sang luật v2 nên chưa có hạn mức phí mỗi ngày. Hãy đặt lại để thêm.",
   validDays: "Hiệu lực (ngày)",
@@ -206,7 +210,7 @@ const vi: Record<Key, string> = {
   demoStep1: "Tạo passkey (bước 1 bên dưới).",
   demoStep2:
     "Nhận agent demo: agent được gắn với passkey của bạn trước khi được phép gửi bất cứ gì.",
-  demoStep3: "Đặt uỷ quyền: người nhận, hạn mức mỗi lần và mỗi ngày (bước 3).",
+  demoStep3: "Đặt uỷ quyền: người nhận, hạn mức mỗi lần và mỗi ngày (bước 4).",
   demoStep4:
     "Thử trả cho người lạ (bị từ chối), trả cho người nhận được phép (đi qua), rồi dừng agent và trả lại người nhận đó (bị từ chối).",
   demoGet: "Nhận agent demo",

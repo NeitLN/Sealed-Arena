@@ -159,6 +159,7 @@ async function main() {
     await page.getByLabel("Per day (USDC)").fill("0.3");
     await page.getByLabel("Valid (days)").fill("1");
     await page.getByRole("button", { name: "Sign and set mandate" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to passkey" }).click();
     await until(
       page,
       "the mandate",
@@ -170,6 +171,7 @@ async function main() {
     check("live: the agent can pay inside the mandate", (await pay()) === "success");
 
     await page.getByRole("button", { name: "Freeze agent" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to passkey" }).click();
     await until(
       page,
       "frozen",
@@ -183,6 +185,7 @@ async function main() {
     );
     await page.getByRole("button", { name: "Unfreeze agent" }).waitFor({ timeout: 30_000 });
     await page.getByRole("button", { name: "Unfreeze agent" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to passkey" }).click();
     await until(
       page,
       "unfrozen",
@@ -196,6 +199,7 @@ async function main() {
     await other.getByLabel("Agent address").fill(agent.address);
     await other.getByText("Linked to another passkey").waitFor({ timeout: 30_000 });
     await other.getByRole("button", { name: "Freeze agent" }).click();
+    await other.getByRole("dialog").getByRole("button", { name: "Continue to passkey" }).click();
     const refused = other.getByText(/^Refused: /);
     await refused.waitFor({ timeout: 60_000 });
     const reason = (await refused.textContent()) ?? "";

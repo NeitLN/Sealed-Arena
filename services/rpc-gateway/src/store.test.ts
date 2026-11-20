@@ -116,3 +116,46 @@ describe("sqliteStore on a database from an older gateway", () => {
     s.close();
   });
 });
+
+describe("source label and recent() filters", () => {
+  it("stores the source, defaults to rpc, and filters by result and time (both stores)", async () => {
+    for (const s of [new MemoryStore(), await sqliteStore(join(dir, "source.db"))]) {
+      await s.add(a({ ts: 10, result: "accepted", reason: "", source: "web:arena" }));
+      await s.add(a({ ts: 20 }));
+      await s.add(a({ ts: 30, source: "web:console" }));
+      const all = await s.recent(10);
+      expect(all.map((r) => r.source)).toEqual(["web:console", "rpc", "web:arena"]);
+      expect((await s.recent(10, undefined, { result: "rejected" })).map((r) => r.ts)).toEqual([
+        30, 20,
+      ]);
+      expect(
+        (await s.recent(10, undefined, { result: "rejected", since: 25 })).map((r) => r.ts),
+      ).toEqual([30]);
+      // `since` is inclusive: an attempt at exactly that time is listed.
+      expect(
+        (await s.recent(10, undefined, { result: "rejected", since: 20 })).map((r) => r.ts),
+      ).toEqual([30, 20]);
+      expect((await s.recent(10, undefined, { result: "accepted" })).map((r) => r.ts)).toEqual([
+        10,
+      ]);
+      s.close();
+    }
+  });
+
+  it("an older database gets the column; its rows read as rpc", async () => {
+    const path = join(dir, "legacy-source.db");
+    const { DatabaseSync } = await import("node:sqlite");
+    const raw = new DatabaseSync(path);
+    raw.exec(`CREATE TABLE attempts (
+      ts INTEGER NOT NULL, ip_hash TEXT NOT NULL, from_addr TEXT NOT NULL, to_addr TEXT NOT NULL,
+      value TEXT NOT NULL, hash TEXT NOT NULL, result TEXT NOT NULL, reason TEXT NOT NULL)`);
+    raw
+      .prepare("INSERT INTO attempts VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(1, "h", "0xA", "0xB", "1", "", "rejected", "x");
+    raw.close();
+    const s = await sqliteStore(path);
+    await s.add(a({ ts: 2, source: "web:arena" }));
+    expect((await s.recent(10)).map((r) => r.source)).toEqual(["web:arena", "rpc"]);
+    s.close();
+  });
+});

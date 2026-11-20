@@ -12,9 +12,9 @@ import { useRef, useState } from "react";
 import { type Address, formatEther, type Hex, parseEther } from "viem";
 import { ARENA } from "./arena.config.js";
 import type { arenaText } from "./arenaText.js";
-import { StatusPill } from "./Evidence.js";
 import { type SendOutcome, sendAsAgent } from "./forbiddenSend.js";
 import { type AgentView, chainClient } from "./owner.js";
+import { StatusPill } from "./StatusPill.js";
 import { RPC } from "./useArenaLive.js";
 import { type Account, curlFor, lookUp, readAccount, type Verdict, verdict } from "./verify.js";
 
@@ -45,6 +45,8 @@ type Check =
 const RECHECK_MS = 8_000;
 /** Longest wait for the node's answer to a send. */
 const SEND_TIMEOUT_MS = 10_000;
+/** Pause after each send before the buttons work again. */
+const TRY_COOLDOWN_MS = 3_000;
 
 /** "before → after", or the word for unchanged. */
 const change = (a: string | number, b: string | number, same: string) =>
@@ -71,7 +73,7 @@ export function TryPayment(o: {
   onReportBreach: () => void;
 }) {
   const { t, view } = o;
-  const [client] = useState(() => chainClient(RPC, { live: true }));
+  const [client] = useState(() => chainClient(RPC, { live: true, source: "web:arena" }));
   const [busy, setBusy] = useState<Key>();
   const [sent, setSent] = useState<Attempt>();
   const [result, setResult] = useState<SendOutcome>();
@@ -131,9 +133,12 @@ export function TryPayment(o: {
       : undefined,
   };
 
+  // A short pause after each send: the buttons send real transactions from a public key, and
+  // the gateway limits sends per client (people at one event share an IP).
+  const [cooling, setCooling] = useState(false);
   const run = async (key: Key) => {
     const a = attempts[key];
-    if (!a || busy) return;
+    if (!a || busy || cooling) return;
     setBusy(key);
     setSent(a);
     setResult(undefined);
@@ -164,6 +169,8 @@ export function TryPayment(o: {
       setResult({ kind: "error", message: e instanceof Error ? e.message : String(e) });
     } finally {
       setBusy(undefined);
+      setCooling(true);
+      setTimeout(() => setCooling(false), TRY_COOLDOWN_MS);
     }
   };
 
@@ -191,7 +198,7 @@ export function TryPayment(o: {
       label={busy === key ? t.trySending : label}
       variant={variant}
       isLoading={busy === key}
-      isDisabled={busy !== undefined || !attempts[key]}
+      isDisabled={busy !== undefined || cooling || !attempts[key]}
       onClick={() => void run(key)}
     />
   );

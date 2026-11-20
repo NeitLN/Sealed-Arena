@@ -144,6 +144,7 @@ async function main() {
     await page.getByLabel("Per day (USDC)").fill("3");
     await page.getByLabel("Valid (days)").fill("7");
     await page.getByRole("button", { name: "Sign and set mandate" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to passkey" }).click();
     await until(
       page,
       "the mandate",
@@ -165,6 +166,7 @@ async function main() {
 
     // ---- E2 -----------------------------------------------------------------------
     await page.getByRole("button", { name: "Freeze agent" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to passkey" }).click();
     await until(page, "frozen", async () => (await readPolicy.mandate(n, agent.address))[1]);
     const frozen = (await readPolicy.mandate(n, agent.address))[1];
     const whileFrozen = await pay();
@@ -175,6 +177,7 @@ async function main() {
     );
     await page.getByRole("button", { name: "Unfreeze agent" }).waitFor({ timeout: 15_000 });
     await page.getByRole("button", { name: "Unfreeze agent" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Continue to passkey" }).click();
     await until(page, "unfrozen", async () => !(await readPolicy.mandate(n, agent.address))[1]);
     check("E2 unfreeze lets the agent pay again", (await pay()) === "success");
 
@@ -216,6 +219,10 @@ async function main() {
     await other.page.getByLabel("Agent address").fill(agent.address);
     await other.page.getByText("Linked to another passkey").waitFor({ timeout: 15_000 });
     await other.page.getByRole("button", { name: "Freeze agent" }).click();
+    await other.page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Continue to passkey" })
+      .click();
     const refused = other.page.getByText(/^Refused: /);
     await refused.waitFor({ timeout: 30_000 });
     const reason = (await refused.textContent()) ?? "";

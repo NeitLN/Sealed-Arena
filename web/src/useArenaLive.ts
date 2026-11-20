@@ -1,6 +1,7 @@
 import { arenaRecorderAbi } from "@sealed-arena/shared";
 import { useCallback, useEffect, useState } from "react";
 import { ARENA, GATEWAY_URL } from "./arena.config.js";
+import { isStateAnswer, recorderFromState, viewFromState } from "./arenaState.js";
 import { type AgentView, chainClient, readAgent } from "./owner.js";
 import { poll } from "./poll.js";
 
@@ -28,6 +29,7 @@ export function useArenaLive(recentLimit = 15) {
   const [summary, setSummary] = useState<Summary>();
   const [recent, setRecent] = useState<Attempt[]>();
   const [fails, setFails] = useState(0);
+  const [stale, setStale] = useState(false);
 
   const refreshChain = useCallback(async () => {
     try {
@@ -82,17 +84,44 @@ export function useArenaLive(recentLimit = 15) {
     }
   }, [recentLimit]);
 
+  // One GET /state every 5 s: the gateway answers every tab from one cached snapshot. If the
+  // gateway has no /state (404) or it fails, the page falls back to its own reads below.
+  const [useState_, setUseState] = useState(true);
+  const refreshState = useCallback(async () => {
+    try {
+      const r = await fetch(`${GATEWAY_URL}/state`);
+      if (r.status === 404) {
+        setUseState(false);
+        return true;
+      }
+      if (!r.ok) throw new Error(String(r.status));
+      const s: unknown = await r.json();
+      if (!isStateAnswer(s)) throw new Error("bad state");
+      setView(viewFromState(s));
+      setRec(recorderFromState(s));
+      setSummary(s.summary as Summary);
+      setRecent((s.recent as Attempt[]).slice(0, recentLimit));
+      setStale(s.stale === true);
+      setFails(0);
+      return true;
+    } catch {
+      setFails((n) => n + 1);
+      return false;
+    }
+  }, [recentLimit]);
+
   useEffect(() => {
-    // Every open page polls the public gateway, which limits calls per client IP; people at one
-    // event share an IP. So: a chain read (10 calls in one batch) every 15 s, attempts every 5 s,
-    // longer waits after failures, nothing while the tab is hidden.
+    if (useState_) return poll(refreshState, 5_000);
+    // Fallback. Every open page polls the public gateway, which limits calls per client IP; people
+    // at one event share an IP. So: a chain read (10 calls in one batch) every 15 s, attempts every
+    // 5 s, longer waits after failures, nothing while the tab is hidden.
     const a = poll(refreshAttempts, 5_000);
     const b = poll(refreshChain, 15_000);
     return () => {
       a();
       b();
     };
-  }, [refreshChain, refreshAttempts]);
+  }, [useState_, refreshState, refreshChain, refreshAttempts]);
 
-  return { view, rec, summary, recent, error: fails >= 2, refreshChain };
+  return { view, rec, summary, recent, error: fails >= 2, stale, refreshChain };
 }

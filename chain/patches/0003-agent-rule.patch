@@ -448,10 +448,10 @@ index 0000000..5c37aab
 +}
 diff --git a/graft/subnet-evm/core/agent_rule_test.go b/graft/subnet-evm/core/agent_rule_test.go
 new file mode 100644
-index 0000000..fdb5199
+index 0000000..5e681ea
 --- /dev/null
 +++ b/graft/subnet-evm/core/agent_rule_test.go
-@@ -0,0 +1,723 @@
+@@ -0,0 +1,751 @@
 +// Copyright (C) 2026, Sealed Arena. See the file LICENSE for licensing terms.
 +
 +package core
@@ -542,7 +542,7 @@ index 0000000..fdb5199
 +// arEnv is a chain where block 1 registers the agent (and sets its mandate, if any),
 +// with helpers to extend it by valid blocks and to try hand-built invalid blocks.
 +type arEnv struct {
-+	t       *testing.T
++	t       testing.TB
 +	chain   *BlockChain
 +	gspec   *Genesis
 +	gendb   ethdb.Database
@@ -559,7 +559,7 @@ index 0000000..fdb5199
 +}
 +
 +// newArEnvWith is newArEnv on another chain config, with `engine` verifying inserted blocks.
-+func newArEnvWith(t *testing.T, m *agentpolicy.IAgentPolicyMandate, config *params.ChainConfig, engine consensus.Engine) *arEnv {
++func newArEnvWith(t testing.TB, m *agentpolicy.IAgentPolicyMandate, config *params.ChainConfig, engine consensus.Engine) *arEnv {
 +	t.Helper()
 +	gspec := &Genesis{
 +		Config: config,
@@ -1174,6 +1174,34 @@ index 0000000..fdb5199
 +	e.good(10, e.pay(1)) // t = 40: activation
 +	require.Equal(t, uint64(2), version())
 +	e.checkInvariant()
++}
++
++// The cost of the agent rule per transaction, as preCheck and the pool pay it: a sender that is
++// not an agent (one storage read), and an agent payment inside its mandate under v1 and v2.
++func BenchmarkCheckAgentTx(b *testing.B) {
++	for _, c := range []struct {
++		name   string
++		config *params.ChainConfig
++		tx     AgentTx
++	}{
++		{"not an agent", arConfig(), AgentTx{From: arStranger, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap, Plain: true}},
++		{"agent v1", arConfig(), AgentTx{From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap, Plain: true}},
++		{"agent v2", arConfigV2At(0), AgentTx{From: arAgent, To: &arPayee, Value: common.Big1, GasLimit: arTransfer, GasFeeCap: arFeeCap, Plain: true, V2: true, TxType: 2, GasTipCap: arTip, BaseFee: big.NewInt(1)}},
++	} {
++		b.Run(c.name, func(b *testing.B) {
++			e := newArEnvWith(b, arBigMandate(), c.config, dummy.NewCoinbaseFaker())
++			st, err := e.chain.State()
++			require.NoError(b, err)
++			ts := e.chain.CurrentBlock().Time + 1
++			b.ReportAllocs()
++			b.ResetTimer()
++			for range b.N {
++				if _, _, err := CheckAgentTx(st, ts, c.tx); err != nil {
++					b.Fatal(err)
++				}
++			}
++		})
++	}
 +}
 diff --git a/graft/subnet-evm/core/agent_rule_v2_test.go b/graft/subnet-evm/core/agent_rule_v2_test.go
 new file mode 100644

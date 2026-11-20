@@ -112,6 +112,8 @@ O+ and S both kept every coin inside the mandate in these 45 cases. S ends with 
 
 The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 26 cases ended inside the mandate, and on the Sealed L1 on Fuji all 24 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)). The Fuji run has two cases fewer: Fuji has one node, so "sent straight to node 2" and "node 3" do not apply.
 
+Costs and timings on Fuji (fee of an agent payment 0.000021 test USDC; owner freeze to receipt 4.7 s, the next payment refused), the cost of the rule check (6.6 µs for an agent payment under rule v2, 0.34 µs for any other sender) and a mutation check of the rule's tests (14 of 14 weakened conditions caught): [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
+
 Three mandates are used, so the amounts differ between sections: the open challenge and the 20-payments-at-once run use 0.5 USDC per payment and 1 USDC per day; the 45-case evaluation uses 0.02 and 0.05; the leaked-key suite sets its own.
 
 With two live models (claude-sonnet-5-5 and claude-haiku-5-5), the buying agent followed none of the injected pages in 30 runs (15 in the evaluation below, 15 in [`services/agent`](services/agent/README.md)). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node (local Sealed L1) refused 15 of 15 payments to the attacker's address (agent-tier table in [`docs/EVALUATION.md`](docs/EVALUATION.md)). S does not stop T1: the rule limits where and how much, not what the owner wanted.
@@ -206,7 +208,7 @@ More, including logs and troubleshooting: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 | [`packages/shared/`](packages/shared) | Chain id, addresses, ABI, and the encoders for passkey challenges and proofs, shared by every service                                 |
 | `services/`, `web/`                   | x402 facilitator, demo seller, buying agent, relayer, RPC gateway, Fuji operations, attack suites, web app                            |
 | [`scripts/`](scripts)                 | `check.sh`, `check-localnet.sh`, `localnet.sh`, `forge.sh`, `submission-check.sh`                                                     |
-| [`docs/`](docs)                       | Architecture, runbook, decision records, evaluation, submission checklist                                                             |
+| [`docs/`](docs)                       | Architecture, runbook, own-node verification, decision records, evaluation, submission checklist                                      |
 
 Only our changes to avalanchego live in this repository, as patch files applied to a pinned tag, so reviewers can read exactly what we wrote.
 
@@ -227,7 +229,7 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 
 ## Security model and limitations
 
-What the rule gives: on the Sealed L1, a transaction sent with an agent's key that falls outside the agent's mandate cannot be included in a block. The patched node checks this as part of block validity; today one validator, run by the team, does so.
+What the rule gives: on the Sealed L1, a transaction sent with an agent's key that falls outside the agent's mandate cannot be included in a block. The patched node checks this as part of block validity; today one validator, run by the team, does so. Anyone can run a non-validator node that executes every block again with the rule and compare it with our RPC: [`docs/VERIFY.md`](docs/VERIFY.md). That shows whether the blocks follow the rule, not who controls the chain.
 
 What it does not give, stated plainly:
 

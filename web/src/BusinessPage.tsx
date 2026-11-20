@@ -2,15 +2,16 @@ import { Button } from "@astryxdesign/core/Button";
 import { ARENA } from "./arena.config.js";
 import { businessText } from "./businessText.js";
 import { designText } from "./designText.js";
-import { StatusPill } from "./Evidence.js";
 import { useI18n } from "./i18n.js";
 import { LandingIcon } from "./LandingVisual.js";
 import { SiteShell } from "./SiteShell.js";
+import { StatusPill } from "./StatusPill.js";
 
 export default function BusinessPage() {
   const { lang, setLang } = useI18n();
   const t = businessText(lang);
   const d = designText(lang);
+  const partnerUrl = `${ARENA.source}/issues/new?${new URLSearchParams({ title: t.partnerTitle, body: t.partnerBody })}`;
   const sources = [
     `${ARENA.source}/tree/main/chain`,
     ARENA.deployments,
@@ -26,30 +27,34 @@ export default function BusinessPage() {
           <p>{d.businessLead}</p>
           <div className="hero-actions">
             <Button label={t.ctaConsole} href="/console" variant="primary" />
-            <Button label={d.partner} href="#design-partner" variant="secondary" />
+            <Button label={d.partner} href={partnerUrl} variant="secondary" />
           </div>
         </div>
         <div
           className="business-flow"
           role="img"
-          aria-label={`${d.flow.join(" → ")}. ${d.flowNote}`}
+          aria-label={`${t.paymentFlow.join(" → ")}. ${t.subscriptionFlow}. ${t.subscriptionNote}`}
         >
           <p className="micro-label">{t.moneyTitle}</p>
-          {d.flow.map((label, index) => (
+          {t.paymentFlow.map((label, index) => (
             <div className="flow-node" key={label}>
               <LandingIcon
                 name={index === 0 ? "layers" : index === 1 ? "key" : "check"}
                 size={24}
               />
               <span>{label}</span>
-              {index < d.flow.length - 1 && (
+              {index < t.paymentFlow.length - 1 && (
                 <span className="flow-connector" aria-hidden="true">
                   ↓
                 </span>
               )}
             </div>
           ))}
-          <p className="caption">{d.flowNote}</p>
+          <div className="subscription-flow">
+            <StatusPill state="caution">{t.hypothesisBadge}</StatusPill>
+            <strong>{t.subscriptionFlow}</strong>
+            <p className="caption">{t.subscriptionNote}</p>
+          </div>
         </div>
       </header>
       <section className="page-section business-audience">
@@ -80,8 +85,9 @@ export default function BusinessPage() {
       </section>
       <section className="page-section business-model">
         <div>
-          <p className="micro-label">{t.hypothesisBadge}</p>
+          <StatusPill state="caution">{t.hypothesisBadge}</StatusPill>
           <h2>{t.moneyTitle}</h2>
+          <p>{t.hypothesisNote}</p>
         </div>
         <dl>
           {t.money.map(([title, body]) => (
@@ -122,12 +128,9 @@ export default function BusinessPage() {
           <p className="micro-label">{t.hypothesisBadge}</p>
           <h2>{d.partner}</h2>
           <p>{d.partnerNote}</p>
+          <p>{t.partnerPrivacy}</p>
         </div>
-        <Button
-          label={d.partnerAction}
-          variant="primary"
-          href={`${ARENA.source}/issues/new?title=${encodeURIComponent("Design partnership")}&body=${encodeURIComponent(lang === "vi" ? "Marketplace của bạn:\n\nNgười bán và API:\n\nNhu cầu thanh toán của agent:\n\nCách liên hệ (tuỳ chọn):\n" : "Your marketplace:\n\nSeller network and APIs:\n\nAgent payment needs:\n\nContact (optional):\n")}`}
-        />
+        <Button label={d.partnerAction} variant="primary" href={partnerUrl} />
       </section>
     </SiteShell>
   );

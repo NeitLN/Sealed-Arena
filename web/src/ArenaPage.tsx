@@ -23,9 +23,9 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
 import { designText } from "./designText.js";
-import { StatusPill } from "./Evidence.js";
 import { useI18n } from "./i18n.js";
 import { PublishedKey } from "./PublishedKey.js";
+import { StatusPill } from "./StatusPill.js";
 
 const survivalHours = (score: bigint) => Number(score / 10n ** 15n) / 1000 / 3600;
 
@@ -311,6 +311,7 @@ await client.sendTransaction({
           {t.offChain}
         </Text>
         {live.error ? <Banner status="warning" title={t.liveDown} /> : null}
+        {!live.error && live.stale ? <Banner status="warning" title={t.liveStale} /> : null}
         {summary && Object.keys(summary.byReason).length > 0 ? (
           <HStack gap={2} wrap="wrap">
             {Object.entries(summary.byReason)
