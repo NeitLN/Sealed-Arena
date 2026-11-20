@@ -112,6 +112,8 @@ O+ and S both kept every coin inside the mandate in these 45 cases. S ends with 
 
 The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 26 cases ended inside the mandate, and on the Sealed L1 on Fuji all 24 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)). The Fuji run has two cases fewer: Fuji has one node, so "sent straight to node 2" and "node 3" do not apply.
 
+Costs and timings on Fuji (fee of an agent payment 0.000021 test USDC; owner freeze to receipt 4.7 s, the next payment refused), the cost of the rule check (6.6 µs for an agent payment under rule v2, 0.34 µs for any other sender) and a mutation check of the rule's tests (14 of 14 weakened conditions caught): [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
+
 Three mandates are used, so the amounts differ between sections: the open challenge and the 20-payments-at-once run use 0.5 USDC per payment and 1 USDC per day; the 45-case evaluation uses 0.02 and 0.05; the leaked-key suite sets its own.
 
 With two live models (claude-sonnet-5-5 and claude-haiku-5-5), the buying agent followed none of the injected pages in 30 runs (15 in the evaluation below, 15 in [`services/agent`](services/agent/README.md)). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node (local Sealed L1) refused 15 of 15 payments to the attacker's address (agent-tier table in [`docs/EVALUATION.md`](docs/EVALUATION.md)). S does not stop T1: the rule limits where and how much, not what the owner wanted.

@@ -1,0 +1,179 @@
+{
+  "at": "2026-11-20T13:10:05.792Z",
+  "network": "Sealed L1 on Fuji (through an SSH tunnel to the validator)",
+  "ruleVersion": 2,
+  "agent": "0x2E913e5119c1c997c2D03F639621FAC811f52B0A",
+  "payments": {
+    "plain": [
+      {
+        "ms": 203,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1899,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1747,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1915,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1914,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1894,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1907,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1771,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1936,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      },
+      {
+        "ms": 1917,
+        "gasUsed": "21000",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21000000021000",
+        "withData": false
+      }
+    ],
+    "withRef": [
+      {
+        "ms": 1909,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1961,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1904,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1741,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1801,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1918,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1908,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1896,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1741,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      },
+      {
+        "ms": 1855,
+        "gasUsed": "21512",
+        "effectiveGasPrice": "1000000001",
+        "feeWei": "21512000021512",
+        "withData": true
+      }
+    ]
+  },
+  "summary": {
+    "plainFeeWei": {
+      "n": 10,
+      "min": 21000000021000,
+      "median": 21000000021000,
+      "p90": 21000000021000,
+      "max": 21000000021000
+    },
+    "withRefFeeWei": {
+      "n": 10,
+      "min": 21512000021512,
+      "median": 21512000021512,
+      "p90": 21512000021512,
+      "max": 21512000021512
+    },
+    "plainFee": "0.000021000000021",
+    "withRefFee": "0.000021512000021512",
+    "receiptMs": {
+      "n": 20,
+      "min": 203,
+      "median": 1904,
+      "p90": 1936,
+      "max": 1961
+    },
+    "freezeReceiptMs": 4676,
+    "paymentAfterFreeze": "agent: frozen"
+  }
+}
