@@ -1,0 +1,27 @@
+sealed-arena.duckdns.org {
+	encode gzip
+	# Public JSON-RPC of the Sealed L1 (POST only). Nothing else of the node is exposed.
+	@rpc {
+		path /rpc
+		method POST OPTIONS
+	}
+	handle @rpc {
+		rewrite * /
+		reverse_proxy 127.0.0.1:4050
+	}
+	# Attempt records kept by the gateway (no IPs in them), and the open challenge's state.
+	@attempts {
+		path /attempts/summary /attempts/recent /state
+		method GET
+	}
+	handle @attempts {
+		reverse_proxy 127.0.0.1:4050
+	}
+	# Relayer for owner passkey actions (register only for allowed agents; rate limited per client).
+	handle_path /relayer/* {
+		reverse_proxy 127.0.0.1:4040
+	}
+	handle {
+		respond "Sealed Arena (testnet). Assets have no monetary value." 404
+	}
+}

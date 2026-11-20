@@ -1,5 +1,7 @@
 import { serve } from "@hono/node-server";
+import { createPublicClient, getAddress, http } from "viem";
 import { createGatewayApp } from "./app.js";
+import { arenaState } from "./state.js";
 import { sqliteStore } from "./store.js";
 
 const rpc = process.env.SEALED_RPC_URL;
@@ -19,7 +21,16 @@ const perMinute = perMinuteEnv === undefined ? undefined : Number(perMinuteEnv);
 if (perMinute !== undefined && !(Number.isInteger(perMinute) && perMinute > 0))
   throw new Error(`GATEWAY_PER_MINUTE must be a positive whole number, got "${perMinuteEnv}"`);
 const store = await sqliteStore(process.env.GATEWAY_DB ?? "attempts.db");
+// GET /state: the open challenge's agent and ArenaRecorder (both public, web/src/arena.config.ts).
+const arenaAgent = process.env.GATEWAY_ARENA_AGENT;
+const arenaRecorder = process.env.GATEWAY_ARENA_RECORDER;
+const reader = createPublicClient({ transport: http(rpc) });
+const state =
+  arenaAgent && arenaRecorder
+    ? () => arenaState(reader as never, store, getAddress(arenaAgent), getAddress(arenaRecorder))
+    : undefined;
 const app = createGatewayApp({
+  ...(state ? { state } : {}),
   store,
   ipSalt: salt,
   trustProxy: process.env.GATEWAY_TRUST_PROXY === "1",

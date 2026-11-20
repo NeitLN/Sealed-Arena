@@ -302,3 +302,75 @@ describe("attempt summary cache size", () => {
     expect(cache.size).toBeLessThanOrEqual(50);
   });
 });
+
+describe("GET /state", () => {
+  const make = (state: () => Promise<unknown>, now: () => number) =>
+    createGatewayApp({
+      upstream: async () => ({}),
+      store: { add: async () => {}, summary: async () => ({}), recent: async () => [] } as never,
+      ipSalt: "0123456789abcdef",
+      state,
+      stateTtlMs: 3000,
+      now,
+    });
+
+  it("is off when no snapshot is configured", async () => {
+    const app = createGatewayApp({
+      upstream: async () => ({}),
+      store: { add: async () => {}, summary: async () => ({}), recent: async () => [] } as never,
+      ipSalt: "0123456789abcdef",
+    });
+    expect((await app.request("/state")).status).toBe(404);
+  });
+
+  it("reads the chain once per TTL however many pages ask", async () => {
+    let t = 0;
+    let reads = 0;
+    const app = make(
+      async () => ({ n: ++reads }),
+      () => t,
+    );
+    const bodies = await Promise.all(
+      Array.from({ length: 50 }, () =>
+        Promise.resolve(app.request("/state")).then((r) => r.json() as Promise<unknown>),
+      ),
+    );
+    expect(reads).toBe(1);
+    expect(bodies.every((b) => (b as { n: number }).n === 1)).toBe(true);
+    t = 2999;
+    await app.request("/state");
+    expect(reads).toBe(1);
+    t = 3000;
+    expect(await (await app.request("/state")).json()).toEqual({ n: 2 });
+  });
+
+  it("serves the last good snapshot marked stale when the node fails, and does not cache the failure", async () => {
+    let t = 0;
+    let fail = false;
+    let reads = 0;
+    const app = make(
+      async () => {
+        reads++;
+        if (fail) throw new Error("down");
+        return { n: reads };
+      },
+      () => t,
+    );
+    await app.request("/state");
+    fail = true;
+    t = 5000;
+    expect(await (await app.request("/state")).json()).toEqual({ n: 1, stale: true });
+    fail = false;
+    expect(await (await app.request("/state")).json()).toEqual({ n: 3 });
+  });
+
+  it("answers 503 when the node fails before any good snapshot", async () => {
+    const app = make(
+      async () => {
+        throw new Error("down");
+      },
+      () => 0,
+    );
+    expect((await app.request("/state")).status).toBe(503);
+  });
+});
