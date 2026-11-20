@@ -21,3 +21,26 @@ Command: `pnpm --filter agent scenario-fuji P --replay-s` and `pnpm --filter age
 Raw files: [`services/attacks/results/agent-replay-fuji-P-2026-11-20T13-36-21-059Z.json`](../services/attacks/results/agent-replay-fuji-P-2026-11-20T13-36-21-059Z.json) and [`agent-replay-fuji-Oplus-2026-11-20T13-39-36-883Z.json`](../services/attacks/results/agent-replay-fuji-Oplus-2026-11-20T13-39-36-883Z.json) (every replayed call with its Fuji transaction hash and the wallet's answer; the 0.03 returned from the attacker wallet in `recovered`). An earlier pair of replays the same afternoon (13:28 to 13:35 UTC) gave the same counts (P 15/15 let through, O+ 0/15) but did not record the calls, so its files were not kept. In each run the wallet's USDC balance dropped by exactly the purchases plus what the attacker received (P: 0.014 per run, O+: 0.008 per run).
 
 What this shows: for these payments a payee list stops the tip whether the list is in a contract wallet (O+) or in the node's rule (S); a plain wallet does not. The difference between O+ and S lies elsewhere (README limits, `docs/EVALUATION.md`: fees, paths that do not go through the contract). The report generator (`pnpm --filter attacks suite report`) reads live agent runs only, so these replays are not in `docs/EVALUATION.md`.
+
+## Edge cases of the agent rule under rule v2 (local Sealed L1)
+
+Command: `SEALED_RULE_V2_AT=0 bash scripts/localnet.sh up` (a new network with rule v2 from genesis, as on the Sealed L1 on Fuji since rule v2 was switched on), then `pnpm --filter attacks edge` (`services/attacks/src/edge.ts`). Revision `81657bc` of `main` plus this script, node image built from that revision (`chain/scripts/build.sh`), 3 nodes in Docker on Windows 11, 20/11/2026 13:36 UTC. Each case uses a fresh agent: 10 coins, mandate 1 per payment, 3 per day, daily fee cap 0.15 (dailyCap / 20, the default), minimum base fee 1 gwei. Raw file: [`services/attacks/results/edge-2026-11-20T13-36-28-509Z.json`](../services/attacks/results/edge-2026-11-20T13-36-28-509Z.json).
+
+| Case | What was sent | Result | Verdict |
+|---|---|---|---|
+| a. 00:00 UTC boundary | payments up to dailyCap just before and just after 00:00 UTC | not sent: see below | NOT RUN |
+| b1. high tip | type 2, tip 10 gwei | refused: `agent: tip too high: 10000000000 above 1000000000` | PASS |
+| b2. high gas price | legacy, gas price 10 gwei above the base fee | refused: `agent: tip too high` | PASS |
+| b3. fee cap above the daily fee cap | tip 1 gwei, maximum fee 0.2 (21000 × fee cap) | refused: `agent: fee budget exceeded: fees today 0 + fee 199999999999989000 above dailyFeeCap 150000000000000000` | PASS |
+| b4. fee cap above perTxCap | tip 1 gwei, maximum fee 1.1 | refused: `agent: budget exceeded: charge 1109999999999992000 above perTxCap 1000000000000000000` | PASS |
+| b5. high fee cap inside every cap | 0.01, tip 1 gwei, maximum fee 0.1 | included; fee paid 0.000042 (base fee 1 gwei + tip 1 gwei, × 21000), balance drop 0.010042; counted toward dailyCap: 0.11 (value + gas limit × fee cap) | PASS |
+| c. payment in the pool when the owner freezes | payment sent, then the owner's freeze (relayer, tip 10 gwei) milliseconds later; 5 trials, fresh agent each | every trial: the payment was in the pool when the freeze was sent; the freeze went into a block; the payment never did and was gone from the pool (`eth_getTransactionByHash` null) after three more blocks | PASS (5/5) |
+| d. listed payee gets code | the deployer key's next contract address listed as a payee, paid once, then the deployer creates a contract there | first payment included; after the deploy: refused `agent: payee has code` | PASS |
+| e. control: not a registered agent | an allowed sender that is not an agent: 10 coins to a stranger, tip 10 gwei, 64 bytes of data, gas 60000, an access list | included; the stranger received 10 | PASS |
+| invariant | every agent of the run | balance ≥ funded − totalCharged for all 7 agents | PASS |
+
+Result: 9 PASS, 0 FAIL, 1 NOT RUN.
+
+- b5 shows what a high fee cap costs an agent under v2: the tip is capped at 1 gwei, so the fee paid is base fee plus at most 1 gwei per gas; the maximum fee (gas limit × fee cap) is what counts toward perTxCap, dailyCap and the daily fee cap, so a high fee cap uses up budget without being paid.
+- c: in these 5 trials the freeze and the payment arrived in the pool together and the freeze, with the higher tip, went first; the payment was then refused by the rule at block building and dropped. A payment that is already in a block before the freeze lands is not undone; this case does not cover that.
+- **a. NOT RUN.** The day index is the block timestamp divided by 86400, and the block timestamp comes from the nodes' clock. The clock is not changed for a test, so the case needs a real wait until 00:00 UTC; at the run the next boundary was 57441 s (about 16 h) away. `pnpm --filter attacks edge --utc-boundary` waits for it when it is at most 15 minutes away (`EDGE_UTC_MAX_WAIT`), spends 0.99 three times and a fourth time before and again after the boundary, and checks the block days.

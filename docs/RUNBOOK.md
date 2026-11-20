@@ -36,6 +36,11 @@ bash scripts/localnet.sh down      # xoá container, volume dữ liệu và netw
 
 bash scripts/check-localnet.sh     # mạng mới + smoke + seed + leaked-key + x402 + ArenaRecorder + chain/tests/rule/run.sh
 bash chain/tests/byzantine/run.sh  # node 3 chạy plugin không có quy tắc; node 1, 2 phải từ chối block nó đề xuất (cần image node mới)
+
+# Trường hợp biên dưới luật v2 (docs/MEASUREMENTS.md); mạng dựng với SEALED_RULE_V2_AT=0
+SEALED_RULE_V2_AT=0 bash scripts/localnet.sh up
+pnpm --filter attacks edge                 # phí, đóng băng khi khoản trả còn trong pool, payee có code sau khi được liệt kê, đối chứng
+pnpm --filter attacks edge --utc-boundary  # thêm ranh giới 00:00 UTC: chạy trong vòng 15 phút trước 00:00 UTC, script chờ thật
 ```
 - Mặc định 3 node (đổi bằng `SEALED_NODE_COUNT=1`). Các node cùng chạy trong một container; cổng HTTP `9650`, `9652`, `9654` đều được mở ra máy, đường dẫn RPC giống nhau.
 - Genesis: `chain/genesis/sealed-local.json` (giải thích trong `chain/genesis/README.md`). Đổi file genesis bằng `SEALED_GENESIS_FILE=<tên file trong chain/genesis>`.
