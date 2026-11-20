@@ -223,9 +223,11 @@ export default function OwnerPage() {
       else
         setOutcome({
           kind: "error",
-          text: r.error?.endsWith("rate_limited")
-            ? relayerErrorText(t, r, "failed")
-            : explain(t, c.code),
+          // Rate limits carry retryAfter: say how long to wait.
+          text:
+            !r.ok && r.error?.endsWith("rate_limited")
+              ? relayerErrorText(t, r, "failed")
+              : explain(t, c.code),
           detail: c.detail,
           tx: c.tx,
         });
