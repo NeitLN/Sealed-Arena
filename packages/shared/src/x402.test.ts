@@ -1,9 +1,11 @@
 import { type Address, encodeAbiParameters, type Hex, keccak256 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
+import { UNLIMITED_PAYMENTS } from "./agentPolicy.js";
 import { CHAIN_ID } from "./chain.js";
 import {
   checkSignedNativeTx,
+  effectiveMandateV3,
   newRequestId,
   paymentCharge,
   paymentData,
@@ -212,6 +214,70 @@ describe("precheckMandate", () => {
     });
     it("v1 conditions come first", () => {
       expect(precheckMandate({ ...ok, frozen: true, v2 }, { ...p2, gas: 1n })).toBe("agent_frozen");
+    });
+  });
+
+  describe("under rule v3", () => {
+    const gwei = 1_000_000_000n;
+    const v2 = { feeSpentToday: 0n, feeCapSet: true, dailyFeeCap: 10n ** 16n, baseFee: 25n * gwei };
+    const p3 = {
+      ...pay,
+      value: 500n,
+      gas: 21_000n,
+      maxFeePerGas: 50n * gwei,
+      maxPriorityFeePerGas: gwei,
+    };
+    const v3 = {
+      paymentsToday: 2,
+      maxPaymentsPerDay: 3,
+      payeeSpentToday: 400n,
+      payeeDailyCap: 1_000n,
+    };
+
+    it("passes within the payment count and the payee cap", () => {
+      expect(precheckMandate({ ...ok, v2, v3 }, p3)).toBeUndefined();
+      expect(
+        precheckMandate({ ...ok, v2, v3: { ...v3, payeeSpentToday: 500n } }, p3),
+      ).toBeUndefined();
+    });
+    it("rejects the payment past the day's count, and value past the payee cap (fees not counted)", () => {
+      expect(precheckMandate({ ...ok, v2, v3: { ...v3, paymentsToday: 3 } }, p3)).toBe(
+        "agent_daily_payment_count_exceeded",
+      );
+      expect(precheckMandate({ ...ok, v2, v3: { ...v3, payeeSpentToday: 501n } }, p3)).toBe(
+        "agent_payee_budget_exceeded",
+      );
+    });
+    it("no limit: UNLIMITED_PAYMENTS and no payee cap", () => {
+      const { payeeDailyCap: _, ...noCap } = v3;
+      expect(
+        precheckMandate(
+          {
+            ...ok,
+            v2,
+            v3: {
+              ...noCap,
+              paymentsToday: 10_000,
+              maxPaymentsPerDay: UNLIMITED_PAYMENTS,
+              payeeSpentToday: 10n ** 30n,
+            },
+          },
+          p3,
+        ),
+      ).toBeUndefined();
+    });
+    it("v2 conditions come first", () => {
+      expect(
+        precheckMandate(
+          { ...ok, v2, v3: { ...v3, paymentsToday: 3 } },
+          { ...p3, maxPriorityFeePerGas: 2n * gwei },
+        ),
+      ).toBe("agent_tip_too_high");
+    });
+    it("a scheduled mandate applies from its eta by the caller's clock", () => {
+      expect(effectiveMandateV3("old", "new", 0n, 10n ** 12n)).toBe("old");
+      expect(effectiveMandateV3("old", "new", 100n, 99n)).toBe("old");
+      expect(effectiveMandateV3("old", "new", 100n, 100n)).toBe("new");
     });
   });
 

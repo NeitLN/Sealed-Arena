@@ -3,6 +3,7 @@ export * from "./agentPolicy.js";
 export { allowListAbi } from "./allowListAbi.js";
 export { arenaRecorderAbi } from "./arenaRecorderAbi.js";
 export * from "./chain.js";
+export * from "./clientDataStrict.js";
 export { nativeMinterAbi } from "./nativeMinterAbi.js";
 export * from "./policyCalls.js";
 export * from "./webauthn.js";

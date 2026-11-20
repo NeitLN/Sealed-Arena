@@ -9,7 +9,7 @@ import {
   parseTransaction,
   recoverTransactionAddress,
 } from "viem";
-import type { Mandate } from "./agentPolicy.js";
+import { type Mandate, UNLIMITED_PAYMENTS } from "./agentPolicy.js";
 import { CHAIN_ID } from "./chain.js";
 import { AGENT_MAX_TIP, agentPaymentGas } from "./policyCalls.js";
 
@@ -143,7 +143,27 @@ export type AgentState = {
     /** Base fee of the latest block. */
     baseFee: bigint;
   };
+  /** Set when agent rule v3 is in force and the mandate in force is a v3 mandate. */
+  v3?: {
+    /** Payments counted today (getCounters, zero on a new UTC day). */
+    paymentsToday: number;
+    /** The mandate's limit (UNLIMITED_PAYMENTS = none). */
+    maxPaymentsPerDay: number;
+    /** Value paid to this payee today (getPayeeSpend, zero on a new UTC day). */
+    payeeSpentToday: bigint;
+    /** The payee's daily value cap; undefined when it has none. */
+    payeeDailyCap?: bigint;
+  };
 };
+
+/**
+ * The v3 mandate in force at `now`: a scheduled loosening applies from its time on, without any
+ * transaction. On an idle chain an eth_call at the head still shows the old one after the eta,
+ * so clients judge the eta by their own clock (getPending().mandateEta).
+ */
+export function effectiveMandateV3<M>(active: M, pending: M, mandateEta: bigint, now: bigint): M {
+  return mandateEta !== 0n && now >= mandateEta ? pending : active;
+}
 
 /**
  * The agent rule of the chain (core.CheckAgentTx), in the same order, run before broadcasting
@@ -157,6 +177,8 @@ export function precheckMandate(
     charge: bigint;
     /** Needed for the rule v2 checks (s.v2 set). */
     gas?: bigint;
+    /** The value sent to the payee; needed for the rule v3 payee cap (s.v3 set). */
+    value?: bigint;
     data?: Hex;
     maxFeePerGas?: bigint;
     maxPriorityFeePerGas?: bigint;
@@ -183,6 +205,19 @@ export function precheckMandate(
     if (tip > AGENT_MAX_TIP) return "agent_tip_too_high";
     if (s.v2.feeCapSet && s.v2.feeSpentToday + (p.gas ?? 0n) * feeCap > s.v2.dailyFeeCap)
       return "agent_fee_budget_exceeded";
+  }
+  if (s.v3) {
+    // Rule v3, after every v1 and v2 condition, in the order of core.CheckAgentTx.
+    if (
+      s.v3.maxPaymentsPerDay !== UNLIMITED_PAYMENTS &&
+      s.v3.paymentsToday >= s.v3.maxPaymentsPerDay
+    )
+      return "agent_daily_payment_count_exceeded";
+    if (
+      s.v3.payeeDailyCap !== undefined &&
+      s.v3.payeeSpentToday + (p.value ?? 0n) > s.v3.payeeDailyCap
+    )
+      return "agent_payee_budget_exceeded";
   }
   return undefined;
 }
