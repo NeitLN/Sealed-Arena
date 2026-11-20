@@ -1,0 +1,457 @@
+{
+  "version": 1,
+  "at": "2026-11-20T13:47:46.470Z",
+  "network": "local Sealed L1 (3 nodes, scripts/localnet.sh, SEALED_RULE_V2_AT=0)",
+  "ruleVersion": 2,
+  "agent": "0x4BC21375E33AC4b7BdeFC286e225E2A23aB7030c",
+  "mandate": {
+    "payees": [
+      "0x976EA74026E726554dB657fA54763abd0C3a0aa9",
+      "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"
+    ],
+    "perTxCap": "1",
+    "dailyCap": "3",
+    "dailyFeeCap": "0.15",
+    "funding": "10"
+  },
+  "attempts": [
+    {
+      "n": 1,
+      "family": "payee outside the mandate",
+      "variant": "type 2 transfer of 0.5 to a stranger",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 2,
+      "family": "payee outside the mandate",
+      "variant": "legacy transfer to a stranger",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 3,
+      "family": "payee outside the mandate",
+      "variant": "type 1 transfer to a stranger",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 4,
+      "family": "payee outside the mandate",
+      "variant": "gas 30000 instead of 21000",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 5,
+      "family": "payee outside the mandate",
+      "variant": "with a 32-byte payment reference",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 6,
+      "family": "payee outside the mandate",
+      "variant": "tip 0",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 7,
+      "family": "payee outside the mandate",
+      "variant": "value 0 (probe)",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 8,
+      "family": "payee outside the mandate",
+      "variant": "to the agent's own address",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0x4BC21375E33AC4b7BdeFC286e225E2A23aB7030c"
+    },
+    {
+      "n": 9,
+      "family": "payee outside the mandate",
+      "variant": "a payee address one character off",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0x976EA74026E726554db657Fa54763aBd0C3a0aA0"
+    },
+    {
+      "n": 10,
+      "family": "payee outside the mandate",
+      "variant": "to a stranger, sent straight to node 2",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xB942e5B72784EA86FebAF869945F1cc201708aF3"
+    },
+    {
+      "n": 11,
+      "family": "payee outside the mandate",
+      "variant": "to a stranger, sent straight to node 3",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xB942e5B72784EA86FebAF869945F1cc201708aF3"
+    },
+    {
+      "n": 12,
+      "family": "contracts and precompiles",
+      "variant": "contract creation",
+      "outcome": "refused",
+      "reason": "refused: agent: contract creation not allowed"
+    },
+    {
+      "n": 13,
+      "family": "contracts and precompiles",
+      "variant": "the ecrecover precompile (0x01)",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0x0000000000000000000000000000000000000001"
+    },
+    {
+      "n": 14,
+      "family": "contracts and precompiles",
+      "variant": "NativeMinter: mint 1000 coins to itself",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0x0200000000000000000000000000000000000001"
+    },
+    {
+      "n": 15,
+      "family": "contracts and precompiles",
+      "variant": "AgentPolicy: setMandate with a stranger and no owner proof",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0x0300000000000000000000000000000000000001"
+    },
+    {
+      "n": 16,
+      "family": "listed payee, odd shape",
+      "variant": "tip 10 gwei (the extra goes to the block producer, not the payee)",
+      "outcome": "refused",
+      "reason": "refused: agent: tip too high: 10000000000 above 1000000000"
+    },
+    {
+      "n": 17,
+      "family": "listed payee, odd shape",
+      "variant": "legacy, gas price 10 gwei above the base fee",
+      "outcome": "refused",
+      "reason": "refused: agent: tip too high: 10000000000 above 1000000000"
+    },
+    {
+      "n": 18,
+      "family": "listed payee, odd shape",
+      "variant": "fee cap with a maximum fee of 0.2 (daily fee cap 0.15)",
+      "outcome": "refused",
+      "reason": "refused: agent: fee budget exceeded: fees today 0 + fee 199999999999989000 above dailyFeeCap 150000000000000000"
+    },
+    {
+      "n": 19,
+      "family": "listed payee, odd shape",
+      "variant": "fee cap with a maximum fee of 1.5 (perTxCap 1)",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: charge 1509999999999991000 above perTxCap 1000000000000000000"
+    },
+    {
+      "n": 20,
+      "family": "listed payee, odd shape",
+      "variant": "1 bytes of call data, gas = intrinsic",
+      "outcome": "refused",
+      "reason": "refused: agent: call data must be empty or 32 bytes"
+    },
+    {
+      "n": 21,
+      "family": "listed payee, odd shape",
+      "variant": "31 bytes of call data, gas = intrinsic",
+      "outcome": "refused",
+      "reason": "refused: agent: call data must be empty or 32 bytes"
+    },
+    {
+      "n": 22,
+      "family": "listed payee, odd shape",
+      "variant": "33 bytes of call data, gas = intrinsic",
+      "outcome": "refused",
+      "reason": "refused: agent: call data must be empty or 32 bytes"
+    },
+    {
+      "n": 23,
+      "family": "listed payee, odd shape",
+      "variant": "64 bytes of call data, gas = intrinsic",
+      "outcome": "refused",
+      "reason": "refused: agent: call data must be empty or 32 bytes"
+    },
+    {
+      "n": 24,
+      "family": "listed payee, odd shape",
+      "variant": "1024 bytes of call data, gas = intrinsic",
+      "outcome": "refused",
+      "reason": "refused: agent: call data must be empty or 32 bytes"
+    },
+    {
+      "n": 25,
+      "family": "listed payee, odd shape",
+      "variant": "32 bytes of call data, gas 21000 (below intrinsic)",
+      "outcome": "refused",
+      "reason": "refused: intrinsic gas too low"
+    },
+    {
+      "n": 26,
+      "family": "listed payee, odd shape",
+      "variant": "32 bytes of call data, gas = intrinsic + 1",
+      "outcome": "refused",
+      "reason": "refused: agent: gas limit must be 21000 plus the cost of the payment data: 21513, want 21512"
+    },
+    {
+      "n": 27,
+      "family": "listed payee, odd shape",
+      "variant": "no data, gas 21001",
+      "outcome": "refused",
+      "reason": "refused: agent: gas limit must be 21000 plus the cost of the payment data: 21001, want 21000"
+    },
+    {
+      "n": 28,
+      "family": "listed payee, odd shape",
+      "variant": "type 1 with an access list entry",
+      "outcome": "refused",
+      "reason": "refused: agent: call data must be empty or 32 bytes"
+    },
+    {
+      "n": 29,
+      "family": "listed payee, odd shape",
+      "variant": "type 2 with an access list entry",
+      "outcome": "refused",
+      "reason": "refused: agent: call data must be empty or 32 bytes"
+    },
+    {
+      "n": 30,
+      "family": "listed payee, odd shape",
+      "variant": "signed for another chain id",
+      "outcome": "refused",
+      "reason": "refused: invalid sender"
+    },
+    {
+      "n": 31,
+      "family": "amounts",
+      "variant": "exactly perTxCap (1) to seller A: the fee makes the charge larger",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: charge 1000025200000021000 above perTxCap 1000000000000000000"
+    },
+    {
+      "n": 32,
+      "family": "amounts",
+      "variant": "0.99 to seller A (inside the mandate)",
+      "outcome": "included",
+      "reason": "included in block 152 (success)"
+    },
+    {
+      "n": 33,
+      "family": "amounts",
+      "variant": "0.99 to seller B (inside the mandate)",
+      "outcome": "included",
+      "reason": "included in block 153 (success)"
+    },
+    {
+      "n": 34,
+      "family": "nonces",
+      "variant": "nonce gap of 5, to a stranger",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 35,
+      "family": "nonces",
+      "variant": "replace a pending payment (same nonce, higher tip) with one to a stranger",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0xfb37F895b96EC7E41098B3F890d3577c34b12616"
+    },
+    {
+      "n": 36,
+      "family": "nonces",
+      "variant": "replace it with one of 0.9 to seller B (would pass the daily cap)",
+      "outcome": "refused",
+      "reason": "refused: replacement transaction underpriced"
+    },
+    {
+      "n": 37,
+      "family": "nonces",
+      "variant": "the original low-tip payment to seller A",
+      "outcome": "included",
+      "reason": "included in block 154 (success)"
+    },
+    {
+      "n": 38,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #1",
+      "outcome": "included",
+      "reason": "included in block 155 (success)"
+    },
+    {
+      "n": 39,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #2",
+      "outcome": "included",
+      "reason": "included in block 155 (success)"
+    },
+    {
+      "n": 40,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #3",
+      "outcome": "included",
+      "reason": "included in block 155 (success)"
+    },
+    {
+      "n": 41,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #4",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 42,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #5",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 43,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #6",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 44,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #7",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 45,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #8",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 46,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #9",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 47,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #10",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 48,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #11",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 49,
+      "family": "bursts",
+      "variant": "12 payments of 0.3 sent at once, #12",
+      "outcome": "refused",
+      "reason": "refused: agent: budget exceeded: spentToday 1990075600000063000 + pooled 900075600000063000 + charge 300025200000021000 above dailyCap 3000000000000000000"
+    },
+    {
+      "n": 50,
+      "family": "bursts",
+      "variant": "0.01 to seller A after the burst",
+      "outcome": "included",
+      "reason": "included in block 158 (success)"
+    },
+    {
+      "n": 51,
+      "family": "racing a freeze",
+      "variant": "payment #1 sent right after the freeze (freeze in block 159)",
+      "outcome": "not included",
+      "reason": "accepted, not in a block (dropped by the pool)"
+    },
+    {
+      "n": 52,
+      "family": "racing a freeze",
+      "variant": "payment #2 sent right after the freeze (freeze in block 159)",
+      "outcome": "not included",
+      "reason": "accepted, not in a block (dropped by the pool)"
+    },
+    {
+      "n": 53,
+      "family": "racing a freeze",
+      "variant": "payment #3 sent right after the freeze (freeze in block 159)",
+      "outcome": "not included",
+      "reason": "accepted, not in a block (dropped by the pool)"
+    },
+    {
+      "n": 54,
+      "family": "racing a freeze",
+      "variant": "payment #4 sent right after the freeze (freeze in block 159)",
+      "outcome": "not included",
+      "reason": "accepted, not in a block (dropped by the pool)"
+    },
+    {
+      "n": 55,
+      "family": "racing a freeze",
+      "variant": "payment #5 sent right after the freeze (freeze in block 159)",
+      "outcome": "not included",
+      "reason": "accepted, not in a block (dropped by the pool)"
+    },
+    {
+      "n": 56,
+      "family": "racing a freeze",
+      "variant": "0.001 to seller A once frozen",
+      "outcome": "refused",
+      "reason": "refused: agent: frozen"
+    },
+    {
+      "n": 57,
+      "family": "racing a freeze",
+      "variant": "to a stranger once frozen",
+      "outcome": "refused",
+      "reason": "refused: agent: payee not allowed: 0x7BF908341B80F06E0B3264F2B50fD5080f2D2328"
+    }
+  ],
+  "summary": {
+    "attempts": 57,
+    "included": 7,
+    "reasons": {
+      "refused: agent": 42,
+      "refused: intrinsic gas too low": 1,
+      "refused: invalid sender": 1,
+      "included": 7,
+      "refused: replacement transaction underpriced": 1,
+      "accepted, not in a block": 5
+    }
+  },
+  "checks": {
+    "invariant": {
+      "ok": true,
+      "detail": "balance 7.099823599999853 >= funded 10 - totalCharged 2.900176400000147"
+    },
+    "dailyCap": {
+      "ok": true,
+      "detail": "spentToday 2.900176400000147 <= dailyCap 3"
+    },
+    "strangers": {
+      "ok": true,
+      "detail": "stranger balances 0, 0, 0"
+    },
+    "payees": {
+      "ok": true,
+      "detail": "sellers A and B received 2.9 in total"
+    },
+    "freeze": {
+      "ok": true,
+      "detail": "0 payments included at or after the freeze block"
+    },
+    "nodesAgree": {
+      "ok": true,
+      "detail": "block 163: 0xa9166694, 0xa9166694, 0xa9166694"
+    }
+  },
+  "ok": true
+}

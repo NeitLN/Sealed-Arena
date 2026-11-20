@@ -44,3 +44,33 @@ Result: 9 PASS, 0 FAIL, 1 NOT RUN.
 - b5 shows what a high fee cap costs an agent under v2: the tip is capped at 1 gwei, so the fee paid is base fee plus at most 1 gwei per gas; the maximum fee (gas limit × fee cap) is what counts toward perTxCap, dailyCap and the daily fee cap, so a high fee cap uses up budget without being paid.
 - c: in these 5 trials the freeze and the payment arrived in the pool together and the freeze, with the higher tip, went first; the payment was then refused by the rule at block building and dropped. A payment that is already in a block before the freeze lands is not undone; this case does not cover that.
 - **a. NOT RUN.** The day index is the block timestamp divided by 86400, and the block timestamp comes from the nodes' clock. The clock is not changed for a test, so the case needs a real wait until 00:00 UTC; at the run the next boundary was 57441 s (about 16 h) away. `pnpm --filter attacks edge --utc-boundary` waits for it when it is at most 15 minutes away (`EDGE_UTC_MAX_WAIT`), spends 0.99 three times and a fourth time before and again after the boundary, and checks the block days.
+
+## Scripted adaptive attacker (local Sealed L1, rule v2)
+
+Command: `pnpm --filter attacks adaptive` (`services/attacks/src/adaptive.ts`) on the same network as the edge cases (`SEALED_RULE_V2_AT=0`), revision `3bd963e` of this branch plus this script, 20/11/2026 13:47 UTC. The attacker holds the key of a fresh agent (10 coins; mandate: sellers A and B, 1 per payment, 3 per day, daily fee cap 0.15) and works through an ordered list of variants, sending the next one after each answer: other transaction types (0, 1, 2), gas limits, tips and fee caps, call data of 1 to 1024 bytes, access lists, another chain id, a nonce gap and a same-nonce replacement, contract creation and precompiles, a payee one character off, each node directly, amounts at and under perTxCap, a burst of 12 payments split under perTxCap, and five payments sent right after the owner's freeze. Types 3 and 4 are in the leaked-key suite, not here. Raw file, every attempt with the node's answer: [`services/attacks/results/adaptive-2026-11-20T13-47-46-470Z.json`](../services/attacks/results/adaptive-2026-11-20T13-47-46-470Z.json).
+
+| Answer of the node | Attempts |
+|---|---|
+| `agent: payee not allowed` (stranger, own address, payee one character off, precompiles, AgentPolicy, NativeMinter, nonce gap, replacement to a stranger, each node) | 17 |
+| `agent: call data must be empty or 32 bytes, and no access list` (1, 31, 33, 64, 1024 bytes; access list on type 1 and type 2) | 7 |
+| `agent: budget exceeded` (fee cap above perTxCap; exactly perTxCap, as the fee is added; 9 of the 12 burst payments: spentToday + pooled + charge above dailyCap) | 11 |
+| `agent: tip too high` (type 2 tip 10 gwei; legacy gas price 10 gwei above the base fee) | 2 |
+| `agent: gas limit must be 21000 plus the cost of the payment data` (gas 21001; 32 bytes with one gas too many) | 2 |
+| `agent: fee budget exceeded` (maximum fee 0.2 against a daily fee cap of 0.15) | 1 |
+| `agent: contract creation not allowed` | 1 |
+| `agent: frozen` (after the freeze) | 1 |
+| `intrinsic gas too low`, `invalid sender` (other chain id), `replacement transaction underpriced` (geth pool rules, before the agent rule) | 3 |
+| accepted by the pool, then dropped without entering a block (the five payments sent right after the freeze) | 5 |
+| included, inside the mandate (0.99 to A, 0.99 to B, 0.01 to A, 3 of the 12 burst payments of 0.3, 0.01 to A) | 7 |
+| Total | 57 |
+
+| Check after the run | Result |
+|---|---|
+| balance ≥ funded − totalCharged | 7.0998 ≥ 10 − 2.9002: PASS |
+| spentToday ≤ dailyCap | 2.9002 ≤ 3: PASS |
+| addresses outside the mandate received anything | 0 for each of the 3 strangers: PASS |
+| sellers A and B received in total | 2.9 (≤ dailyCap 3): PASS |
+| payments included at or after the freeze block | 0: PASS |
+| the three nodes agree on the chain | same hash at block 163: PASS |
+
+The variants are the team's list; "adaptive" here means the script keeps trying the next variant after each refusal, not that it searches for new ones. It shows that none of these 57 moved coins outside the mandate; it does not show that no other variant can.

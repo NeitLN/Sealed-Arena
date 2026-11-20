@@ -59,8 +59,9 @@ export async function sign(
 
 /** The node's own reason for refusing a transaction (viem keeps it in `details`). */
 export function reasonOf(e: unknown): string {
-  const text =
-    e instanceof Error ? `${(e as { details?: string }).details ?? ""} ${e.message}` : String(e);
+  const text = (
+    e instanceof Error ? `${(e as { details?: string }).details ?? ""} ${e.message}` : String(e)
+  ).replaceAll(" Missing or invalid parameters.", "");
   return (
     text
       .match(/agent: [a-z0-9 -]+(: [^\n"]*)?/)?.[0]

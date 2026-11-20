@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit -p .",
     "x402": "tsx src/x402.ts",
     "edge": "tsx src/edge.ts",
+    "adaptive": "tsx src/adaptive.ts",
     "arena": "tsx src/arena.ts",
     "arena-open": "tsx src/arena-open.ts",
     "compare": "tsx compare/run.ts",
