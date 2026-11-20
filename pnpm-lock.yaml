@@ -107,6 +107,9 @@ importers:
       '@sealed-arena/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      attacks:
+        specifier: workspace:*
+        version: link:../attacks
       viem:
         specifier: 2.57.19
         version: 2.57.19(typescript@5.9.3)(zod@4.6.7)

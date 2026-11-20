@@ -10,10 +10,13 @@
     "ictt": "tsx src/ictt.ts",
     "reputation": "tsx src/reputation.ts",
     "demo-manager": "tsx src/demo-manager.ts",
-    "health": "tsx src/health.ts"
+    "health": "tsx src/health.ts",
+    "verify-agree": "tsx src/verify-agree.ts",
+    "canary": "tsx src/canary.ts"
   },
   "dependencies": {
     "@sealed-arena/shared": "workspace:*",
+    "attacks": "workspace:*",
     "viem": "2.57.19"
   },
   "devDependencies": {

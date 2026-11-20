@@ -208,7 +208,7 @@ More, including logs and troubleshooting: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 | [`packages/shared/`](packages/shared) | Chain id, addresses, ABI, and the encoders for passkey challenges and proofs, shared by every service                                 |
 | `services/`, `web/`                   | x402 facilitator, demo seller, buying agent, relayer, RPC gateway, Fuji operations, attack suites, web app                            |
 | [`scripts/`](scripts)                 | `check.sh`, `check-localnet.sh`, `localnet.sh`, `forge.sh`, `submission-check.sh`                                                     |
-| [`docs/`](docs)                       | Architecture, runbook, decision records, evaluation, submission checklist                                                             |
+| [`docs/`](docs)                       | Architecture, runbook, own-node verification, decision records, evaluation, submission checklist                                      |
 
 Only our changes to avalanchego live in this repository, as patch files applied to a pinned tag, so reviewers can read exactly what we wrote.
 
@@ -229,7 +229,7 @@ Only our changes to avalanchego live in this repository, as patch files applied 
 
 ## Security model and limitations
 
-What the rule gives: on the Sealed L1, a transaction sent with an agent's key that falls outside the agent's mandate cannot be included in a block. The patched node checks this as part of block validity; today one validator, run by the team, does so.
+What the rule gives: on the Sealed L1, a transaction sent with an agent's key that falls outside the agent's mandate cannot be included in a block. The patched node checks this as part of block validity; today one validator, run by the team, does so. Anyone can run a non-validator node that executes every block again with the rule and compare it with our RPC: [`docs/VERIFY.md`](docs/VERIFY.md). That shows whether the blocks follow the rule, not who controls the chain.
 
 What it does not give, stated plainly:
 
