@@ -11,7 +11,7 @@ import { ARENA } from "./arena.config.js";
 import { arenaText } from "./arenaText.js";
 import { designText } from "./designText.js";
 import { useI18n } from "./i18n.js";
-import { limitationsText } from "./limitationsText.js";
+import { limitationSources, limitationsText } from "./limitationsText.js";
 import { SiteShell } from "./SiteShell.js";
 
 function Block({ title, children }: { title: string; children: ReactNode }) {
@@ -47,22 +47,7 @@ export default function RulesPage() {
   const vi = lang === "vi";
   const d = designText(lang);
   const limits = limitationsText(lang);
-  const sources = [
-    "README.md#security-model-and-limitations",
-    "chain/patches/0002-agentpolicy-precompile.patch",
-    "chain/patches/0003-agent-rule.patch",
-    "chain/patches/0003-agent-rule.patch",
-    "services/attacks/suite/results/leaked-key-fuji.json",
-    "chain/patches/0003-agent-rule.patch",
-    "contracts/src/ArenaRecorder.sol",
-    "contracts/src/ReputationReceiver.sol",
-    "services/facilitator/src/scheme.ts",
-    "packages/shared/src/agentPolicy.ts",
-    "chain/patches/0002-agentpolicy-precompile.patch",
-    "chain/patches/0003-agent-rule.patch",
-    "services/relayer/src/chain.ts",
-    "chain/patches/0003-agent-rule.patch",
-  ];
+  const sources = limitationSources;
   return (
     <SiteShell lang={lang} setLang={setLang} current="rules" maxWidth={860}>
       <VStack gap={6}>
