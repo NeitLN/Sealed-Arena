@@ -1,6 +1,6 @@
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
-import { createGatewayApp, normalizeReason } from "./app.js";
+import { createGatewayApp, normalizeReason, sourceOf } from "./app.js";
 import { MemoryStore } from "./store.js";
 
 const agent = privateKeyToAccount(generatePrivateKey());
@@ -372,5 +372,14 @@ describe("GET /state", () => {
       () => 0,
     );
     expect((await app.request("/state")).status).toBe(503);
+  });
+});
+
+describe("source label", () => {
+  it("accepts short lower-case labels and falls back to rpc", () => {
+    expect(sourceOf("web:arena")).toBe("web:arena");
+    expect(sourceOf(undefined)).toBe("rpc");
+    expect(sourceOf("Web Arena")).toBe("rpc");
+    expect(sourceOf("x".repeat(33))).toBe("rpc");
   });
 });

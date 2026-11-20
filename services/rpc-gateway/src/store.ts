@@ -9,7 +9,15 @@ export type Attempt = {
   result: "accepted" | "rejected";
   /** The node's reason, normalized (e.g. "agent: payee not allowed"); empty when accepted. */
   reason: string;
+  /**
+   * Where the attempt came from, as the client said (X-Sealed-Source, e.g. "web:arena"), or "rpc".
+   * Not authenticated: a label for reading the log, not evidence.
+   */
+  source?: string;
 };
+
+/** Filters for recent(): only accepted or only rejected attempts, and only from a time on. */
+export type RecentFilter = { result?: "accepted" | "rejected"; since?: number };
 
 export type PublicAttempt = Omit<Attempt, "ipHash">;
 
@@ -25,7 +33,7 @@ export type Summary = {
 export interface AttemptStore {
   add(a: Attempt): Promise<void>;
   /** Newest first, without the IP hash. */
-  recent(limit: number, from?: string): Promise<PublicAttempt[]>;
+  recent(limit: number, from?: string, filter?: RecentFilter): Promise<PublicAttempt[]>;
   summary(from?: string): Promise<Summary>;
   /** Everything stored (tests). */
   dump(): Promise<Attempt[]>;
@@ -62,11 +70,14 @@ export class MemoryStore implements AttemptStore {
   async add(a: Attempt) {
     this.rows.push(a);
   }
-  async recent(limit: number, from?: string) {
+  async recent(limit: number, from?: string, f: RecentFilter = {}) {
     const out: PublicAttempt[] = [];
     for (let i = this.rows.length - 1; i >= 0 && out.length < limit; i--) {
       const r = this.rows[i] as Attempt;
-      if (same(r.from, from)) out.push(strip(r));
+      if (!same(r.from, from)) continue;
+      if (f.result && r.result !== f.result) continue;
+      if (f.since !== undefined && r.ts < f.since) continue;
+      out.push(strip({ ...r, source: r.source ?? "rpc" }));
     }
     return out;
   }
@@ -90,6 +101,7 @@ const toAttempt = (r: unknown): Attempt => {
     hash: String(x.hash),
     result: x.result === "accepted" ? "accepted" : "rejected",
     reason: String(x.reason),
+    source: x.source === null || x.source === undefined ? "rpc" : String(x.source),
   };
 };
 
@@ -111,13 +123,16 @@ export async function sqliteStore(path: string): Promise<AttemptStore> {
     db.exec("ALTER TABLE attempts ADD COLUMN from_lc TEXT");
   }
   db.exec("UPDATE attempts SET from_lc = lower(from_addr) WHERE from_lc IS NULL");
+  if (!cols.some((c) => c.name === "source")) {
+    db.exec("ALTER TABLE attempts ADD COLUMN source TEXT");
+  }
   db.exec("DROP INDEX IF EXISTS attempts_from");
   db.exec("CREATE INDEX IF NOT EXISTS attempts_from_lc ON attempts (from_lc, ts)");
   db.exec("CREATE INDEX IF NOT EXISTS attempts_ts ON attempts (ts)");
 
   const insert = db.prepare(
-    `INSERT INTO attempts (ts, ip_hash, from_addr, to_addr, value, hash, result, reason, from_lc)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO attempts (ts, ip_hash, from_addr, to_addr, value, hash, result, reason, from_lc, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const filter = (from?: string) => (from ? "from_lc = ?" : "1 = 1");
   const args = (from?: string) => (from ? [from.toLowerCase()] : []);
@@ -133,14 +148,25 @@ export async function sqliteStore(path: string): Promise<AttemptStore> {
         a.result,
         a.reason,
         a.from.toLowerCase(),
+        a.source ?? "rpc",
       );
     },
-    async recent(limit, from) {
+    async recent(limit, from, f = {}) {
+      const where = [filter(from)];
+      const extra: (string | number)[] = [];
+      if (f.result) {
+        where.push("result = ?");
+        extra.push(f.result);
+      }
+      if (f.since !== undefined) {
+        where.push("ts >= ?");
+        extra.push(f.since);
+      }
       return db
         .prepare(
-          `SELECT * FROM attempts WHERE ${filter(from)} ORDER BY ts DESC, rowid DESC LIMIT ?`,
+          `SELECT * FROM attempts WHERE ${where.join(" AND ")} ORDER BY ts DESC, rowid DESC LIMIT ?`,
         )
-        .all(...args(from), limit)
+        .all(...args(from), ...extra, limit)
         .map((r) => strip(toAttempt(r)));
     },
     async summary(from) {
