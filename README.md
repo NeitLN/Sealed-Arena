@@ -18,14 +18,14 @@
 - **The idea.** Give the agent a card, not the whole wallet. The owner signs a mandate with a passkey: allowed payees, a cap per payment, a cap per day and an expiry. On the Sealed L1 that mandate is part of **transaction validity**: a payment outside it is not a reverted call but an invalid transaction. The node refuses it and no valid block can contain it, even when the attacker holds the agent's private key.
 - **What we measured** (sources in the last column):
 
-| Measurement                                                                                      | Result                                                     | Source                                                       |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------ |
-| Coins left outside the mandate, same 45 attack cases: plain wallet P / caps-only O / O+ / Sealed | 36 / 16 / 0 / **0**                                        | [`docs/EVALUATION.md`](docs/EVALUATION.md)                   |
-| Leaked-key cases that ended inside the mandate (attacker holds the agent's key)                  | **24/24** on the Sealed L1 on Fuji, 26/26 on the local L1  | [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)  |
-| 20 payments sent at once against a 1 USDC daily cap                                              | 2 settled, 18 refused on arrival, refused ones paid no fee | [`web/src/compare-result.json`](web/src/compare-result.json) |
-| Owner freezes the agent with a passkey                                                           | 4.7 s to the receipt; the next payment is refused          | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
-| Fee of an agent payment on the Sealed L1                                                         | 0.000021 test USDC                                         | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
-| Weakened rule conditions caught by the node's tests (mutation check)                             | 14 of 14                                                   | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
+| Measurement                                                                                       | Result                                                     | Source                                                       |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
+| Coins left outside the mandate, same 45 attack cases: plain wallet P / caps-only O / O+ / Sealed  | 36 / 16 / 0 / **0**                                        | [`docs/EVALUATION.md`](docs/EVALUATION.md)                   |
+| Leaked-key cases that ended inside the mandate (attacker holds the agent's key)                   | **24/24** on the Sealed L1 on Fuji, 26/26 on the local L1  | [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)  |
+| 20 payments sent at once against a 1 USDC daily cap                                               | 2 settled, 18 refused on arrival, refused ones paid no fee | [`web/src/compare-result.json`](web/src/compare-result.json) |
+| Owner freezes the agent with a passkey                                                            | 4.7 s to the receipt; the next payment is refused          | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
+| Fee of an agent payment on the Sealed L1                                                          | 0.000021 test USDC                                         | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
+| Weakened rule conditions caught by the node's tests (mutation check, rules v1 and v2, 20/11/2026) | 14 of 14                                                   | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
 
 - **What we do not claim.** The claim is about where the rule is checked (transaction validity), not about who operates the chain: today the team runs the only validator. A contract wallet with a payee list (O+) also kept every coin inside the mandate in our 45 cases; [Why not a contract wallet?](#why-not-a-contract-wallet) explains what differs. All 16 known limits: [Security model and limitations](#security-model-and-limitations).
 
@@ -149,7 +149,7 @@ O+ and S both kept every coin inside the mandate in these 45 cases. S ends with 
 
 The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 26 cases ended inside the mandate, and on the Sealed L1 on Fuji all 24 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)). The Fuji run has two cases fewer: Fuji has one node, so "sent straight to node 2" and "node 3" do not apply.
 
-Costs and timings on Fuji (fee of an agent payment 0.000021 test USDC; owner freeze to receipt 4.7 s, the next payment refused), the cost of the rule check (6.6 µs for an agent payment under rule v2, 0.34 µs for any other sender) and a mutation check of the rule's tests (14 of 14 weakened conditions caught): [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
+Costs and timings on Fuji (fee of an agent payment 0.000021 test USDC; owner freeze to receipt 4.7 s, the next payment refused), the cost of the rule check (6.6 µs for an agent payment under rule v2, 0.34 µs for any other sender) and a mutation check of the rule's tests (14 of 14 weakened conditions caught, rules v1 and v2, run on 20/11/2026): [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
 
 Three mandates are used, so the amounts differ between sections: the open challenge and the 20-payments-at-once run use 0.5 USDC per payment and 1 USDC per day; the 45-case evaluation uses 0.02 and 0.05; the leaked-key suite sets its own.
 
@@ -179,6 +179,8 @@ The burst run is `services/attacks/compare/results/fuji-2026-11-17T06-00-03-128Z
 **When Sealed is worth its price.** You want the limit to hold for the key itself, fees included, with no wallet code per agent, and you accept a separate L1. We have not yet shown that customers find this worth the price (see "Business model").
 
 ## Try it on Fuji (testnet)
+
+[![The open challenge page: the agent's private key is published, and each button sends a real testnet payment that the node answers](docs/images/arena.png)](https://sealed-arena.vercel.app/arena)
 
 - RPC: `https://sealed-arena.duckdns.org/rpc` (chain id `261126`, native coin: USDC bridged from Fuji with ICTT)
 - Overview with live numbers: https://sealed-arena.vercel.app
