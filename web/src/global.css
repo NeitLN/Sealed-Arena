@@ -241,7 +241,7 @@ pre {
   background: #edf1f7;
   color: var(--muted);
 }
-@media (max-width: 700px) {
+@media (max-width: 1050px) {
   .site-content {
     padding-block: 24px 56px;
   }
@@ -267,5 +267,13 @@ pre {
     transition: none !important;
     /* biome-ignore lint/complexity/noImportantStyles: Reduced motion takes precedence. */
     scroll-behavior: auto !important;
+  }
+}
+
+/* The site is shown at 150% from tablet width up. Every width breakpoint in the stylesheets and
+   in useMediaQuery is written in screen pixels, 1.5 times the layout width it guards. */
+@media (min-width: 768px) {
+  html {
+    zoom: 1.5;
   }
 }

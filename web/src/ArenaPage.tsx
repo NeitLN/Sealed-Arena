@@ -62,8 +62,8 @@ const big = (v: number | undefined) =>
   );
 
 export default function ArenaPage() {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-  const isNarrow = useMediaQuery("(max-width: 639px)");
+  const isMobile = useMediaQuery("(max-width: 1151px)");
+  const isNarrow = useMediaQuery("(max-width: 959px)");
   const [allAttempts, setAllAttempts] = useState(false);
   const { lang, setLang, t: tr } = useI18n();
   const t = arenaText(lang);

@@ -204,7 +204,7 @@
   font-size: 12px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1350px) {
   .arena-intro,
   .owner-overview {
     grid-template-columns: 1fr;
@@ -225,7 +225,7 @@
     height: 90px;
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 900px) {
   .owner-path .owner-stepper {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -294,7 +294,7 @@
 .arena-intro h1 {
   white-space: pre-line;
 }
-@media (max-width: 639px) {
+@media (max-width: 959px) {
   .arena-intro .operation-description {
     display: none;
   }
