@@ -7,6 +7,7 @@ import { usdcApprox } from "./format.js";
 import { useI18n } from "./i18n.js";
 import { LandingIcon } from "./LandingVisual.js";
 import { landingText } from "./landingText.js";
+import { PaymentExample } from "./PaymentExample.js";
 import { PolicyDiagram } from "./PolicyDiagram.js";
 import { poll } from "./poll.js";
 import { SiteShell } from "./SiteShell.js";
@@ -96,7 +97,10 @@ export default function LandingPage() {
             {t.eyebrow}
           </p>
           <h1 id="hero-title">
-            <span>{t.headline}</span> <span className="hero-accent">{t.headlineAccent}</span>
+            <span>{t.headline}</span>{" "}
+            <span>
+              {t.headlineOwner} <em>{t.headlineAccent}</em>
+            </span>
           </h1>
           <p className="hero-lead">{t.lead}</p>
           <div className="hero-actions">
@@ -117,7 +121,7 @@ export default function LandingPage() {
           </div>
           <p className="hero-action-note">{d.liveHint}</p>
         </div>
-        <PolicyDiagram lang={lang} />
+        <PaymentExample lang={lang} />
       </section>
       {trying && (
         <section ref={panel} id="hero-transaction" className="landing-container hero-transaction">
@@ -151,26 +155,6 @@ export default function LandingPage() {
           </a>
         </div>
       </aside>
-      <section className="evidence-section" id="evidence" aria-labelledby="evidence-title">
-        <div className="landing-container">
-          <div className="section-heading chapter-intro">
-            <p className="micro-label">{t.compareEyebrow}</p>
-            <h2 id="evidence-title">{d.evidence}</h2>
-            <p>{d.evidenceIntro}</p>
-          </div>
-          <EvidenceMatrix lang={lang} />
-          <AgentEvidence lang={lang} />
-          <div className="section-links">
-            <a className="text-link" href="/compare">
-              {t.fullResults}
-              <LandingIcon name="arrow" />
-            </a>
-            <a className="text-link" href={`${ARENA.source}/blob/main/docs/EVALUATION.md`}>
-              {t.evaluation} ↗
-            </a>
-          </div>
-        </div>
-      </section>
       <section className="how-section" id="how-it-works" aria-labelledby="how-title">
         <div className="landing-container">
           <div className="section-heading chapter-intro">
@@ -197,6 +181,39 @@ export default function LandingPage() {
           <div className="policy-notes">
             <p>{d.mechanism}</p>
             <p>{d.risk}</p>
+          </div>
+        </div>
+      </section>
+      <section className="evidence-section" id="evidence" aria-labelledby="evidence-title">
+        <div className="landing-container">
+          <div className="section-heading chapter-intro">
+            <p className="micro-label">{t.compareEyebrow}</p>
+            <h2 id="evidence-title">{d.evidence}</h2>
+            <p>{d.evidenceIntro}</p>
+          </div>
+          <EvidenceMatrix lang={lang} />
+          <div className="landing-burst">
+            <div className="burst-copy">
+              <h3>{t.burstHeading}</h3>
+              <p>{t.burstBody}</p>
+              <a
+                className="text-link"
+                href={`${ARENA.source}/blob/main/web/src/compare-result.json`}
+              >
+                {t.burstSource} ↗
+              </a>
+            </div>
+            <PolicyDiagram lang={lang} />
+          </div>
+          <AgentEvidence lang={lang} />
+          <div className="section-links">
+            <a className="text-link" href="/compare">
+              {t.fullResults}
+              <LandingIcon name="arrow" />
+            </a>
+            <a className="text-link" href={`${ARENA.source}/blob/main/docs/EVALUATION.md`}>
+              {t.evaluation} ↗
+            </a>
           </div>
         </div>
       </section>
