@@ -43,13 +43,26 @@ export default function ComparePage() {
   ];
   return (
     <SiteShell lang={lang} setLang={setLang} current="compare">
-      <header className="page-title">
+      <header className="page-title research-intro">
         <h1>{d.compareTitle}</h1>
-        <p>{d.evidenceIntro}</p>
+        <div className="research-lead">
+          <p>{d.evidenceIntro}</p>
+          <a href={`${ARENA.source}/blob/main/docs/EVALUATION.md`} className="text-link">
+            {vi ? "Mở báo cáo đánh giá" : "Read evaluation report"} ↗
+          </a>
+        </div>
       </header>
-      <EvidenceMatrix lang={lang} detailed />
-      <AgentEvidence lang={lang} />
-      <section className="page-section">
+      <nav className="section-index" aria-label={vi ? "Nội dung trang" : "On this page"}>
+        <a href="#wallets">{vi ? "Bốn loại ví" : "Four wallets"}</a>
+        <a href="#tradeoffs">{vi ? "Đánh đổi" : "Tradeoffs"}</a>
+        <a href="#burst">{vi ? "Giao dịch đồng thời" : "Concurrent payments"}</a>
+        <a href="#method">{vi ? "Phương pháp" : "Method"}</a>
+      </nav>
+      <div id="wallets">
+        <EvidenceMatrix lang={lang} detailed />
+      </div>
+      <AgentEvidence lang={lang} detailed />
+      <section id="tradeoffs" className="page-section">
         <div className="section-heading">
           <p className="micro-label">{vi ? "ĐÁNH ĐỔI" : "THE TRADEOFF"}</p>
           <h2>{why.title}</h2>
@@ -92,7 +105,7 @@ export default function ComparePage() {
           </a>
         </p>
       </section>
-      <section className="page-section">
+      <section id="burst" className="page-section">
         <div className="section-heading">
           <p className="micro-label">{vi ? "PHÉP THỬ BỔ SUNG" : "SECONDARY EXPERIMENT"}</p>
           <h2>{d.burst}</h2>
@@ -128,14 +141,15 @@ export default function ComparePage() {
                   <div key={s.state}>
                     <dt>{s.label}</dt>
                     <dd>{s.count}</dd>
+                    {s.state === "refused" && (
+                      <dd className="burst-reason">
+                        <code>{Object.keys(result.S.refusals).join(" · ")}</code>
+                      </dd>
+                    )}
                   </div>
                 ))}
               </dl>
-              {b.name === t.sName && (
-                <p className="caption">
-                  <code>{Object.keys(result.S.refusals).join(" · ")}</code>
-                </p>
-              )}
+
               <Collapsible trigger={<Text>{t.txs}</Text>} defaultIsOpen={false}>
                 <ul className="transaction-list">
                   {b.txs.map((tx) => (
@@ -191,7 +205,7 @@ export default function ComparePage() {
           {t.oName}: {t.notRun}
         </p>
       </section>
-      <section className="page-section method-section">
+      <section id="method" className="page-section method-section">
         <h2>{vi ? "Cách đo và lưu ý" : "Method and caveats"}</h2>
         <ul>
           {t.notes.map((n) => (

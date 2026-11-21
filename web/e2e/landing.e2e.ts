@@ -9,6 +9,7 @@ import { Hono } from "hono";
 import { chromium } from "playwright";
 import { decodeFunctionData, encodeFunctionResult, type Hex, parseEther, toHex } from "viem";
 import result from "../src/compare-result.json" with { type: "json" };
+import walletRuns from "../src/evalSummary.json" with { type: "json" };
 import leakedKey from "../src/leakedKeySummary.json" with { type: "json" };
 import { limitationSources } from "../src/limitationsText.js";
 
@@ -51,7 +52,7 @@ try {
   await page.getByRole("heading", { level: 1 }).waitFor();
   assert.match((await page.locator("h1").textContent()) ?? "", /Đưa agent một chiếc thẻ/);
   await page.getByText("Hiện chưa lấy được dữ liệu trực tiếp.", { exact: true }).waitFor();
-  assert.equal(await page.locator(".metric-loading").count(), 3);
+  assert.equal(await page.locator(".metric-loading").count(), 2);
   assert.equal(
     bundles.some((url) => /OwnerPage-|useArenaLive-|TryPayment-/.test(url)),
     false,
@@ -67,6 +68,25 @@ try {
     ((await page.locator(".key-evidence .evidence-number").textContent()) ?? "").replace(/\s/g, ""),
     `${leakedKey.passed}/${leakedKey.cases}`,
   );
+  const diagram = page.locator(".policy-diagram");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const fastCycle = await page.addStyleTag({
+    content: ".policy-diagram { --policy-cycle: 450ms; }",
+  });
+  await diagram.locator(".packet-out").waitFor({ state: "detached" });
+  await diagram.locator(".packet-out").waitFor({ state: "attached" });
+  await fastCycle.evaluate((style) => style.parentNode?.removeChild(style));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "Over budget", exact: true }).click();
+  assert.match(
+    (await page.locator('.policy-result[aria-hidden="false"]').textContent()) ?? "",
+    new RegExp(`${result.S.refusedByPool} of ${result.S.attempts}`),
+  );
+  await page.getByRole("button", { name: "Within budget", exact: true }).click();
+  assert.match(
+    (await page.locator('.policy-result[aria-hidden="false"]').textContent()) ?? "",
+    new RegExp(`${result.S.settledOnChain} fit the daily cap and settled`),
+  );
   await page.getByRole("button", { name: "Try a real payment", exact: true }).click();
   await page.locator("#hero-transaction h2").waitFor();
   assert.equal(await page.getByRole("button", { name: /Pay a stranger/ }).isVisible(), true);
@@ -77,12 +97,20 @@ try {
   );
   await page.getByRole("button", { name: "Try a real payment", exact: true }).click();
   mkdirSync("screenshots", { recursive: true });
-  for (const path of ["/", "/arena", "/arena/rules", "/compare", "/business", "/console"]) {
+  for (const path of [
+    "/",
+    "/arena",
+    "/arena/rules",
+    "/live",
+    "/compare",
+    "/business",
+    "/console",
+  ]) {
     for (const lang of ["en", "vi"]) {
       await page.goto(`${base}${path}?lang=${lang}`);
       await page.locator("h1").waitFor();
       await page.evaluate(() => document.fonts.ready);
-      for (const width of [360, 390, 768, 1024, 1440]) {
+      for (const width of [360, 390, 768, 1024, 1152, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
         assert.ok(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -112,6 +140,22 @@ try {
     }
   }
   await page.goto(`${base}/compare?lang=en`);
+  const fujiWallets = walletRuns.filter((row) => !row.network.startsWith("local"));
+  for (const [metric, label] of [
+    ["t1", "Inside the mandate, unwanted"],
+    ["benign", "Benign payments"],
+  ] as const) {
+    const option = page.getByRole("radio", { name: new RegExp(label) });
+    await option.focus();
+    await page.keyboard.press("Space");
+    assert.equal(await option.isChecked(), true);
+    assert.deepEqual(
+      await page.locator(".matrix-number").allTextContents(),
+      fujiWallets.map((row) =>
+        metric === "benign" ? `${row.benignDone}/${row.benign}` : `${row.t1}/${row.cases}`,
+      ),
+    );
+  }
   await page.locator(".burst-panel").first().waitFor();
   assert.equal(
     await page.locator(".burst-panel").nth(1).locator(".burst-dot").count(),
@@ -125,7 +169,8 @@ try {
     (await page.locator(".section-note").textContent()) ?? "",
     /waiting payments may/i,
   );
-  await page.goto(`${base}/arena/rules?lang=en`);
+  await page.goto(`${base}/arena/rules?lang=en#limitation-2`);
+  await page.locator("#limitation-2 details[open]").waitFor();
   await page.locator(".limits-ledger").waitFor();
   // As many as the limitations list (every limit has a source, tested in limitationsText).
   assert.equal(await page.locator(".limits-ledger li").count(), limitationSources.length);
@@ -134,10 +179,25 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator(".landing-mobile-menu summary").click();
   assert.equal(
-    await page.getByRole("link", { name: "For builders", exact: true }).isVisible(),
+    await page
+      .locator(".landing-mobile-menu")
+      .getByRole("link", { name: "For builders", exact: true })
+      .isVisible(),
     true,
   );
-  await page.getByRole("link", { name: "How it works", exact: true }).click();
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator(".landing-mobile-menu").getAttribute("open"), null);
+  assert.equal(
+    await page
+      .locator(".landing-mobile-menu summary")
+      .evaluate((el) => el === document.activeElement),
+    true,
+  );
+  await page.keyboard.press("Enter");
+  await page
+    .locator(".landing-mobile-menu")
+    .getByRole("link", { name: "How it works", exact: true })
+    .click();
   assert.equal(await page.locator(".landing-mobile-menu").getAttribute("open"), null);
   assert.equal(
     await page.evaluate(
@@ -154,6 +214,57 @@ try {
     await page.getByRole("link", { name: "Full results", exact: true }).getAttribute("href"),
     "/compare",
   );
+  // Exercise both chain and gateway readouts with one cached, read-only snapshot.
+  const snapshotUrl = "**/state";
+  const recent = Array.from({ length: 8 }, (_, index) => ({
+    ts: 1_790_000_000_000 + index,
+    result: "accepted",
+    reason: "",
+    hash: `0x${String(index).repeat(64)}`,
+    to: result.S.agent,
+    value: "10000000000000000",
+  }));
+  await page.route(snapshotUrl, (route) =>
+    route.fulfill({
+      json: {
+        ruleVersion: 2,
+        registered: true,
+        frozen: false,
+        balance: parseEther("3.5").toString(),
+        spentToday: "0",
+        totalCharged: "0",
+        mandate: {
+          payees: [result.S.agent],
+          perTxCap: parseEther("0.5").toString(),
+          dailyCap: parseEther("1").toString(),
+          expiry: "1798761600",
+        },
+        recorder: {
+          funded: parseEther("3.5").toString(),
+          required: "0",
+          score: "0",
+          breached: false,
+        },
+        recent,
+        summary: { total: 8, accepted: 8, rejected: 0, distinctSenders: 2, byReason: {} },
+      },
+    }),
+  );
+  await page.goto(`${base}/?lang=vi`);
+  await page.locator(".live-metric").getByText("3.5 USDC", { exact: true }).waitFor();
+  await page.locator('a[href="/compare#tradeoffs"]').click();
+  await page.locator("#tradeoffs").waitFor();
+  assert.equal(await page.locator("html").getAttribute("lang"), "vi");
+  await page.goto(`${base}/arena`);
+  await page.locator(".feed-toggle").waitFor();
+  assert.equal(await page.locator(".attempt-feed li").count(), 6);
+  await page.locator(".feed-toggle").click();
+  assert.equal(await page.locator(".attempt-feed li").count(), recent.length);
+  assert.equal(await page.getByText("01/01/2027 UTC", { exact: true }).isVisible(), true);
+  const buttons = await page.locator(".payment-actions").boundingBox();
+  const keyBox = await page.locator(".published-key").boundingBox();
+  assert.ok(buttons && keyBox && buttons.y < keyBox.y, "mobile payment controls precede the key");
+  await page.unroute(snapshotUrl);
   // Exercise the populated console without signing or sending anything. All RPC values here
   // are UI fixtures; real passkey + chain integration remains in owner.e2e.ts.
   const fixture = await browser.newPage({
@@ -285,7 +396,7 @@ try {
   assert.deepEqual(writes, [], "viewing pages and opening controls sends no transactions");
   assert.deepEqual(errors, [], "no browser runtime errors");
   console.log(
-    "PASS: all six routes in EN/VI at five widths, readable text, recorded data, lazy transaction bundles, unavailable data, language persistence, mobile navigation, reduced motion, no transaction writes, no runtime errors. Screenshots: web/screenshots/",
+    "PASS: all seven routes in EN/VI at six widths, readable text, recorded data, lazy transaction bundles, unavailable data, language persistence, mobile navigation, reduced motion, no transaction writes, no runtime errors. Screenshots: web/screenshots/",
   );
 } finally {
   await browser.close();

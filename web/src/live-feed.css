@@ -1,0 +1,161 @@
+.live-heading .live-mobile-open {
+  display: none;
+}
+.live-readings dd {
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .live-readings .reading-value {
+    display: inline-block;
+    font-variant-numeric: tabular-nums;
+    animation: reading-update 420ms ease-out;
+  }
+  @keyframes reading-update {
+    from {
+      transform: translateY(3px);
+      color: #a8c5ff;
+    }
+    to {
+      transform: none;
+      color: inherit;
+    }
+  }
+}
+.monitor-feed {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.monitor-feed th {
+  color: var(--muted);
+  background: var(--seal-soft);
+  padding: 12px 16px;
+  text-align: start;
+  vertical-align: bottom;
+  font: 600 13px / 1.35 var(--display);
+}
+.monitor-feed td {
+  vertical-align: top;
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font: 500 15px / 1.45 var(--display);
+}
+.monitor-feed tbody tr:nth-child(even) {
+  background: var(--paper);
+}
+.monitor-feed :where(time, strong, .attempt-age, code) {
+  display: block;
+}
+.monitor-feed code,
+.monitor-feed .attempt-age {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.monitor-feed .attempt-age {
+  font-family: var(--display);
+}
+.monitor-feed .attempt-payment strong {
+  font-variant-numeric: tabular-nums;
+}
+.live-display.is-full .live-overview {
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 0.66fr);
+}
+.live-display.is-full .live-join {
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+.live-display.is-full .arena-qr {
+  width: 280px;
+  height: 280px;
+}
+.live-display.is-full .live-join div a {
+  font-size: 20px;
+}
+.live-display.is-full .monitor-feed :is(th, td, code, .attempt-age, .status-pill) {
+  font-size: 18px;
+}
+
+@media (max-width: 700px) {
+  .live-heading .live-mobile-open {
+    display: inline-flex;
+  }
+  .live-heading .live-full-toggle,
+  .page-live .live-join,
+  .page-live .live-identity .text-link {
+    display: none;
+  }
+  .live-display.is-full .live-heading .live-full-toggle {
+    display: inline-flex;
+  }
+  .page-live .live-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .live-readings dd {
+    font-size: clamp(20px, 5vw, 30px);
+  }
+  .monitor-feed {
+    display: block;
+  }
+  .monitor-feed thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .monitor-feed tbody {
+    display: block;
+  }
+  .monitor-feed tr {
+    display: grid;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+    grid-template-areas: "clock node" "payment receipt";
+    align-items: start;
+    gap: 7px 10px;
+    padding: 13px 14px;
+    border-top: 1px solid var(--line);
+  }
+  .monitor-feed td {
+    padding: 0;
+    border: 0;
+    font-size: 14px;
+  }
+  .monitor-feed .attempt-clock {
+    grid-area: clock;
+  }
+  .monitor-feed .attempt-payment {
+    grid-area: payment;
+  }
+  .monitor-feed .attempt-node {
+    grid-area: node;
+  }
+  .monitor-feed .attempt-receipt {
+    grid-area: receipt;
+  }
+  .monitor-feed .attempt-receipt[data-refused="true"] {
+    display: none;
+  }
+  .monitor-feed tr:has(.attempt-receipt[data-refused="true"]) .attempt-payment {
+    grid-column: 1 / -1;
+  }
+  .monitor-feed :where(.attempt-payment) strong,
+  .monitor-feed :where(.attempt-payment) code {
+    display: inline;
+  }
+  .monitor-feed .attempt-payment code::before {
+    content: " → ";
+  }
+  .monitor-feed .attempt-age,
+  .monitor-feed code {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  .monitor-feed .status-pill {
+    font-size: 12px;
+  }
+}

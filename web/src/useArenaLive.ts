@@ -14,7 +14,14 @@ export type Summary = {
   byReason: Record<string, number>;
   distinctSenders: number;
 };
-export type Attempt = { ts: number; to: string; value: string; result: string; reason: string };
+export type Attempt = {
+  ts: number;
+  hash?: string;
+  to: string;
+  value: string;
+  result: string;
+  reason: string;
+};
 export type Recorder = { funded: bigint; required: bigint; score: bigint; breached: boolean };
 
 /**

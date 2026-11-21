@@ -82,7 +82,7 @@ const vi: typeof en = [
   ],
   [
     "Vẫn chi được trong uỷ quyền",
-    "Khoá lộ vẫn trả được cho người bán được phép trong hạn mức, cho tới khi đóng băng hoặc hết hạn. Hạn mức ngày đặt lại lúc 00:00 UTC (07:00 Việt Nam), không tính theo cửa sổ trượt: có thể dùng ngân sách của hai ngày trong vài phút quanh mốc này. Với luật v2 (trên Fuji từ block 491) giới hạn gas phải bằng đúng gas tối thiểu của khoản trả, tip tối đa 1 gwei, và uỷ quyền đặt bằng setMandateV2 có thêm hạn mức phí mỗi ngày; uỷ quyền cũ chưa có hạn mức phí cho tới khi đặt lại.",
+    "Khoá lộ vẫn trả được cho người bán được phép trong hạn mức, cho tới khi đóng băng hoặc hết hạn. Hạn mức ngày đặt lại lúc 00:00 UTC (07:00 Việt Nam), không tính theo cửa sổ trượt: có thể dùng ngân sách của hai ngày trong vài phút quanh mốc này. Với luật v2 (trên Fuji từ block 491) giới hạn gas phải bằng đúng gas tối thiểu của khoản thanh toán, tip tối đa 1 gwei, và uỷ quyền đặt bằng setMandateV2 có thêm hạn mức phí mỗi ngày; uỷ quyền cũ chưa có hạn mức phí cho tới khi đặt lại.",
   ],
   [
     "Vẫn có thể phá rối",

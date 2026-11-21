@@ -34,6 +34,7 @@ import { RELAYER_URL } from "./owner.js";
 import { SiteShell } from "./SiteShell.js";
 import { TryPayment } from "./TryPayment.js";
 import { RPC, useArenaLive } from "./useArenaLive.js";
+import "./operations.css";
 
 const colBasis: CSSProperties = { flexBasis: 0 };
 
@@ -62,7 +63,8 @@ const big = (v: number | undefined) =>
 
 export default function ArenaPage() {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const isNarrow = useMediaQuery("(max-width: 599px)");
+  const isNarrow = useMediaQuery("(max-width: 639px)");
+  const [allAttempts, setAllAttempts] = useState(false);
   const { lang, setLang, t: tr } = useI18n();
   const t = arenaText(lang);
   const d = designText(lang);
@@ -213,7 +215,6 @@ await client.sendTransaction({
               value={asNumber(view.spentToday)}
               max={asNumber(view.mandate.dailyCap) || 1}
               variant={view.frozen ? "warning" : "success"}
-              marks={[{ value: asNumber(view.mandate.perTxCap), label: t.perTx }]}
               hasValueLabel
               formatValueLabel={(v, m) => `${v} / ${m} USDC`}
             />
@@ -225,7 +226,14 @@ await client.sendTransaction({
                 label={t.perDay}
               >{`${usdc(view.mandate.dailyCap)} USDC`}</MetadataListItem>
               <MetadataListItem label={t.expires}>
-                <Timestamp value={Number(view.mandate.expiry)} format="date" />
+                {view.mandate.expiry > 8_640_000_000_000n
+                  ? `${view.mandate.expiry} (Unix)`
+                  : `${new Intl.DateTimeFormat(lang === "vi" ? "vi-VN" : "en-US", {
+                      day: "2-digit",
+                      month: lang === "vi" ? "2-digit" : "short",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    }).format(Number(view.mandate.expiry) * 1000)} UTC`}
               </MetadataListItem>
               <MetadataListItem label={t.payees}>
                 <VStack gap={1}>
@@ -242,40 +250,45 @@ await client.sendTransaction({
           <Skeleton height={120} />
         )}
         <Divider />
-        <Collapsible trigger={<Text weight="bold">{t.onChainCheck}</Text>} defaultIsOpen={false}>
-          <VStack gap={3}>
-            <MetadataList>
-              <MetadataListItem label={t.balance}>
-                {view ? `${usdc(view.balance)} USDC` : "…"}
-              </MetadataListItem>
-              <MetadataListItem label={t.funded}>
-                {rec ? `${usdc(rec.funded)} USDC` : "…"}
-              </MetadataListItem>
-              <MetadataListItem label={t.required}>
-                {rec ? `${usdc(rec.required)} USDC` : "…"}
-              </MetadataListItem>
-            </MetadataList>
-            <HStack gap={2} wrap="wrap" vAlign="center">
-              <Button
-                label={t.checkpoint}
-                variant="secondary"
-                size="sm"
-                isLoading={busy === "checkpoint"}
-                isDisabled={!!busy}
-                onClick={() => void act("checkpoint")}
-              />
-              <Button
-                label={t.reportBreach}
-                variant="secondary"
-                size="sm"
-                isLoading={busy === "reportBreach"}
-                isDisabled={!!busy}
-                onClick={() => void act("reportBreach")}
-              />
-              <InfoTip content={t.actionHelp} />
-            </HStack>
-          </VStack>
-        </Collapsible>
+        <div id="on-chain-check">
+          <Collapsible
+            trigger={<Text weight="bold">{t.onChainCheck}</Text>}
+            defaultIsOpen={location.hash === "#on-chain-check"}
+          >
+            <VStack gap={3}>
+              <MetadataList>
+                <MetadataListItem label={t.balance}>
+                  {view ? `${usdc(view.balance)} USDC` : "…"}
+                </MetadataListItem>
+                <MetadataListItem label={t.funded}>
+                  {rec ? `${usdc(rec.funded)} USDC` : "…"}
+                </MetadataListItem>
+                <MetadataListItem label={t.required}>
+                  {rec ? `${usdc(rec.required)} USDC` : "…"}
+                </MetadataListItem>
+              </MetadataList>
+              <HStack gap={2} wrap="wrap" vAlign="center">
+                <Button
+                  label={t.checkpoint}
+                  variant="secondary"
+                  size="sm"
+                  isLoading={busy === "checkpoint"}
+                  isDisabled={!!busy}
+                  onClick={() => void act("checkpoint")}
+                />
+                <Button
+                  label={t.reportBreach}
+                  variant="secondary"
+                  size="sm"
+                  isLoading={busy === "reportBreach"}
+                  isDisabled={!!busy}
+                  onClick={() => void act("reportBreach")}
+                />
+                <InfoTip content={t.actionHelp} />
+              </HStack>
+            </VStack>
+          </Collapsible>
+        </div>
       </VStack>
     </Card>
   );
@@ -328,23 +341,44 @@ await client.sendTransaction({
         ) : recent.length === 0 ? (
           <EmptyState isCompact title={t.none} description={t.emptyHint} />
         ) : (
-          <ol className="attempt-feed">
-            {recent.map((a) => (
-              <li key={`${a.ts}-${a.to}-${a.value}-${a.result}`}>
-                <div className="attempt-topline">
-                  <StatusPill state={a.result === "accepted" ? "passed" : "refused"}>
-                    {a.result === "accepted" ? t.accepted : t.refused}
-                  </StatusPill>
-                  <Timestamp value={Math.floor(a.ts / 1000)} format="relative" isLive />
-                </div>
-                <div className="attempt-detail">
-                  <code>{short(a.to)}</code>
-                  <span>{usdc(BigInt(a.value || "0"))} USDC</span>
-                </div>
-                {a.reason && <code className="attempt-reason">{a.reason}</code>}
-              </li>
-            ))}
-          </ol>
+          <>
+            <ol className="attempt-feed">
+              {(allAttempts ? recent : recent.slice(0, 6)).map((a) => (
+                <li key={`${a.ts}-${a.hash ?? ""}-${a.to}-${a.value}-${a.result}-${a.reason}`}>
+                  <div className="attempt-topline">
+                    <StatusPill state={a.result === "accepted" ? "passed" : "refused"}>
+                      {a.result === "accepted" ? t.accepted : t.refused}
+                    </StatusPill>
+                    <Timestamp value={Math.floor(a.ts / 1000)} format="relative" isLive />
+                  </div>
+                  <div className="attempt-detail">
+                    <code>{short(a.to)}</code>
+                    <span>{usdc(BigInt(a.value || "0"))} USDC</span>
+                  </div>
+                  {a.result === "accepted" && a.hash && (
+                    <CopyAddress address={a.hash} copy={t.copy} copied={t.copied} />
+                  )}
+                  {a.reason && <code className="attempt-reason">{a.reason}</code>}
+                </li>
+              ))}
+            </ol>
+            {recent.length > 6 && (
+              <button
+                type="button"
+                className="feed-toggle"
+                aria-expanded={allAttempts}
+                onClick={() => setAllAttempts(!allAttempts)}
+              >
+                {allAttempts
+                  ? lang === "vi"
+                    ? "Thu gọn"
+                    : "Show fewer"
+                  : lang === "vi"
+                    ? `Xem cả ${recent.length} lượt gần nhất`
+                    : `Show all ${recent.length} recent attempts`}
+              </button>
+            )}
+          </>
         )}
       </VStack>
     </Card>
@@ -353,25 +387,20 @@ await client.sendTransaction({
   return (
     <SiteShell lang={lang} setLang={setLang} current="arena">
       <VStack gap={6}>
-        <VStack gap={3}>
-          <HStack gap={3} hAlign="between" vAlign="center" wrap="wrap">
-            <Text type="supporting" color="secondary">
-              {t.arenaTitle}
-            </Text>
-            <HStack gap={2} vAlign="center">
+        <header className="arena-intro">
+          <div className="operation-lead">
+            <p className="micro-label">{t.arenaTitle}</p>
+            <h1>{t.headline}</h1>
+            <p className="operation-description">{t.arenaIntro}</p>
+            <div className="arena-lead-actions">
               {statusBadge}
-              <Button label={t.rulesLink} variant="secondary" size="sm" href="/arena/rules" />
-            </HStack>
-          </HStack>
-          <Heading level={1} type="display-2" textWrap="balance">
-            {t.headline}
-          </Heading>
-          <Text type="body" color="secondary">
-            {t.arenaIntro}
-          </Text>
-        </VStack>
-
-        <PublishedKey lang={lang} />
+              <a className="text-link" href="/arena/rules">
+                {t.rulesLink} <span aria-hidden="true">→</span>
+              </a>
+            </div>
+          </div>
+          {!isNarrow && <PublishedKey lang={lang} />}
+        </header>
         <div className="arena-workbench">
           <TryPayment
             t={t}
@@ -379,6 +408,7 @@ await client.sendTransaction({
             onSent={() => void live.refreshChain()}
             onReportBreach={() => void act("reportBreach")}
           />
+          {isNarrow && <PublishedKey lang={lang} />}
           {mandateCard}
         </div>
         {outcome ? (
@@ -388,7 +418,11 @@ await client.sendTransaction({
           <Banner status="warning" title={t.lowBalance} />
         ) : null}
 
-        <section className="arena-stats" aria-label={t.statusTitle}>
+        <section
+          className="arena-stats"
+          aria-label={lang === "vi" ? "Số liệu thử thách" : "Challenge metrics"}
+        >
+          <h2 id="chain-status">{t.statusTitle}</h2>
           <Grid columns={{ minWidth: 160, max: 3 }} gap={4}>
             <Tile label={t.atStake}>
               {view ? (
@@ -422,6 +456,9 @@ await client.sendTransaction({
                 </HStack>
               )}
             </Tile>
+          </Grid>
+          <h2>{lang === "vi" ? "Lượt thử qua gateway" : "Attempts seen by the gateway"}</h2>
+          <Grid columns={{ minWidth: 160, max: 3 }} gap={4}>
             <Tile
               label={
                 <HStack gap={1} vAlign="center">
@@ -453,21 +490,25 @@ await client.sendTransaction({
 /** A payee shown as 0x1234…abcd with a button that copies the full address. */
 function CopyAddress(o: { address: string; copy: string; copied: string }) {
   const [done, setDone] = useState(false);
+  const [manual, setManual] = useState(false);
   return (
     <HStack gap={2} vAlign="center" wrap="wrap">
       <Code>
-        <span title={o.address}>{shortAddress(o.address)}</span>
+        <span title={o.address}>{manual ? o.address : shortAddress(o.address)}</span>
       </Code>
       <Button
         label={done ? o.copied : o.copy}
-        variant="ghost"
+        variant="secondary"
         size="sm"
         aria-label={`${done ? o.copied : o.copy} ${o.address}`}
         onClick={() =>
           void navigator.clipboard
             .writeText(o.address)
             .then(() => setDone(true))
-            .catch(() => setDone(false))
+            .catch(() => {
+              setDone(false);
+              setManual(true);
+            })
         }
       />
     </HStack>

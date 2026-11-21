@@ -211,15 +211,27 @@ export function TryPayment(o: {
       <VStack gap={4}>
         <VStack gap={2}>
           <Heading level={2}>{t.tryTitle}</Heading>
-          <Text type="body" color="secondary">
-            {t.tryIntro}
-          </Text>
+          <p className="payment-description">{t.tryIntro}</p>
+          <p className="payment-compact">{t.tryCompact}</p>
         </VStack>
-        <HStack gap={3} wrap="wrap">
+        <div className="payment-actions">
           {button("stranger", t.tryStranger, "primary")}
-          {button("overCap", t.tryOverCap, "secondary")}
+          {button(
+            "overCap",
+            view && attempts.overCap
+              ? t.tryOverAmount
+                  .replace("{amount}", formatEther(attempts.overCap.value))
+                  .replace("{cap}", formatEther(view.mandate.perTxCap))
+              : t.tryOverCap,
+            "secondary",
+          )}
           {button("allowed", t.tryAllowed, "secondary")}
-        </HStack>
+        </div>
+        {!result && (
+          <p className="payment-placeholder" role="status">
+            {busy ? t.trySending : t.tryPlaceholder}
+          </p>
+        )}
         {!view ? (
           <Text type="supporting" color="secondary">
             {t.tryLoading}
