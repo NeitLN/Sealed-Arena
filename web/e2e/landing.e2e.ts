@@ -207,6 +207,25 @@ try {
     0,
     "reduced motion stops animations",
   );
+  // From another page, one click on "How it works" lands on that section (the landing page is
+  // loaded lazily, so the browser's own jump to the anchor finds nothing yet).
+  await page.goto(`${base}/arena?lang=en`);
+  await page.locator("h1").waitFor();
+  await page.locator(".landing-mobile-menu summary").click();
+  await page
+    .locator(".landing-mobile-menu")
+    .getByRole("link", { name: "How it works", exact: true })
+    .click();
+  await page.waitForURL(/#how-it-works$/);
+  await page.locator("#how-it-works").waitFor();
+  await page.waitForFunction(
+    () => {
+      const top = document.getElementById("how-it-works")?.getBoundingClientRect().top;
+      return top !== undefined && Math.abs(top) < 160;
+    },
+    undefined,
+    { timeout: 5000 },
+  );
   await page.keyboard.press("Control+Home");
   await page.keyboard.press("Tab");
   assert.equal(await page.locator(".landing-skip").getAttribute("href"), "#site-main");

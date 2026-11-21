@@ -26,6 +26,16 @@ export default function LandingPage() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     panel.current?.scrollIntoView({ behavior: reduce ? "instant" : "smooth", block: "start" });
   }, [trying]);
+  // This page is loaded lazily, so when a link from another page opens "/#how-it-works" the
+  // browser's own jump finds no section yet. Scroll to it once the page has rendered.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const frame = requestAnimationFrame(() =>
+      document.getElementById(id)?.scrollIntoView({ block: "start" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const [counts, setCounts] = useState<LiveCounts>();
   const [chain, setChain] = useState<{ breached: boolean; balance: string; stale: boolean }>();
   const [failed, setFailed] = useState(false);
