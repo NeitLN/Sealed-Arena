@@ -52,6 +52,21 @@ try {
   await page.getByRole("heading", { level: 1 }).waitFor();
   const example = page.getByRole("region", { name: "Ví dụ thanh toán" });
   await page.emulateMedia({ reducedMotion: "no-preference" });
+  // The example switches payee by itself after each run; clicking the payee already shown stops it.
+  const stage = example.locator(".transfer-stage");
+  await stage.scrollIntoViewIfNeeded();
+  await page.waitForFunction(
+    () => document.querySelector(".transfer-stage")?.getAttribute("data-route") === "refused",
+    undefined,
+    { timeout: 10000 },
+  );
+  await example.locator(".payee-options label").filter({ hasText: "Địa chỉ khác" }).click();
+  await page.waitForTimeout(5000);
+  assert.equal(
+    await stage.getAttribute("data-route"),
+    "refused",
+    "a click on the shown payee stops the switching",
+  );
   const replay = example.getByRole("button", { name: "Phát lại minh hoạ" });
   await replay.click({ timeout: 4000 });
   await example.getByRole("radio", { name: "Địa chỉ khác" }).check({ timeout: 4000 });

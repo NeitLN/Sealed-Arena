@@ -107,6 +107,8 @@ export function PaymentExample({ lang }: { lang: Lang }) {
                   name="example-payee"
                   checked={approved === allowed}
                   onChange={() => choose(allowed)}
+                  // A click on the payee already shown fires no change; it still stops the switching.
+                  onClick={() => choose(allowed)}
                 />
                 <LandingIcon name={allowed ? "blocks" : "crosshair"} size={16} />
                 <span>{allowed ? t.apiProvider : t.otherPayee}</span>
