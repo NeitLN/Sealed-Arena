@@ -6,13 +6,45 @@
 
 **An Avalanche L1 where a payment from an AI agent's key is valid only if it stays inside the mandate its owner set with a passkey.**
 
-[Live demo](https://sealed-arena.vercel.app) · [Try a forbidden payment](https://sealed-arena.vercel.app/arena) · Video: (link added on submission) · Slides: (link added on submission)
+[Live demo](https://sealed-arena.vercel.app) · [Try a forbidden payment](https://sealed-arena.vercel.app/arena) · [Evidence](https://sealed-arena.vercel.app/compare) · Video: (link added on submission) · Slides: (link added on submission)
 
-Give the agent a card, not the whole wallet. If the agent is tricked, or its private key leaks, a transfer outside the mandate is not a reverted transaction. It is an **invalid** transaction, and the chain's validator does not accept a block that contains it.
+[![The Sealed Arena home page: an AI agent's payment passes through the Sealed L1 to an allowed payee](docs/images/landing.png)](https://sealed-arena.vercel.app)
 
-> **Today:** one validator, run by the team, on the Fuji testnet. The claim is about where the rule is checked (transaction validity), not about who operates the chain. See [Security model and limitations](#security-model-and-limitations).
+> Built for Team1 Vietnam UniHack 2026, _Build on Avalanche_, track AI agents & security. Fuji testnet only; one validator, run by the team.
 
-> Built for Team1 Vietnam UniHack 2026, _Build on Avalanche_, track AI agents & security. Testnet only.
+## In 60 seconds
+
+- **The problem.** AI agents now hold keys and pay for APIs and data on their own. A prompt injection, a poisoned tool or a leaked key can send their money anywhere.
+- **The idea.** Give the agent a card, not the whole wallet. The owner signs a mandate with a passkey: allowed payees, a cap per payment, a cap per day and an expiry. On the Sealed L1 that mandate is part of **transaction validity**: a payment outside it is not a reverted call but an invalid transaction. The node refuses it and no valid block can contain it, even when the attacker holds the agent's private key.
+- **What we measured** (sources in the last column):
+
+| Measurement                                                                                       | Result                                                     | Source                                                       |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
+| Coins left outside the mandate, same 45 attack cases: plain wallet P / caps-only O / O+ / Sealed  | 36 / 16 / 0 / **0**                                        | [`docs/EVALUATION.md`](docs/EVALUATION.md)                   |
+| Leaked-key cases that ended inside the mandate (attacker holds the agent's key)                   | **24/24** on the Sealed L1 on Fuji, 26/26 on the local L1  | [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)  |
+| 20 payments sent at once against a 1 USDC daily cap                                               | 2 settled, 18 refused on arrival, refused ones paid no fee | [`web/src/compare-result.json`](web/src/compare-result.json) |
+| Owner freezes the agent with a passkey                                                            | 4.7 s to the receipt; the next payment is refused          | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
+| Fee of an agent payment on the Sealed L1                                                          | 0.000021 test USDC                                         | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
+| Weakened rule conditions caught by the node's tests (mutation check, rules v1 and v2, 20/11/2026) | 14 of 14                                                   | [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md)               |
+
+- **What we do not claim.** The claim is about where the rule is checked (transaction validity), not about who operates the chain: today the team runs the only validator. A contract wallet with a payee list (O+) also kept every coin inside the mandate in our 45 cases; [Why not a contract wallet?](#why-not-a-contract-wallet) explains what differs. All 16 known limits: [Security model and limitations](#security-model-and-limitations).
+
+### For judges: where to look
+
+| Criterion                | Start here                                                                                                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Technical implementation | The rule in the node: [`chain/patches/0003-agent-rule.patch`](chain/patches) (460 lines of rule, see [How it works](#how-it-works)); the passkey precompile in `0002`; [Testing](#testing), including a local run where a node without the rule proposes forbidden blocks and the other two reject them |
+| Avalanche integration    | [Avalanche components used](#avalanche-components-used): our own L1 on Fuji, patched Subnet-EVM with a stateful precompile, USDC bridged with ICTT, a record sent over ICM to ERC-8004; [addresses on Fuji](#try-it-on-fuji-testnet)                                                                    |
+| Creativity & innovation  | The spending limit lives in transaction validity instead of in a wallet contract; [Why not a contract wallet?](#why-not-a-contract-wallet)                                                                                                                                                              |
+| Impact & use case        | [Why on-chain, why Avalanche](#why-on-chain-why-avalanche-where-the-money-comes-from) and the [business model (hypothesis, no customers yet)](#business-model-hypothesis)                                                                                                                               |
+| UI/UX & demo             | [Live site](https://sealed-arena.vercel.app): owner console with passkeys, open challenge with a public agent key, evidence page; English and Vietnamese                                                                                                                                                |
+
+<details>
+<summary><b>Contents</b></summary>
+
+[The problem](#the-problem) · [How it works](#how-it-works) · [Why on-chain, why Avalanche](#why-on-chain-why-avalanche-where-the-money-comes-from) · [Business model](#business-model-hypothesis) · [Avalanche components](#avalanche-components-used) · [Status](#status) · [Evaluation](#evaluation) · [Why not a contract wallet?](#why-not-a-contract-wallet) · [Try it on Fuji](#try-it-on-fuji-testnet) · [Quick start](#quick-start) · [Repository layout](#repository-layout) · [Testing](#testing) · [Security model and limitations](#security-model-and-limitations) · [Legal note](#legal-note) · [License](#license)
+
+</details>
 
 > **Tóm tắt (Tiếng Việt).** Sealed Arena là một Avalanche L1 riêng. Mỗi khoản chi từ khoá của một AI agent chỉ hợp lệ khi nằm trong uỷ quyền mà chủ ví đặt bằng passkey: danh sách người nhận, hạn mức mỗi giao dịch, hạn mức mỗi ngày, hạn dùng. Quy tắc nằm trong điều kiện hợp lệ của giao dịch ở node (Subnet-EVM), nên giao dịch vượt uỷ quyền không được đưa vào block mà validator của chain chấp nhận (hiện có một validator, do đội vận hành), kể cả khi kẻ tấn công cầm được private key của agent. Chủ ví có thể dừng agent bất cứ lúc nào bằng passkey. Dự án chỉ chạy trên testnet; tài sản không có giá trị quy đổi.
 
@@ -20,7 +52,7 @@ Give the agent a card, not the whole wallet. If the agent is tricked, or its pri
 
 ## The problem
 
-AI agents now hold wallets and pay for APIs and data on their own (for example with x402). A prompt injection, a poisoned tool, or a leaked key can make the agent send money anywhere. Today's spending limits live in a server or in a smart-contract wallet. A contract wallet binds the funds held in it and the paths its code covers: the first wallet we wrote for comparison (O, caps only) let coins leave the mandate in 16 of 45 cases; with a payee list added (O+), in 0 of 45. Sealed Arena puts the check in transaction validity instead: one implementation in the node, for every registered agent, with fees counted in the caps.
+AI agents now hold wallets and pay for APIs and data on their own (for example with x402). A prompt injection, a poisoned tool, or a leaked key can make the agent send money anywhere. Today's spending limits live in a server or in a smart-contract wallet. A contract wallet binds the funds held in it and the paths its code covers: a minimal caps-only wallet written by the team for comparison (O) let coins leave the mandate in 16 of 45 cases; with a payee list added (O+), in 0 of 45. Sealed Arena puts the check in transaction validity instead: one implementation in the node, for every registered agent, with fees counted in the caps.
 
 ## How it works
 
@@ -55,7 +87,8 @@ Transactions from other senders are not affected. Details and the exact contract
 
 We have no customers yet; this is a hypothesis we have not tested.
 
-- **Who pays.** Agent platforms that hold wallets for their agents pay a fee per protected agent.
+- **First customer we expect.** A closed marketplace that runs or hosts buying agents and settles with its own sellers. Each agent owner sets a mandate; the node refuses payments outside it.
+- **Who pays.** The marketplace platform pays a subscription per agent under a mandate. It is not a deduction from the seller's payment.
 - **Fees on the L1.** Transaction fees on the Sealed L1 are a second source. The current genesis does not enable fee recipients, so collecting them would need a network upgrade.
 - **How money moves.** Users deposit USDC from the C-Chain through ICTT (see [D6](docs/decisions/D6.md), Vietnamese); sellers withdraw to the C-Chain through the same bridge.
 
@@ -76,20 +109,21 @@ We have no customers yet; this is a hypothesis we have not tested.
 
 ## Status
 
-| Component                                                                                                                                    | Status |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                                                 | Done   |
-| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters                                 | Done   |
-| Validity rule in `preCheck` and the txpool (mandate, daily budget, concurrent payments; rule v2: type, gas, tip, call data, daily fee cap)   | Done   |
-| Genesis with allow-lists, 3-node network, leaked-key attack suite                                                                            | Done   |
-| x402 payments with a signed native transaction: facilitator, sample seller, client                                                           | Done   |
-| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                                                 | Done   |
-| Buying agent driven by an LLM; prompt-injection scenarios with recorded transcripts and replay                                               | Done   |
-| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese                                | Done   |
-| Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel                              | Done   |
-| Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain                                           | Done   |
-| Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages                                 | Done   |
-| Comparison on Fuji with a plain wallet (P) and two minimal spending-limit contract wallets written by the team (O, and O+ with a payee list) | Done   |
+| Component                                                                                                                                                                                                                  | Status                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Local L1 from pinned avalanchego `v1.15.3` + Subnet-EVM, built and run in Docker (1–3 nodes)                                                                                                                               | Done                                                           |
+| `AgentPolicy` precompile: register, mandates, freeze/unfreeze with passkey (WebAuthn) proofs, spend counters                                                                                                               | Done                                                           |
+| Validity rule in `preCheck` and the txpool (mandate, daily budget, concurrent payments; rule v2: type, gas, tip, call data, daily fee cap)                                                                                 | Done                                                           |
+| Genesis with allow-lists, 3-node network, leaked-key attack suite                                                                                                                                                          | Done                                                           |
+| x402 payments with a signed native transaction: facilitator, sample seller, client                                                                                                                                         | Done                                                           |
+| `ArenaRecorder`: funding, survival score, public breach check (`balance ≥ funded − charged`)                                                                                                                               | Done                                                           |
+| Buying agent driven by an LLM; prompt-injection scenarios with recorded transcripts and replay                                                                                                                             | Done                                                           |
+| Owner console with passkeys (WebAuthn): link agent, set mandate, freeze/unfreeze; relayer; English/Vietnamese                                                                                                              | Done                                                           |
+| Sealed L1 on Fuji: validator, public HTTPS RPC, USDC bridged to the native coin (ICTT), owner console on Vercel                                                                                                            | Done                                                           |
+| Survival record sent over ICM (Teleporter) to the ERC-8004 reputation registry on the Fuji C-Chain                                                                                                                         | Done                                                           |
+| Open red-team challenge: public agent key, RPC gateway that records every attempt, challenge and rules pages                                                                                                               | Done                                                           |
+| Comparison on Fuji with a plain wallet (P) and two minimal spending-limit contract wallets written by the team (O, and O+ with a payee list)                                                                               | Done                                                           |
+| Agent rule v3: stricter owner proofs (User Verification), a guardian who can freeze, a waiting time before a mandate is loosened, a constrained sweep, caps per payee ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 3.6) | Implemented and tested on the local L1; not active on Fuji yet |
 
 Each design decision is recorded with its evidence (source lines, commands, results) in [`docs/decisions/`](docs/decisions) (Vietnamese; D1 opens with an English summary):
 [D1](docs/decisions/D1.md) a failing `preCheck` keeps a transaction out of every block ·
@@ -115,11 +149,11 @@ O+ and S both kept every coin inside the mandate in these 45 cases. S ends with 
 
 The leaked-key suite is reported separately, because it uses its own mandate: on the local L1 all 26 cases ended inside the mandate, and on the Sealed L1 on Fuji all 24 (see [`docs/EVALUATION.md`](docs/EVALUATION.md#leaked-key-suite)). The Fuji run has two cases fewer: Fuji has one node, so "sent straight to node 2" and "node 3" do not apply.
 
-Costs and timings on Fuji (fee of an agent payment 0.000021 test USDC; owner freeze to receipt 4.7 s, the next payment refused), the cost of the rule check (6.6 µs for an agent payment under rule v2, 0.34 µs for any other sender) and a mutation check of the rule's tests (14 of 14 weakened conditions caught): [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
+Costs and timings on Fuji (fee of an agent payment 0.000021 test USDC; owner freeze to receipt 4.7 s, the next payment refused), the cost of the rule check (6.6 µs for an agent payment under rule v2, 0.34 µs for any other sender) and a mutation check of the rule's tests (14 of 14 weakened conditions caught, rules v1 and v2, run on 20/11/2026): [`docs/MEASUREMENTS.md`](docs/MEASUREMENTS.md).
 
 Three mandates are used, so the amounts differ between sections: the open challenge and the 20-payments-at-once run use 0.5 USDC per payment and 1 USDC per day; the 45-case evaluation uses 0.02 and 0.05; the leaked-key suite sets its own.
 
-With two live models (claude-sonnet-5-5 and claude-haiku-5-5), the buying agent followed none of the injected pages in 30 runs (15 in the evaluation below, 15 in [`services/agent`](services/agent/README.md)). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node (local Sealed L1) refused 15 of 15 payments to the attacker's address (agent-tier table in [`docs/EVALUATION.md`](docs/EVALUATION.md)). S does not stop T1: the rule limits where and how much, not what the owner wanted.
+With two live models (claude-sonnet-5-5 and claude-haiku-5-5), the buying agent followed none of the injected pages in 30 runs (15 in the evaluation, 15 in [`services/agent`](services/agent/README.md)). It followed a note planted in its memory in 5/5 runs when its owner's task told it to read its notes; the node (local Sealed L1) refused 15 of 15 payments to the attacker's address (agent-tier table in [`docs/EVALUATION.md`](docs/EVALUATION.md)). S does not stop T1: the rule limits where and how much, not what the owner wanted.
 
 ## Why not a contract wallet?
 
@@ -145,6 +179,8 @@ The burst run is `services/attacks/compare/results/fuji-2026-11-17T06-00-03-128Z
 **When Sealed is worth its price.** You want the limit to hold for the key itself, fees included, with no wallet code per agent, and you accept a separate L1. We have not yet shown that customers find this worth the price (see "Business model").
 
 ## Try it on Fuji (testnet)
+
+[![The open challenge page: the agent's private key is published, and each button sends a real testnet payment that the node answers](docs/images/arena.png)](https://sealed-arena.vercel.app/arena)
 
 - RPC: `https://sealed-arena.duckdns.org/rpc` (chain id `261126`, native coin: USDC bridged from Fuji with ICTT)
 - Overview with live numbers: https://sealed-arena.vercel.app
