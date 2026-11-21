@@ -1,12 +1,13 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ARENA, GATEWAY_URL } from "./arena.config.js";
-import { BrandMark } from "./BrandMark.js";
-import r from "./compare-result.json";
+import { isStateAnswer } from "./arenaState.js";
 import { designText } from "./designText.js";
 import { AgentEvidence, EvidenceMatrix } from "./Evidence.js";
+import { usdcApprox } from "./format.js";
 import { useI18n } from "./i18n.js";
 import { LandingIcon } from "./LandingVisual.js";
 import { landingText } from "./landingText.js";
+import { PolicyDiagram } from "./PolicyDiagram.js";
 import { poll } from "./poll.js";
 import { SiteShell } from "./SiteShell.js";
 
@@ -26,18 +27,46 @@ export default function LandingPage() {
     panel.current?.scrollIntoView({ behavior: reduce ? "instant" : "smooth", block: "start" });
   }, [trying]);
   const [counts, setCounts] = useState<LiveCounts>();
+  const [chain, setChain] = useState<{ breached: boolean; balance: string; stale: boolean }>();
   const [failed, setFailed] = useState(false);
   useEffect(
     () =>
       poll(async () => {
         try {
-          const response = await fetch(`${GATEWAY_URL}/attempts/summary?from=${ARENA.agent}`, {
+          const response = await fetch(`${GATEWAY_URL}/state`, {
             signal: AbortSignal.timeout(8000),
           });
-          if (!response.ok) throw new Error("unavailable");
-          const result = (await response.json()) as LiveCounts;
-          if (![result.rejected, result.accepted, result.distinctSenders].every(Number.isFinite))
+          let result: LiveCounts;
+          let nextChain: typeof chain;
+          if (response.status === 404) {
+            // Older gateways still expose attempt counts, but have no chain snapshot.
+            const legacy = await fetch(`${GATEWAY_URL}/attempts/summary?from=${ARENA.agent}`, {
+              signal: AbortSignal.timeout(8000),
+            });
+            if (!legacy.ok) throw new Error("unavailable");
+            result = (await legacy.json()) as LiveCounts;
+          } else {
+            if (!response.ok) throw new Error("unavailable");
+            const state: unknown = await response.json();
+            if (
+              !isStateAnswer(state) ||
+              typeof state.recorder.breached !== "boolean" ||
+              !/^\d+$/.test(state.balance)
+            )
+              throw new Error("unavailable");
+            result = state.summary as LiveCounts;
+            nextChain = {
+              breached: state.recorder.breached,
+              balance: usdcApprox(BigInt(state.balance)),
+              stale: state.stale === true,
+            };
+          }
+          if (
+            !result ||
+            ![result.rejected, result.accepted, result.distinctSenders].every(Number.isFinite)
+          )
             throw new Error("unavailable");
+          setChain(nextChain);
           setCounts(result);
           setFailed(false);
           return true;
@@ -53,13 +82,11 @@ export default function LandingPage() {
       <section className="landing-hero landing-container" aria-labelledby="hero-title">
         <div className="hero-copy">
           <p className="micro-label hero-eyebrow">
-            <span className="eyebrow-square" />
+            <LandingIcon name="layers" size={16} />
             {t.eyebrow}
           </p>
           <h1 id="hero-title">
-            {t.headline}
-            <br />
-            <em>{t.headlineAccent}</em>
+            <span>{t.headline}</span> <span className="hero-accent">{t.headlineAccent}</span>
           </h1>
           <p className="hero-lead">{t.lead}</p>
           <div className="hero-actions">
@@ -80,66 +107,7 @@ export default function LandingPage() {
           </div>
           <p className="hero-action-note">{d.liveHint}</p>
         </div>
-        <div className="hero-art">
-          <div className="card-register">
-            <span className="micro-label">SEALED / AGENT POLICY</span>
-            <span className="registration-stamp">L1</span>
-          </div>
-          <div className="spending-card">
-            <div className="spending-card-top">
-              <BrandMark size={38} />
-              <span>{d.permission}</span>
-            </div>
-            <p className="spending-card-title">{t.mandate}</p>
-            <div className="card-chip" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </div>
-            <dl>
-              <div>
-                <dt>{d.perPayment}</dt>
-                <dd>
-                  {r.S.caps.perTx}
-                  <small>USDC</small>
-                </dd>
-              </div>
-              <div>
-                <dt>{d.perDay}</dt>
-                <dd>
-                  {r.S.caps.daily}
-                  <small>USDC</small>
-                </dd>
-              </div>
-            </dl>
-            <div className="card-signature">
-              <span>{t.ownerSigned}</span>
-              <LandingIcon name="check" />
-              <span>Sealed L1</span>
-            </div>
-          </div>
-          <div className="boundary-track" role="img" aria-label={d.receipt}>
-            <span>
-              <LandingIcon name="key" />
-              {t.agentKey}
-            </span>
-            <i />
-            <strong>
-              <LandingIcon name="layers" />
-              {d.rule}
-            </strong>
-            <i />
-            <span>{t.payees}</span>
-          </div>
-          <p className="caption">
-            {d.cardCaption} · {(r.atS ?? r.at).slice(0, 10)}
-          </p>
-        </div>
-        <div className="hero-trust">
-          <span className="network-dot" />
-          {t.heroNote}
-        </div>
-        <p className="hero-risk">{d.risk}</p>
+        <PolicyDiagram lang={lang} />
       </section>
       {trying && (
         <section ref={panel} id="hero-transaction" className="landing-container hero-transaction">
@@ -148,97 +116,170 @@ export default function LandingPage() {
           </Suspense>
         </section>
       )}
-      <section className="mechanism-band">
+      <aside className="network-strip">
         <div className="landing-container">
-          <span className="micro-label">AGENT POLICY</span>
-          <p>{d.mechanism}</p>
+          <div className="network-identity">
+            <span className="network-symbol" aria-hidden="true">
+              <LandingIcon name="layers" size={24} />
+            </span>
+            <div>
+              <span>{lang === "vi" ? "Mạng thử nghiệm" : "Test network"}</span>
+              <strong>Avalanche Fuji</strong>
+            </div>
+          </div>
+          <div>
+            <span>Chain ID</span>
+            <strong>{Number(ARENA.chainIdHex)}</strong>
+          </div>
+          <div>
+            <span>{lang === "vi" ? "Validator do đội vận hành" : "Team-run validator"}</span>
+            <strong>{ARENA.validators.length}</strong>
+          </div>
+          <a href="/live">
+            {d.live.nav}
+            <LandingIcon name="arrow" size={17} />
+          </a>
+        </div>
+      </aside>
+      <section className="evidence-section" id="evidence" aria-labelledby="evidence-title">
+        <div className="landing-container">
+          <div className="section-heading chapter-intro">
+            <p className="micro-label">{t.compareEyebrow}</p>
+            <h2 id="evidence-title">{d.evidence}</h2>
+            <p>{d.evidenceIntro}</p>
+          </div>
+          <EvidenceMatrix lang={lang} />
+          <AgentEvidence lang={lang} />
+          <div className="section-links">
+            <a className="text-link" href="/compare">
+              {t.fullResults}
+              <LandingIcon name="arrow" />
+            </a>
+            <a className="text-link" href={`${ARENA.source}/blob/main/docs/EVALUATION.md`}>
+              {t.evaluation} ↗
+            </a>
+          </div>
         </div>
       </section>
-      <section className="landing-container evidence-section" id="evidence">
-        <div className="section-heading">
-          <p className="micro-label">{t.compareEyebrow}</p>
-          <h2>{d.evidence}</h2>
-          <p>{d.evidenceIntro}</p>
-        </div>
-        <EvidenceMatrix lang={lang} />
-        <AgentEvidence lang={lang} />
-        <div className="section-links">
-          <a className="text-link" href="/compare">
-            {t.fullResults}
-            <LandingIcon name="arrow" />
-          </a>
-          <a className="text-link" href={`${ARENA.source}/blob/main/docs/EVALUATION.md`}>
-            {t.evaluation} ↗
-          </a>
-        </div>
-      </section>
-      <section className="how-section" id="how-it-works">
+      <section className="how-section" id="how-it-works" aria-labelledby="how-title">
         <div className="landing-container">
-          <div className="section-heading">
+          <div className="section-heading chapter-intro">
             <p className="micro-label">{t.howEyebrow}</p>
-            <h2>{t.howHeading}</h2>
+            <h2 id="how-title">{t.howHeading}</h2>
             <p>{t.howLead}</p>
           </div>
-          <div className="process-grid">
+          <ol className="process-grid">
             {[
               { title: t.step1Title, body: t.step1, icon: "key" },
               { title: t.step2Title, body: t.step2, icon: "arrow" },
               { title: t.step3Title, body: t.step3, icon: "layers" },
             ].map((step, i) => (
-              <article key={step.title}>
-                <span className="process-number">0{i + 1}</span>
+              <li key={step.title}>
+                <span className="process-number" aria-hidden="true">
+                  0{i + 1}
+                </span>
                 <LandingIcon name={step.icon as "key" | "arrow" | "layers"} size={28} />
                 <h3>{step.title}</h3>
                 <p>{step.body}</p>
-              </article>
+              </li>
             ))}
+          </ol>
+          <div className="policy-notes">
+            <p>{d.mechanism}</p>
+            <p>{d.risk}</p>
           </div>
         </div>
       </section>
-      <section className="landing-container live-section" id="live-proof">
+      <section
+        className="landing-container live-section"
+        id="live-proof"
+        aria-labelledby="challenge-title"
+      >
         <div className="challenge-panel">
-          <div>
+          <div className="challenge-intro">
             <p className="micro-label">{t.challengeEyebrow}</p>
-            <h2>{d.liveTitle}</h2>
+            <h2 id="challenge-title">{d.liveTitle}</h2>
             <p>{d.liveBody}</p>
-            <a className="landing-button button-white" href="/arena">
-              {t.tryIt}
-              <LandingIcon name="arrow" />
-            </a>
-          </div>
-          <div className="challenge-key">
-            <span className="micro-label">PRIVATE KEY / TESTNET ONLY</span>
-            <code>{ARENA.agentPrivateKey}</code>
-            <a href="/arena/rules">{t.rules} →</a>
-          </div>
-        </div>
-        <div className="live-heading">
-          <span className={`network-dot ${failed ? "is-waiting" : ""}`} />
-          <p>{failed ? d.liveUnavailable : counts ? d.liveSource : d.waiting}</p>
-        </div>
-        <div className="live-metrics">
-          {[
-            [t.refusedShort, counts?.rejected],
-            [d.accepted, counts?.accepted],
-            [t.senders, counts?.distinctSenders],
-          ].map(([label, value]) => (
-            <div className="live-metric" key={String(label)}>
-              <span>{label}</span>
-              <strong>
-                {typeof value === "number" ? (
-                  value.toLocaleString(lang)
-                ) : (
-                  <span
-                    className="metric-loading"
-                    role="img"
-                    aria-label={failed ? d.unavailable : d.waiting}
-                  >
-                    —
-                  </span>
-                )}
-              </strong>
+            <div className="hero-actions">
+              <a className="landing-button button-primary" href="/arena">
+                {t.tryIt}
+                <LandingIcon name="arrow" />
+              </a>
+              <a className="text-link" href="/arena/rules">
+                {t.rules} →
+              </a>
             </div>
-          ))}
+            <details className="challenge-key">
+              <summary>
+                {lang === "vi" ? "Xem khoá riêng đã công bố" : "View the published challenge key"}
+              </summary>
+              <span>
+                {lang === "vi"
+                  ? "Khoá riêng · Chỉ dùng trên testnet"
+                  : "Private key · Testnet only"}
+              </span>
+              <code>{ARENA.agentPrivateKey}</code>
+            </details>
+          </div>
+          <div className="gateway-readout">
+            <h3>{lang === "vi" ? "Trạng thái thử thách" : "Challenge status"}</h3>
+            <div className="gateway-line">
+              <span
+                className={`network-dot ${failed || !chain || chain.stale ? "is-waiting" : ""}`}
+              />
+              <p role="status">
+                {failed
+                  ? chain || counts
+                    ? d.live.stale
+                    : d.liveUnavailable
+                  : chain?.stale
+                    ? d.live.stale
+                    : chain
+                      ? lang === "vi"
+                        ? "Dữ liệu trên chain qua gateway"
+                        : "Chain state via the gateway"
+                      : counts
+                        ? d.liveUnavailable
+                        : d.waiting}
+              </p>
+            </div>
+            <div className="live-metrics">
+              {[
+                [
+                  lang === "vi"
+                    ? "Vi phạm đã ghi trên chain (T0)"
+                    : "Breaches recorded on chain (T0)",
+                  chain ? Number(chain.breached).toString() : undefined,
+                ],
+                [
+                  lang === "vi" ? "Số dư đang thử thách" : "Balance at stake",
+                  chain ? `${chain.balance} USDC` : undefined,
+                ],
+              ].map(([label, value]) => (
+                <div className="live-metric" key={label}>
+                  <span>{label}</span>
+                  <strong>
+                    {value ?? (
+                      <span
+                        className="metric-loading"
+                        role="img"
+                        aria-label={failed || counts ? d.unavailable : d.waiting}
+                      >
+                        —
+                      </span>
+                    )}
+                  </strong>
+                </div>
+              ))}
+            </div>
+            <p className="gateway-counts">
+              {lang === "vi" ? "Gateway · ngoài chain" : "Gateway · off-chain"}
+              <br />
+              {t.refusedShort}: {counts?.rejected.toLocaleString(lang) ?? "—"} · {d.accepted}:{" "}
+              {counts?.accepted.toLocaleString(lang) ?? "—"} · {t.senders}:{" "}
+              {counts?.distinctSenders.toLocaleString(lang) ?? "—"}
+            </p>
+          </div>
         </div>
       </section>
       <section className="avalanche-band">

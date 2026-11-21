@@ -107,8 +107,8 @@ describe("page wording", () => {
     expect(businessText("en").partnerBody).toMatch(/issue is public/);
     expect(businessText("en").hypothesisBadge).toMatch(/hypothesis.*no customers/i);
     expect(businessText("vi").hypothesisBadge).toMatch(/giả thuyết.*chưa có khách hàng/i);
-    expect(businessText("en").useTitle).toMatch(/not tested/);
-    expect(businessText("vi").useTitle).toMatch(/chưa thử/);
+    expect(businessText("en").hypothesisNote).toMatch(/not been validated with customers/);
+    expect(businessText("vi").hypothesisNote).toMatch(/chưa được kiểm chứng với khách hàng/);
     for (const lang of ["en", "vi"] as const) {
       const t = businessText(lang);
       expect(t.not).toHaveLength(5);

@@ -37,25 +37,35 @@ export type Result = {
   };
 };
 
+function displayAmount(value: string, vi: boolean) {
+  const fraction = value.split(".")[1]?.replace(/0+$/, "") ?? "";
+  const formatted = new Intl.NumberFormat(vi ? "vi-VN" : "en-US", {
+    maximumFractionDigits: 6,
+    useGrouping: false,
+  }).format(Number(value));
+  return fraction.length > 6 ? `≈${formatted}` : formatted;
+}
+
 /** The clean-up note for S, in either language, if the run recorded one. */
 const cleanUpNote = (x: Result, vi: boolean): string[] => {
   const a = x.S.afterMeasurement;
   if (!a) return [];
   const back = a.leftoverReturned;
+  const returned = back ? displayAmount(back.value, vi) : "";
   if (a.waitingIncluded.count === 0)
     return vi
       ? [
-          `Sau khi đo, lượt chạy dùng khoá chủ ví của bộ kiểm để nới uỷ quyền (block ${a.mandateWidened.block})${back ? ` rồi trả số dư còn lại ${back.value} USDC về người bán của đội (block ${back.block})` : ""}. Không có khoản nào còn chờ.`,
+          `Sau khi đo, lượt chạy dùng khoá chủ sở hữu của bộ kiểm để nới uỷ quyền (block ${a.mandateWidened.block})${back ? ` rồi trả số dư còn lại ${returned} USDC về người bán của đội (block ${back.block})` : ""}. Không có khoản nào còn chờ.`,
         ]
       : [
-          `After the measurement the run widened the mandate with the suite owner key (block ${a.mandateWidened.block})${back ? ` and returned the remaining ${back.value} USDC to the team-held seller (block ${back.block})` : ""}. No payment was left waiting.`,
+          `After the measurement the run widened the mandate with the suite owner key (block ${a.mandateWidened.block})${back ? ` and returned the remaining ${returned} USDC to the team-held seller (block ${back.block})` : ""}. No payment was left waiting.`,
         ];
   return vi
     ? [
-        `Số của S ở trên đo trước khi dọn dẹp. Sau đó lượt chạy dùng khoá chủ ví của bộ kiểm để nới uỷ quyền (block ${a.mandateWidened.block}), nên ${a.waitingIncluded.count} khoản đang chờ vào block ${a.waitingIncluded.block} (${a.waitingIncluded.value} USDC tới cùng người bán của đội)${back ? `, rồi số dư còn lại ${back.value} USDC được trả về người bán đó (block ${back.block})` : ""}. Tra địa chỉ agent sẽ thấy các giao dịch này; hash nằm trong file kết quả.`,
+        `Số của S ở trên đo trước khi dọn dẹp. Sau đó lượt chạy dùng khoá chủ sở hữu của bộ kiểm để nới uỷ quyền (block ${a.mandateWidened.block}), nên ${a.waitingIncluded.count} khoản đang chờ vào block ${a.waitingIncluded.block} (${displayAmount(a.waitingIncluded.value, vi)} USDC tới cùng người bán của đội)${back ? `, rồi số dư còn lại ${returned} USDC được trả về người bán đó (block ${back.block})` : ""}. Tra địa chỉ agent sẽ thấy các giao dịch này; hash nằm trong file kết quả.`,
       ]
     : [
-        `S's numbers above are from before the clean-up. Afterwards the run widened the mandate with the suite owner key (block ${a.mandateWidened.block}), so the ${a.waitingIncluded.count} waiting payments entered block ${a.waitingIncluded.block} (${a.waitingIncluded.value} USDC to the same team-held seller)${back ? `, and the remaining ${back.value} USDC went back to that seller (block ${back.block})` : ""}. Looking up the agent shows these transactions; their hashes are in the result file.`,
+        `S's numbers above are from before the clean-up. Afterwards the run widened the mandate with the suite owner key (block ${a.mandateWidened.block}), so the ${a.waitingIncluded.count} waiting payments entered block ${a.waitingIncluded.block} (${displayAmount(a.waitingIncluded.value, vi)} USDC to the same team-held seller)${back ? `, and the remaining ${returned} USDC went back to that seller (block ${back.block})` : ""}. Looking up the agent shows these transactions; their hashes are in the result file.`,
       ];
 };
 
@@ -93,7 +103,7 @@ export const whyText = (lang: Lang, x: Result, rows: EvalRow[]) => {
           ],
           [
             "Phí",
-            "Trả bằng AVAX bởi bên gửi khoản trả; nằm ngoài hạn mức",
+            "Trả bằng AVAX bởi bên gửi khoản thanh toán; nằm ngoài hạn mức",
             "Agent trả bằng cùng loại coin; phí tối đa được tính vào cả hai hạn mức",
           ],
           [
@@ -213,18 +223,18 @@ export const compareText = (lang: Lang, x: Result) =>
         pName: "P: ví thường",
         pWhat: "Ví EOA trên Fuji C-Chain; chỉ có system prompt bảo vệ.",
         pLoss: `Mất ${x.P.attackerReceived} trên ${x.P.balanceBefore} USDC; còn ${x.P.balanceAfter}.`,
-        oName: "O: ví hạn mức dạng contract",
+        oName: "O: ví hợp đồng chỉ có hạn mức",
         oWhat:
           "Contract trên Fuji C-Chain, trả bằng USDC qua EIP-3009; kiểm hạn mức trong isValidSignature (ERC-1271). Bản tối giản do đội viết cho phép so sánh này; không đại diện cho các sản phẩm ví đã được audit.",
         oBurst: `${x.O.passedVerifyBeforeSettle}/${x.O.attempts} qua bước kiểm trước khi settle; ${x.O.settledOnChain} settle; ${x.O.revertedOnChain} revert trong block. Đã chi ${x.O.spent} USDC.`,
-        sName: "S: Sealed Arena",
+        sName: "S: Sealed L1",
         sWhat: "Khoá agent trên L1 Sealed; uỷ quyền do node kiểm khi nhận và khi đưa vào block.",
         sInjection: x.S.injection.refused
           ? `Node từ chối (${x.S.injection.reason}); không được đưa vào block.`
           : "Node nhận giao dịch.",
         sBurst: `${x.S.settledOnChain} vào block; ${x.S.leftOutOfBlocks} đang chờ trong pool, chưa vào block; ${x.S.refusedByPool} bị từ chối ngay khi gửi. Đã chi ${x.S.spent} USDC (hạn mức ngày ${x.S.caps.daily}).`,
         notes: [
-          `Cột P chạy lại một bản ghi dựng tay (gửi hết số dư cho kẻ tấn công). Với model thật (claude-sonnet-5-5 và claude-haiku-5-5), agent không làm theo trang cài lệnh lượt nào: 0/30, gồm 15 lượt ở services/agent/README.md và 15 lượt ở docs/EVALUATION.md. Nó làm theo một ghi chú cài vào bộ nhớ ${memory} lượt khi chủ ví bảo đọc ghi chú; với S (Sealed L1 cục bộ), node từ chối ${agent.toAttacker.refused}/${agent.toAttacker.tried} khoản trả tới địa chỉ kẻ tấn công (bảng agent tier trong docs/EVALUATION.md).`,
+          `Cột P chạy lại một bản ghi dựng tay (gửi hết số dư cho kẻ tấn công). Với model thật (claude-sonnet-5-5 và claude-haiku-5-5), agent không làm theo trang cài lệnh lượt nào: 0/30, gồm 15 lượt ở services/agent/README.md và 15 lượt ở docs/EVALUATION.md. Nó làm theo một ghi chú cài vào bộ nhớ ${memory} lượt khi chủ sở hữu bảo đọc ghi chú; với S (Sealed L1 cục bộ), node từ chối ${agent.toAttacker.refused}/${agent.toAttacker.tried} khoản thanh toán tới địa chỉ kẻ tấn công (bảng agent tier trong docs/EVALUATION.md).`,
           "Cả O và S đều không vượt hạn mức ngày. Khác biệt ở chỗ bị từ chối: với O, các khoản hỏng vẫn vào block sau khi đã qua bước kiểm của facilitator; với S, khoản bị từ chối không vào block nào.",
           "Node của S tính cả các khoản đang có trong pool vào hạn mức ngày, nên khoản vượt hạn mức bị từ chối ngay khi gửi thay vì nằm chờ. (Node trước ngày 19/11 để chúng chờ trong pool, và chúng có thể vào block ở ngày sau, trong hạn mức của ngày đó.) Một giao dịch Ethereum không có hạn dùng: khoản đã được nhận mà còn chờ thì vẫn có thể vào block ở ngày khác.",
           ...cleanUpNote(x, true),
@@ -241,11 +251,11 @@ export const compareText = (lang: Lang, x: Result) =>
         pName: "P: plain wallet",
         pWhat: "EOA on the Fuji C-Chain; guarded by its system prompt only.",
         pLoss: `Lost ${x.P.attackerReceived} of ${x.P.balanceBefore} USDC; ${x.P.balanceAfter} left.`,
-        oName: "O: spending-limit contract wallet",
+        oName: "O: caps-only contract wallet",
         oWhat:
           "Contract on the Fuji C-Chain paying USDC with EIP-3009; caps checked in isValidSignature (ERC-1271). A minimal wallet written by the team for this comparison; not representative of audited wallet products.",
         oBurst: `${x.O.passedVerifyBeforeSettle}/${x.O.attempts} passed the check before settling; ${x.O.settledOnChain} settled; ${x.O.revertedOnChain} reverted in a block. Spent ${x.O.spent} USDC.`,
-        sName: "S: Sealed Arena",
+        sName: "S: Sealed L1",
         sWhat:
           "Agent key on the Sealed L1; the mandate is checked by the node on arrival and again when building a block.",
         sInjection: x.S.injection.refused

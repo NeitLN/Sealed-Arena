@@ -14,7 +14,7 @@ const en = {
   paymentFlow: ["Buying agent", "Payment on the Sealed L1", "Marketplace seller"],
   subscriptionFlow: "Marketplace → Sealed: subscription per agent under a mandate",
   subscriptionNote:
-    "Hypothesis · the platform pays per agent; this is not a deduction from the seller’s payment.",
+    "The marketplace pays the subscription separately. The seller receives the full payment.",
   partnerTitle: "Design partnership — closed marketplace",
   partnerBody:
     "Marketplace and what it sells:\n\nHow you run or host buying agents:\n\nHow you settle with your sellers:\n\nSpending limits you need:\n\nWhat you would like to test together:\n\nPlease do not include private keys, credentials or personal data. This issue is public.\n",
@@ -33,7 +33,7 @@ const en = {
       "An EVM JSON-RPC endpoint (chain id 261126) with USDC bridged from the Fuji C-Chain as the native coin. Sending is allow-listed: the team adds the agent's address first; then the owner registers it, sets its mandate with a passkey, and it pays with our x402 method.",
     ],
   ],
-  useTitle: "Use cases we expect (not tested with customers)",
+  useTitle: "Proposed use cases",
   use: [
     [
       "Buying data and API calls",
@@ -52,7 +52,7 @@ const en = {
   money: [
     [
       "A fee per agent under a mandate",
-      "A per-agent subscription paid by the marketplace platform. This pricing model is a hypothesis, not a validated offer.",
+      "The marketplace would pay a subscription for each agent operating under a mandate.",
     ],
     [
       "Transaction fees on the L1",
@@ -89,13 +89,12 @@ const vi: BusinessText = {
   nav: "Doanh nghiệp",
   eyebrow: "Dành cho doanh nghiệp",
   title: "Đưa agent một chiếc thẻ, không phải cả ví.",
-  lead: "Sealed Arena dành cho các đội có agent AI tự trả tiền mua dữ liệu và API. Chủ đặt danh sách người nhận, hạn mức mỗi lần trả, hạn mức mỗi ngày và ngày hết hạn bằng passkey. Sealed L1 kiểm mọi giao dịch mà key của agent ký theo các điều đó.",
+  lead: "Sealed Arena dành cho các đội có agent AI tự trả tiền mua dữ liệu và API. Chủ sở hữu đặt danh sách người nhận, hạn mức mỗi lần trả, hạn mức mỗi ngày và ngày hết hạn bằng passkey. Sealed L1 kiểm mọi giao dịch mà key của agent ký theo các điều đó.",
   hypothesisBadge: "Giả thuyết · chưa có khách hàng",
   hypothesisNote: "Mô hình kinh doanh này chưa được kiểm chứng với khách hàng.",
   paymentFlow: ["Agent mua hàng", "Thanh toán trên Sealed L1", "Người bán của marketplace"],
   subscriptionFlow: "Marketplace → Sealed: phí thuê bao theo mỗi agent có uỷ quyền",
-  subscriptionNote:
-    "Giả thuyết · nền tảng trả phí theo agent; không trừ phí này vào khoản thanh toán cho người bán.",
+  subscriptionNote: "Marketplace trả phí thuê bao riêng. Người bán nhận đủ khoản thanh toán.",
   partnerTitle: "Hợp tác thử nghiệm — marketplace khép kín",
   partnerBody:
     "Marketplace và sản phẩm đang bán:\n\nCách bạn vận hành hoặc lưu trú agent mua hàng:\n\nCách bạn thanh toán với người bán của mình:\n\nGiới hạn chi tiêu cần có:\n\nNội dung muốn cùng thử nghiệm:\n\nVui lòng không ghi private key, thông tin đăng nhập hay dữ liệu cá nhân. Issue này là công khai.\n",
@@ -107,14 +106,14 @@ const vi: BusinessText = {
   who: [
     [
       "Marketplace khép kín",
-      "Giả thuyết khách hàng đầu tiên: marketplace khép kín tự vận hành hoặc lưu trú agent mua hàng và thanh toán với người bán của mình. Từng chủ sở hữu đặt uỷ quyền; node từ chối khoản trả ngoài phạm vi đó.",
+      "Giả thuyết khách hàng đầu tiên: marketplace khép kín tự vận hành hoặc lưu trú agent mua hàng và thanh toán với người bán của mình. Từng chủ sở hữu đặt uỷ quyền; node từ chối khoản thanh toán ngoài phạm vi đó.",
     ],
     [
-      "Lập trình viên",
-      "Endpoint EVM JSON-RPC (chain id 261126), coin gốc là USDC chuyển từ Fuji C-Chain qua cầu nối. Việc gửi tiền theo danh sách được phép: đội thêm địa chỉ agent trước; sau đó chủ đăng ký agent, đặt uỷ quyền bằng passkey, và agent trả tiền bằng phương thức x402 của dự án.",
+      "Nhà phát triển",
+      "Endpoint EVM JSON-RPC (chain id 261126), coin gốc là USDC chuyển từ Fuji C-Chain qua cầu nối. Việc gửi tiền theo danh sách được phép: đội thêm địa chỉ agent trước; sau đó chủ sở hữu đăng ký agent, đặt uỷ quyền bằng passkey, và agent trả tiền bằng phương thức x402 của dự án.",
     ],
   ],
-  useTitle: "Tình huống dùng dự kiến (chưa thử với khách hàng)",
+  useTitle: "Tình huống sử dụng dự kiến",
   use: [
     [
       "Mua dữ liệu và lượt gọi API",
@@ -126,14 +125,14 @@ const vi: BusinessText = {
     ],
     [
       "Dừng agent từ điện thoại",
-      "Chủ dừng agent bằng passkey; mọi thứ agent ký đều bị từ chối cho tới khi mở lại.",
+      "Chủ sở hữu dừng agent bằng passkey; mọi thứ agent ký đều bị từ chối cho tới khi mở lại.",
     ],
   ],
   moneyTitle: "Cách có doanh thu",
   money: [
     [
       "Phí theo mỗi agent có uỷ quyền",
-      "Phí thuê bao theo agent do nền tảng marketplace trả. Đây là giả thuyết về cách tính phí, chưa được kiểm chứng.",
+      "Marketplace dự kiến trả phí thuê bao cho từng agent đang hoạt động theo uỷ quyền.",
     ],
     [
       "Phí giao dịch trên L1",
@@ -146,7 +145,7 @@ const vi: BusinessText = {
   ],
   notTitle: "Những gì nó không làm",
   not: [
-    "Nó không biết chủ thật sự muốn gì: người bán được phép đòi giá cao hơn mà vẫn trong hạn mức thì khoản trả vẫn qua.",
+    "Agent không biết chủ sở hữu thật sự muốn gì: người bán được phép đòi giá cao hơn mà vẫn trong hạn mức thì khoản thanh toán vẫn qua.",
     "Vận hành L1 này đòi hỏi tin bên vận hành và khoá quản trị; chưa chứng minh việc vận hành bởi các bên độc lập.",
     "Chỉ là testnet: mọi coin ở đây, kể cả USDC thử, không có giá trị tiền.",
     "Người bán không nhận được các khoản này bằng client hay facilitator x402 chuẩn: phải thêm mạng eip155:261126 và phương thức thanh toán của dự án.",

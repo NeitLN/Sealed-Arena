@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type Lang = "en" | "vi";
 
@@ -93,7 +93,10 @@ const en = {
   no_passkey: "Create a passkey first.",
   passkey_unsupported: "This browser cannot create passkeys here (needs HTTPS or localhost).",
   relayer_down:
-    "The relayer is not reachable: the chain is still shown, but changes (register, mandate, freeze) cannot be sent now.",
+    "The relayer is unavailable. You can create a passkey on this device. Changes to an agent require a connection to the relayer.",
+  relayerChallengeLink: "View the open challenge through the public gateway →",
+  demoTryPending:
+    "After you set a mandate for a demo agent, try an allowed payment and see how the node responds to a payment outside the mandate.",
   chain_mismatch: "The relayer is on another chain than this page. Changes are disabled.",
   passkey_cancelled: "Passkey prompt closed. Nothing was signed or sent.",
   staleView: "Could not read the chain since {time}. Showing the last values read.",
@@ -173,8 +176,8 @@ const vi: Record<Key, string> = {
   useDemoSeller: "Dùng seller demo",
   demoSellerNote: "Thêm {address}, seller dữ liệu demo do đội vận hành.",
   feeSpentToday: "Phí hôm nay",
-  refusedSince: "Node đã từ chối {n} khoản trả của agent này kể từ lần bạn vào trước",
-  refusedSinceOne: "Node đã từ chối {n} khoản trả của agent này kể từ lần bạn vào trước",
+  refusedSince: "Node đã từ chối {n} khoản thanh toán của agent này kể từ lần bạn vào trước",
+  refusedSinceOne: "Node đã từ chối {n} khoản thanh toán của agent này kể từ lần bạn vào trước",
   markSeen: "Đánh dấu đã xem",
   feeCapNotSet:
     "Uỷ quyền này đặt trước khi mạng chuyển sang luật v2 nên chưa có hạn mức phí mỗi ngày. Hãy đặt lại để thêm.",
@@ -186,7 +189,7 @@ const vi: Record<Key, string> = {
   frozen: "Đã dừng",
   freeze: "Dừng agent",
   unfreeze: "Mở lại agent",
-  freezeHelp: "Dừng agent chặn ngay mọi khoản chi từ khoá của agent.",
+  freezeHelp: "Dừng agent chặn ngay mọi khoản thanh toán từ khoá của agent.",
   unfreezeHelp:
     "Mở băng để agent trả tiền lại, trong uỷ quyền hiện tại (người nhận, hạn mức, hạn dùng).",
   notOwnerNote: "Passkey này không phải passkey đã gắn với agent: chain sẽ từ chối chữ ký của nó.",
@@ -222,7 +225,10 @@ const vi: Record<Key, string> = {
   no_passkey: "Hãy tạo passkey trước.",
   passkey_unsupported: "Trình duyệt này không tạo được passkey ở đây (cần HTTPS hoặc localhost).",
   relayer_down:
-    "Không kết nối được relayer: vẫn xem được chain, nhưng chưa gửi được thay đổi (đăng ký, uỷ quyền, đóng băng).",
+    "Chưa kết nối được relayer. Bạn vẫn có thể tạo passkey trên thiết bị này. Muốn thay đổi thiết lập của agent, cần kết nối với relayer.",
+  relayerChallengeLink: "Xem thử thách mở qua gateway công khai →",
+  demoTryPending:
+    "Sau khi đặt uỷ quyền cho agent demo, bạn có thể thử một khoản thanh toán được phép và xem node xử lý khoản thanh toán ngoài uỷ quyền.",
   chain_mismatch: "Relayer đang ở chain khác với trang này. Đã tắt các thao tác thay đổi.",
   passkey_cancelled: "Đã đóng hộp passkey. Không có gì được ký hay gửi đi.",
   staleView: "Không đọc được chain từ {time}. Đang hiện số liệu đọc được lần gần nhất.",
@@ -248,14 +254,15 @@ const vi: Record<Key, string> = {
   demoFailed: "Không nhận được agent demo. Thử lại sau.",
   demo_cap: "Hôm nay đã hết agent demo. Hãy thử lại vào ngày mai.",
   "demo-disabled":
-    "Đội đang tạm dừng cấp agent demo. Các phần khác của trang chủ ví vẫn dùng được.",
+    "Đội đang tạm dừng cấp agent demo. Các phần khác của bảng điều khiển chủ sở hữu vẫn dùng được.",
   demoTry: "Trả 0.01 USDC cho người lạ",
   demoTryPayee: "Trả 0.01 USDC cho người nhận được phép đầu tiên",
   demoTryHint:
-    "Mỗi nút ký một khoản trả thật bằng key của agent demo rồi gửi tới node; câu trả lời bên dưới là đúng những gì node gửi về. Khoản trả cho người nhận được phép sẽ đi qua khi agent chưa bị dừng.",
+    "Mỗi nút ký một khoản thanh toán bằng khoá của agent demo rồi gửi tới node. Phản hồi của node hiện bên dưới.",
   demoPaid: "Node đã nhận: nằm trong uỷ quyền",
   demoRefused: "Node từ chối",
-  demoAccepted: "Node đã nhận. Khoản trả cho người lạ không được phép được nhận: hãy báo cho đội.",
+  demoAccepted:
+    "Node đã nhận. Khoản thanh toán cho người lạ không được phép được nhận: hãy báo cho đội.",
   demoBusy: "RPC công khai đang bận (giới hạn tần suất). Thử lại sau một phút.",
   demoError: "Không gọi được tới node",
   demoNode: "Node trả lỗi, nhưng không phải lỗi của quy tắc uỷ quyền",
@@ -282,13 +289,20 @@ function initial(): Lang {
 /** Current language, a setter that remembers it, and the lookup function. */
 export function useI18n(): { lang: Lang; setLang: (l: Lang) => void; t: T } {
   const [lang, set] = useState<Lang>(initial);
-  const setLang = useCallback((l: Lang) => {
-    set(l);
-    document.documentElement.lang = l;
+  useEffect(() => {
+    document.documentElement.lang = lang;
     try {
-      localStorage.setItem(STORAGE, l);
+      localStorage.setItem(STORAGE, lang);
     } catch {
       // not remembered: fine
+    }
+  }, [lang]);
+  const setLang = useCallback((l: Lang) => {
+    set(l);
+    const url = new URL(location.href);
+    if (url.searchParams.has("lang")) {
+      url.searchParams.set("lang", l);
+      history.replaceState(history.state, "", url);
     }
   }, []);
   const t = useCallback<T>((k) => dict[lang][k as Key] ?? k, [lang]);

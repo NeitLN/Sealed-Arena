@@ -30,6 +30,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { useAgentView } from "./agentView.js";
 import { ARENA } from "./arena.config.js";
 import { BrandMark } from "./BrandMark.js";
+import { ChallengeMandateExample } from "./ChallengeMandateExample.js";
 import { classifyRelay, explain, formErrorVisible } from "./consoleUi.js";
 import { DemoAgents } from "./DemoAgents.js";
 import { designText } from "./designText.js";
@@ -53,6 +54,7 @@ import { countReasons, refusalCount, useRefusals } from "./refusals.js";
 import { relayerErrorText } from "./relayerError.js";
 import { SiteShell } from "./SiteShell.js";
 import { RPC } from "./useArenaLive.js";
+import "./operations.css";
 
 // Layout from the Astryx payment-form template: form column and a sticky summary column.
 const formColBasis: CSSProperties = { flexBasis: 0 };
@@ -561,42 +563,51 @@ export default function OwnerPage() {
     </Card>
   );
 
+  const steps = ownerSteps({
+    passkey: !!saved.passkey,
+    agent: !!agent,
+    linked: ownedByMe,
+    mandate:
+      !!view?.mandate.payees.length &&
+      view.mandate.expiry > BigInt(Math.floor(Date.now() / 1000)) &&
+      (view.version === 1 || view.feeCapSet),
+  });
   return (
     <SiteShell lang={lang} setLang={setLang} current="owner">
       <VStack gap={5}>
-        {/* Page header */}
-        <Heading level={1} type="display-2">
-          {t("title")}
-        </Heading>
-        <Text type="body" color="secondary">
-          {t("intro")}
-        </Text>
-
-        <ol className="owner-stepper" aria-label={d.next}>
-          {ownerSteps({
-            passkey: !!saved.passkey,
-            agent: !!agent,
-            linked: ownedByMe,
-            mandate:
-              !!view?.mandate.payees.length &&
-              view.mandate.expiry > BigInt(Math.floor(Date.now() / 1000)) &&
-              (view.version === 1 || view.feeCapSet),
-          }).map((state, index) => (
-            <li
-              key={d.consoleSteps[index]}
-              data-state={state}
-              aria-current={state === "current" ? "step" : undefined}
-            >
-              <span className="step-number" aria-hidden="true">
-                {state === "done" ? "✓" : index + 1}
-              </span>
+        <header className="owner-overview">
+          <div className="operation-lead">
+            <h1>{t("title")}</h1>
+            <p className="operation-description">{t("intro")}</p>
+          </div>
+          <section className="owner-path" aria-labelledby="setup-progress">
+            <div className="owner-path-heading">
+              <h2 id="setup-progress">
+                {lang === "vi" ? "Tiến trình thiết lập" : "Setup progress"}
+              </h2>
               <span>
-                {d.consoleSteps[index]}
-                <small>{d.stepStates[state]}</small>
+                {steps.filter((step) => step === "done").length} / {steps.length}
               </span>
-            </li>
-          ))}
-        </ol>
+            </div>
+            <ol className="owner-stepper" aria-labelledby="setup-progress">
+              {steps.map((state, index) => (
+                <li
+                  key={d.consoleSteps[index]}
+                  data-state={state}
+                  aria-current={state === "current" ? "step" : undefined}
+                >
+                  <span className="step-number" aria-hidden="true">
+                    {state === "done" ? "✓" : index + 1}
+                  </span>
+                  <span>
+                    {d.consoleSteps[index]}
+                    <small>{d.stepStates[state]}</small>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </header>
         <dialog
           ref={reviewDialog}
           className="sign-review sign-preview"
@@ -610,7 +621,15 @@ export default function OwnerPage() {
             <Button label={d.cancelSign} variant="secondary" onClick={() => setReview(undefined)} />
           </div>
         </dialog>
-        {boot ? <Banner status="warning" title={t(boot)} /> : null}
+        {boot ? (
+          <Banner
+            status="warning"
+            title={t(boot)}
+            description={
+              boot === "relayer_down" ? <a href="/arena">{t("relayerChallengeLink")}</a> : undefined
+            }
+          />
+        ) : null}
         <div ref={outcomeRef} className="console-outcome" tabIndex={-1} aria-live="polite">
           {outcome ? (
             <Banner
@@ -650,50 +669,53 @@ export default function OwnerPage() {
         ) : null}
         {busy ? <Banner status="info" title={t("working")} /> : null}
 
-        <section className="console-passkey">
-          <VStack gap={3}>
-            <Heading level={2}>{t("passkeySection")}</Heading>
-            <Text type="supporting" color="secondary">
-              {t("passkeyHelp")}
-            </Text>
-            {!saved.passkey && (
-              <section className="sign-preview">
-                <p className="micro-label">{d.signPreview}</p>
-                <p>{d.createPreview}</p>
-              </section>
-            )}
-            {saved.passkey ? (
-              <VStack gap={2}>
-                <strong>{d.useSaved}</strong>
-                <p className="caption">{d.savedNote}</p>
-                <HStack gap={2} vAlign="center" wrap="wrap">
-                  <Badge variant="success" label={t("passkeyReady")} />
-                  <Text type="supporting" color="secondary" style={mono}>
-                    {t("publicKey")} {short(saved.passkey.x)}
+        <div className={agent ? undefined : "console-introduction"}>
+          <section className="console-passkey">
+            <VStack gap={3}>
+              <Heading level={2}>{t("passkeySection")}</Heading>
+              <Text type="supporting" color="secondary">
+                {t("passkeyHelp")}
+              </Text>
+              {!saved.passkey && (
+                <section className="sign-preview">
+                  <p className="micro-label">{d.signPreview}</p>
+                  <p>{d.createPreview}</p>
+                </section>
+              )}
+              {saved.passkey ? (
+                <VStack gap={2}>
+                  <strong>{d.useSaved}</strong>
+                  <p className="caption">{d.savedNote}</p>
+                  <HStack gap={2} vAlign="center" wrap="wrap">
+                    <Badge variant="success" label={t("passkeyReady")} />
+                    <Text type="supporting" color="secondary" style={mono}>
+                      {t("publicKey")} {short(saved.passkey.x)}
+                    </Text>
+                  </HStack>
+                  <HStack gap={2}>
+                    <Button
+                      label={t("forgetPasskey")}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (window.confirm(t("forgetConfirm")))
+                          remember({ ...(saved.agent ? { agent: saved.agent } : {}) });
+                      }}
+                    />
+                  </HStack>
+                </VStack>
+              ) : (
+                <HStack gap={3} vAlign="center" wrap="wrap">
+                  <Button label={t("createPasskey")} variant="primary" onClick={onCreatePasskey} />
+                  <Text type="supporting" color="secondary">
+                    {t("passkeyMissing")}
                   </Text>
                 </HStack>
-                <HStack gap={2}>
-                  <Button
-                    label={t("forgetPasskey")}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (window.confirm(t("forgetConfirm")))
-                        remember({ ...(saved.agent ? { agent: saved.agent } : {}) });
-                    }}
-                  />
-                </HStack>
-              </VStack>
-            ) : (
-              <HStack gap={3} vAlign="center" wrap="wrap">
-                <Button label={t("createPasskey")} variant="primary" onClick={onCreatePasskey} />
-                <Text type="supporting" color="secondary">
-                  {t("passkeyMissing")}
-                </Text>
-              </HStack>
-            )}
-          </VStack>
-        </section>
+              )}
+            </VStack>
+          </section>
+          {!agent && <ChallengeMandateExample lang={lang} t={t} />}
+        </div>
 
         <DemoAgents
           lang={lang}

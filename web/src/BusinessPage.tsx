@@ -1,4 +1,5 @@
 import { Button } from "@astryxdesign/core/Button";
+import { useEffect, useRef, useState } from "react";
 import { ARENA } from "./arena.config.js";
 import { businessText } from "./businessText.js";
 import { designText } from "./designText.js";
@@ -6,12 +7,30 @@ import { useI18n } from "./i18n.js";
 import { LandingIcon } from "./LandingVisual.js";
 import { SiteShell } from "./SiteShell.js";
 import { StatusPill } from "./StatusPill.js";
+import "./reading.css";
 
 export default function BusinessPage() {
   const { lang, setLang } = useI18n();
   const t = businessText(lang);
   const d = designText(lang);
   const partnerUrl = `${ARENA.source}/issues/new?${new URLSearchParams({ title: t.partnerTitle, body: t.partnerBody })}`;
+  const flow = useRef<HTMLElement>(null);
+  const [flowSeen, setFlowSeen] = useState(false);
+  useEffect(() => {
+    const element = flow.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setFlowSeen(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.25 },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const sources = [
     `${ARENA.source}/tree/main/chain`,
     ARENA.deployments,
@@ -30,32 +49,31 @@ export default function BusinessPage() {
             <Button label={d.partner} href={partnerUrl} variant="secondary" />
           </div>
         </div>
-        <div
-          className="business-flow"
-          role="img"
-          aria-label={`${t.paymentFlow.join(" → ")}. ${t.subscriptionFlow}. ${t.subscriptionNote}`}
-        >
-          <p className="micro-label">{t.moneyTitle}</p>
-          {t.paymentFlow.map((label, index) => (
-            <div className="flow-node" key={label}>
-              <LandingIcon
-                name={index === 0 ? "layers" : index === 1 ? "key" : "check"}
-                size={24}
-              />
-              <span>{label}</span>
-              {index < t.paymentFlow.length - 1 && (
-                <span className="flow-connector" aria-hidden="true">
-                  ↓
+        <figure className="settlement-figure" ref={flow} data-seen={flowSeen}>
+          <figcaption>
+            {lang === "vi" ? "Dòng thanh toán cho người bán" : "Seller payment flow"}
+          </figcaption>
+          <ol className="settlement-path">
+            {t.paymentFlow.map((label, index) => (
+              <li key={label}>
+                <span className="settlement-symbol">
+                  <LandingIcon
+                    name={index === 0 ? "key" : index === 1 ? "layers" : "check"}
+                    size={24}
+                  />
                 </span>
-              )}
-            </div>
-          ))}
-          <div className="subscription-flow">
-            <StatusPill state="caution">{t.hypothesisBadge}</StatusPill>
+                <strong>{label}</strong>
+              </li>
+            ))}
+          </ol>
+          <div className="settlement-subscription">
+            <p className="micro-label">
+              {lang === "vi" ? "Phí nền tảng dự kiến" : "Proposed platform fee"}
+            </p>
             <strong>{t.subscriptionFlow}</strong>
-            <p className="caption">{t.subscriptionNote}</p>
+            <p>{t.subscriptionNote}</p>
           </div>
-        </div>
+        </figure>
       </header>
       <section className="page-section business-audience">
         <h2>{t.whoTitle}</h2>

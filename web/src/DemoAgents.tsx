@@ -129,11 +129,11 @@ export function DemoAgents(o: {
           {claimError && <Banner status="error" title={claimError} />}
         </VStack>
       </Card>
-      {o.children}
+      <div className="console-configuration">{o.children}</div>
       <section className="console-test" aria-label={d.workflow[3]}>
         <Heading level={2}>{d.workflow[3]}</Heading>
         {!myKey ? (
-          <p className="caption">{o.current && o.ownedByMe ? d.ownKeyHint : d.pendingMandate}</p>
+          <p className="caption">{o.current && o.ownedByMe ? d.ownKeyHint : t("demoTryPending")}</p>
         ) : (
           <VStack gap={4}>
             <Text type="body" color="secondary">
