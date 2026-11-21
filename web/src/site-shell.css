@@ -211,7 +211,7 @@
 .footer-colophon a {
   font-size: 13px;
 }
-@media (max-width: 700px) {
+@media (max-width: 1050px) {
   .footer-directory {
     grid-template-columns: 1fr 1fr;
   }
@@ -225,7 +225,7 @@
     min-height: 36px;
   }
 }
-@media (max-width: 400px) {
+@media (max-width: 600px) {
   .landing-nav-wrap,
   .landing-header-actions {
     gap: 6px;

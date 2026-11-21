@@ -271,7 +271,7 @@
   font-size: 14px;
   font-weight: 600;
 }
-@media (max-width: 800px) {
+@media (max-width: 1200px) {
   .page-compare .research-intro {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -280,7 +280,7 @@
     max-width: 65ch;
   }
 }
-@media (max-width: 560px) {
+@media (max-width: 840px) {
   .result-selector {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -418,7 +418,7 @@
 .page-compare .method-section li {
   padding: 0;
 }
-@media (max-width: 560px) {
+@media (max-width: 840px) {
   .business-hero .hero-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

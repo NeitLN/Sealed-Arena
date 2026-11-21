@@ -58,7 +58,7 @@
 .sign-review h2 {
   margin-bottom: 16px;
 }
-@media (max-width: 600px) {
+@media (max-width: 900px) {
   .owner-stepper {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -483,7 +483,7 @@
   font-size: 14px;
   border-radius: var(--radius-control);
 }
-@media (max-width: 950px) {
+@media (max-width: 1425px) {
   .business-hero {
     gap: 28px;
   }
@@ -497,7 +497,7 @@
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 700px) {
+@media (max-width: 1050px) {
   .published-key {
     padding: 24px;
   }
@@ -715,7 +715,7 @@
   width: 100%;
   height: 100%;
 }
-@media (max-width: 900px) {
+@media (max-width: 1350px) {
   .live-heading {
     flex-direction: column;
   }
@@ -723,7 +723,7 @@
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 900px) {
   .live-lanes {
     display: none;
   }
@@ -978,7 +978,7 @@
 .live-attempts code {
   font-size: 12px;
 }
-@media (max-width: 700px) {
+@media (max-width: 1050px) {
   .limits-ledger li {
     gap: 10px;
     padding: 16px 12px;
@@ -1068,7 +1068,7 @@
 .console-test {
   border-top: 3px solid var(--seal);
 }
-@media (min-width: 900px) {
+@media (min-width: 1350px) {
   .rule-section {
     grid-template-columns: minmax(180px, 0.4fr) minmax(0, 1fr);
     gap: 42px;

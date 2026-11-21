@@ -104,7 +104,7 @@ const isCancel = (e: unknown) =>
 const DEFAULTS = { perTx: "0.02", daily: "0.03", days: "7" };
 
 export default function OwnerPage() {
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  const isMobile = useMediaQuery("(max-width: 1151px)");
   const { lang, setLang, t } = useI18n();
   const d = designText(lang);
   const [saved, setSaved] = useState(loadSaved);
