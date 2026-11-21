@@ -140,7 +140,7 @@ try {
         await page.locator("h1").waitFor();
         if (path === "/console")
           await page.locator('.owner-stepper li[data-state="done"]').nth(3).waitFor();
-        if (path === "/live") await page.locator(".live-attempts li").first().waitFor();
+        if (path === "/live") await page.locator("table.monitor-feed tbody tr").first().waitFor();
         for (const width of [360, 1440]) {
           await page.setViewportSize({ width, height: 1000 });
           await page.evaluate(() => document.fonts.ready);
@@ -181,7 +181,8 @@ try {
   await page.keyboard.press("Escape");
   assert.equal(await dialog.isVisible(), false);
   await page.goto(`${base}/live?lang=en`);
-  await page.getByText("Payment confirmed", { exact: true }).waitFor();
+  // The accepted fixture payment shows its receipt from eth_getTransactionReceipt.
+  await page.locator("table.monitor-feed").getByText("Confirmed in block").first().waitFor();
   await page.getByRole("button", { name: "Full screen", exact: true }).click();
   await page.locator(".live-display.is-full").waitFor();
   assert.equal(await page.locator(".arena-qr").isVisible(), true);

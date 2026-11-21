@@ -14,7 +14,7 @@ const en = {
   paymentFlow: ["Buying agent", "Payment on the Sealed L1", "Marketplace seller"],
   subscriptionFlow: "Marketplace → Sealed: subscription per agent under a mandate",
   subscriptionNote:
-    "The marketplace pays the subscription separately. The seller receives the full payment.",
+    "Hypothesis: the marketplace would pay the subscription separately, and the seller would receive the full payment.",
   partnerTitle: "Design partnership — closed marketplace",
   partnerBody:
     "Marketplace and what it sells:\n\nHow you run or host buying agents:\n\nHow you settle with your sellers:\n\nSpending limits you need:\n\nWhat you would like to test together:\n\nPlease do not include private keys, credentials or personal data. This issue is public.\n",
@@ -94,7 +94,8 @@ const vi: BusinessText = {
   hypothesisNote: "Mô hình kinh doanh này chưa được kiểm chứng với khách hàng.",
   paymentFlow: ["Agent mua hàng", "Thanh toán trên Sealed L1", "Người bán của marketplace"],
   subscriptionFlow: "Marketplace → Sealed: phí thuê bao theo mỗi agent có uỷ quyền",
-  subscriptionNote: "Marketplace trả phí thuê bao riêng. Người bán nhận đủ khoản thanh toán.",
+  subscriptionNote:
+    "Giả thuyết: marketplace sẽ trả phí thuê bao riêng, và người bán vẫn nhận đủ khoản thanh toán.",
   partnerTitle: "Hợp tác thử nghiệm — marketplace khép kín",
   partnerBody:
     "Marketplace và sản phẩm đang bán:\n\nCách bạn vận hành hoặc lưu trú agent mua hàng:\n\nCách bạn thanh toán với người bán của mình:\n\nGiới hạn chi tiêu cần có:\n\nNội dung muốn cùng thử nghiệm:\n\nVui lòng không ghi private key, thông tin đăng nhập hay dữ liệu cá nhân. Issue này là công khai.\n",
