@@ -9,6 +9,7 @@ export function LandingIcon({
     | "layers"
     | "pause"
     | "play"
+    | "replay"
     | "cross"
     | "crosshair"
     | "pulse"
@@ -24,6 +25,7 @@ export function LandingIcon({
     layers: "m12 3 10 5-10 5L2 8l10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5",
     pause: "M8 5v14M16 5v14",
     play: "m8 4 12 8-12 8V4Z",
+    replay: "M4 9a8 8 0 1 1 0 6m0-11v5h5",
     crosshair:
       "M12 3v3m0 12v3M3 12h3m12 0h3 M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z M13 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z",
     pulse: "M2 12h5l3-7 4 14 3-7h5",

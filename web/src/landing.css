@@ -175,18 +175,41 @@
   color: var(--seal);
   letter-spacing: 0.06em;
 }
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  src: url("./fonts/barlow-semi-condensed-700.woff") format("woff");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Spectral";
+  src: url("./fonts/spectral-600-italic.woff") format("woff");
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+}
+.hero-copy {
+  container-type: inline-size;
+}
 .hero-copy h1 {
-  font: 600 clamp(2rem, 3.65vw, 3.45rem) / 1.12 var(--display);
-  letter-spacing: -0.04em;
+  font:
+    700 clamp(2rem, 13.3cqi, 4.75rem) / 1.12 "Barlow Semi Condensed",
+    var(--display);
+  letter-spacing: -0.032em;
   color: var(--ink);
 }
 .hero-copy :where(h1 > span) {
   display: block;
   text-wrap: balance;
 }
-.hero-copy .hero-accent {
+.hero-copy h1 em {
   color: var(--seal);
-  font-weight: 500;
+  font:
+    italic 600 0.94em / 1.12 "Spectral",
+    Georgia,
+    serif;
+  letter-spacing: -0.055em;
+  white-space: nowrap;
 }
 .hero-lead {
   font-size: clamp(1rem, 1.18vw, 1.125rem);
@@ -776,9 +799,6 @@
   }
   .hero-copy {
     max-width: 650px;
-  }
-  .hero-copy h1 {
-    font-size: clamp(1.625rem, 8.2vw, 3.15rem);
   }
   .matrix-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

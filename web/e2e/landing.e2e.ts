@@ -50,7 +50,38 @@ try {
   });
   await page.goto(`${base}/?lang=vi`);
   await page.getByRole("heading", { level: 1 }).waitFor();
-  assert.match((await page.locator("h1").textContent()) ?? "", /Đưa agent một chiếc thẻ/);
+  const example = page.getByRole("region", { name: "Ví dụ thanh toán" });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  // The example switches payee by itself after each run; clicking the payee already shown stops it.
+  const stage = example.locator(".transfer-stage");
+  await stage.scrollIntoViewIfNeeded();
+  await page.waitForFunction(
+    () => document.querySelector(".transfer-stage")?.getAttribute("data-route") === "refused",
+    undefined,
+    { timeout: 10000 },
+  );
+  await example.locator(".payee-options label").filter({ hasText: "Địa chỉ khác" }).click();
+  await page.waitForTimeout(5000);
+  assert.equal(
+    await stage.getAttribute("data-route"),
+    "refused",
+    "a click on the shown payee stops the switching",
+  );
+  const replay = example.getByRole("button", { name: "Phát lại minh hoạ" });
+  await replay.click({ timeout: 4000 });
+  await example.getByRole("radio", { name: "Địa chỉ khác" }).check({ timeout: 4000 });
+  assert.equal(await example.locator(".transfer-stage").getAttribute("data-route"), "refused");
+  await replay.click();
+  assert.equal(await example.getByRole("radio", { name: "Địa chỉ khác" }).isChecked(), true);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  assert.equal(await replay.isVisible(), false);
+  assert.match(
+    (await example.getByRole("status").textContent()) ?? "",
+    /Người nhận ngoài uỷ quyền/,
+  );
+  await example.getByRole("radio", { name: "Nhà cung cấp API" }).check();
+  assert.match((await example.getByRole("status").textContent()) ?? "", /Người nhận hợp lệ/);
+  assert.match((await page.locator("h1").textContent()) ?? "", /Agent thanh toán/);
   await page.getByText("Hiện chưa lấy được dữ liệu trực tiếp.", { exact: true }).waitFor();
   assert.equal(await page.locator(".metric-loading").count(), 2);
   assert.equal(
@@ -59,16 +90,18 @@ try {
     "landing does not load console or transaction dependencies",
   );
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  assert.match((await page.locator("h1").textContent()) ?? "", /Give your agent a card/);
+  assert.equal(await page.getByRole("radio", { name: "API provider" }).isChecked(), true);
+  assert.match((await page.locator("h1").textContent()) ?? "", /Your agent pays/);
   await page.goto(base);
   await page.locator("h1").waitFor();
   assert.equal(await page.locator("html").getAttribute("lang"), "en");
-  assert.match((await page.locator("h1").textContent()) ?? "", /Give your agent a card/);
+  assert.match((await page.locator("h1").textContent()) ?? "", /Your agent pays/);
   assert.equal(
     ((await page.locator(".key-evidence .evidence-number").textContent()) ?? "").replace(/\s/g, ""),
     `${leakedKey.passed}/${leakedKey.cases}`,
   );
   const diagram = page.locator(".policy-diagram");
+  await diagram.scrollIntoViewIfNeeded();
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const fastCycle = await page.addStyleTag({
     content: ".policy-diagram { --policy-cycle: 450ms; }",
