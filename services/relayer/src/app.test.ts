@@ -1,7 +1,7 @@
 import { AGENT_POLICY_ADDRESS, agentPolicyAbi, arenaRecorderAbi } from "@sealed-arena/shared";
 import { decodeFunctionData, encodeFunctionData, erc20Abi, type Hex } from "viem";
 import { describe, expect, it } from "vitest";
-import { createRelayerApp, type RelayChain } from "./app.js";
+import { createRelayerApp, RELAYED, type RelayChain } from "./app.js";
 
 const IDS = { chainId: 261126n, networkId: 12345, blockchainId: `0x${"ab".repeat(32)}` as Hex };
 const agent = "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc";
@@ -56,6 +56,37 @@ describe("relayer", () => {
   it.each(["register", "setMandate", "freeze", "unfreeze"])("allows %s", async (name) => {
     const fn = agentPolicyAbi.find((x) => x.type === "function" && x.name === name);
     expect(fn).toBeDefined();
+  });
+
+  it("relays exactly the owner actions, the six rule v3 calls, and nothing else", async () => {
+    expect([...RELAYED].sort()).toEqual(
+      [
+        "register",
+        "setMandate",
+        "setMandateV2",
+        "freeze",
+        "unfreeze",
+        "setMandateV3",
+        "cancelPending",
+        "setGuardian",
+        "guardianFreeze",
+        "sweep",
+        "executeSweep",
+      ].sort(),
+    );
+    const { c, sent } = chain();
+    const app = createRelayerApp({ chain: c, trustProxy: true });
+    const data = encodeFunctionData({
+      abi: agentPolicyAbi,
+      functionName: "executeSweep",
+      args: [agent],
+    });
+    expect((await post(app, { data })).status).toBe(200);
+    expect(sent).toEqual([data]);
+    for (const view of ["getMandateV3", "getPending", "getCounters", "guardian"] as const) {
+      const v = encodeFunctionData({ abi: agentPolicyAbi, functionName: view, args: [agent] });
+      expect((await post(app, { data: v }, "5.6.7.8")).status).toBe(400);
+    }
   });
 
   it("refuses anything that is not one of the four owner actions, without sending (E7)", async () => {
@@ -192,6 +223,22 @@ describe("relayer", () => {
       expect((await post(app, { data: freezeData }, "2.2.2.2")).status).toBe(200);
       expect(sent).toHaveLength(3);
       // The limited actions are still held back.
+      expect((await post(app, { data: unfreezeData }, "3.3.3.3")).status).toBe(429);
+    });
+
+    it("never limits a guardian freeze either (rule v3)", async () => {
+      const { c, sent } = chain();
+      const t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t, agentPerHour: 1 });
+      const guardianFreeze = encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "guardianFreeze",
+        args: [agent, 0n, "0x"],
+      });
+      expect((await post(app, { data: mandateOf(agent) }, "1.1.1.1")).status).toBe(200);
+      expect((await post(app, { data: guardianFreeze }, "1.1.1.1")).status).toBe(200);
+      expect((await post(app, { data: guardianFreeze }, "2.2.2.2")).status).toBe(200);
+      expect(sent).toHaveLength(3);
       expect((await post(app, { data: unfreezeData }, "3.3.3.3")).status).toBe(429);
     });
 

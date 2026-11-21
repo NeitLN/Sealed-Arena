@@ -12,7 +12,11 @@
 import { createServer, request } from "node:http";
 
 /** Precompile config keys of this project, unknown to upstream tools. */
-export const SEALED_PRECOMPILE_KEYS = ["agentPolicyConfig", "agentRuleV2Config"];
+export const SEALED_PRECOMPILE_KEYS = [
+  "agentPolicyConfig",
+  "agentRuleV2Config",
+  "agentRuleV3Config",
+];
 
 type JsonRpc = { id?: unknown; method?: string; result?: unknown };
 

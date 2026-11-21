@@ -85,7 +85,7 @@ pnpm --filter web e2e              # build trang, tự bật relayer, Chromium v
 ```
 - Web gọi relayer ở `VITE_RELAYER_URL` (mặc định `http://127.0.0.1:4040`), lấy URL RPC từ `/info` của relayer (`RELAYER_PUBLIC_RPC`, mặc định là `SEALED_RPC_URL`).
 - Ngoài mạng local, relayer cần `RELAYER_PRIVATE_KEY` (địa chỉ phải có trong TxAllowList và có coin trả gas).
-- Giới hạn thao tác của chủ ví qua `POST /relay` theo từng agent: `RELAYER_AGENT_GAP_MS` (khoảng cách tối thiểu giữa hai thao tác cho cùng một agent, mặc định `15000`) và `RELAYER_AGENT_PER_HOUR` (mặc định `20`). Vượt giới hạn trả 429 `agent_rate_limited` kèm `retryAfter` (giây). `freeze` không bị giới hạn này (chủ ví luôn dừng được agent); `setMandate`, `setMandateV2`, `unfreeze` và `register` thì có. Lượt chỉ được tính sau khi chạy thử thành công. Giới hạn 10 yêu cầu/phút theo IP vẫn giữ, kể cả với `freeze`.
+- Giới hạn thao tác của chủ ví qua `POST /relay` theo từng agent: `RELAYER_AGENT_GAP_MS` (khoảng cách tối thiểu giữa hai thao tác cho cùng một agent, mặc định `15000`) và `RELAYER_AGENT_PER_HOUR` (mặc định `20`). Vượt giới hạn trả 429 `agent_rate_limited` kèm `retryAfter` (giây). `freeze` và `guardianFreeze` (rule v3) không bị giới hạn này (chủ ví và guardian luôn dừng được agent); `setMandate`, `setMandateV2`, `unfreeze` và `register` thì có. Lượt chỉ được tính sau khi chạy thử thành công. Giới hạn 10 yêu cầu/phút theo IP vẫn giữ, kể cả với `freeze`.
 - E2E cần Chromium của Playwright: `pnpm --filter web exec playwright install chromium` nếu máy chưa có.
 
 ## 7. L1 Sealed trên Fuji
@@ -121,6 +121,21 @@ Một chiều: qua T thì muốn quay lại phải phát hành thêm một lần
 6. Relayer ICM (`icm-relayer` v1.8.4) đọc `eth_getChainConfig` lúc khởi động và giải mã mọi mục trong `upgrades.precompileUpgrades` bằng danh sách precompile gốc của Subnet-EVM; gặp `agentRuleV2Config` thì dừng với `failed to fetch chain config` và khởi động lại mãi. Chạy proxy `services/fuji-ops/src/chain-config-proxy.ts` (Node 24, không cần cài gói) trên cổng `127.0.0.1:9660` và đặt `rpc-endpoint` của L1 trong cấu hình relayer về cổng đó. Proxy chuyển nguyên mọi yêu cầu, chỉ bỏ các mục precompile riêng của dự án khỏi câu trả lời `eth_getChainConfig`; cấu hình Warp giữ nguyên. Kênh `ws-endpoint` vẫn nối thẳng vào node. Kiểm: `docker inspect -f '{{.RestartCount}}' icm-relayer` đứng yên.
 
 Mạng local: `SEALED_RULE_V2_AT=0 bash scripts/check-localnet.sh` (v2 từ đầu) hoặc `SEALED_RULE_V2_AT=+90 bash scripts/localnet.sh up` (chuyển sau 90 giây).
+
+### 7.2 Bật luật agent v3 trên Fuji
+
+Một chiều như v2 (ARCHITECTURE §3.6). Qua block đầu tiên có thời gian ≥ T thì không quay lại được; trước đó bỏ mục hoặc dời T rồi khởi động lại mọi node.
+1. Trước khi lên lịch: phát hành phần TypeScript (relayer, trang chủ ví, facilitator) và để chạy ở v2 ít nhất 48 giờ; thêm `agentRuleV3Config` vào danh sách lọc của proxy cấu hình chain (đã có trong `SEALED_PRECOMPILE_KEYS`) và khởi động lại relayer ICM trước bước 3.
+2. Build image mới như §7.1 bước 1 và chạy `bash chain/scripts/test.sh`, `bash chain/tests/mutation/run.sh` trên đúng revision đó. Triển khai image mới với `upgrade.json` chưa đổi; image mới không có mục v3 thì giữ nghĩa v2.
+3. Ghi lịch: thêm vào cuối `precompileUpgrades`, giữ nguyên từng byte các mục trước: `{"agentRuleV3Config":{"blockTimestamp":<T>,"loosenDelay":86400}}`. Chọn T cách ít nhất vài ngày, trong giờ làm việc, xa 00:00 UTC. Dừng, sao lưu, chạy lại container như §7.1 bước 3.
+4. Kiểm trước T: `ruleVersion()` trả 2, `loosenDelay()` là selector chưa bật, log node ghi lịch kích hoạt với `loosenDelay` 86400, thời gian head trước T, relayer ICM chạy được một vòng.
+5. Tại T: block đầu tiên có thời gian ≥ T kích hoạt; chain không có giao dịch thì gửi một giao dịch để tạo block.
+6. Kiểm sau T: `ruleVersion()` trả 3, `loosenDelay()` trả 86400; khoản trả của agent theo uỷ quyền v2 vẫn vào block; `setMandateV2` bị từ chối; một lần siết áp ngay, một lần nới có `eta = thời gian block + 86400`; `setMandateV3` không có UV bị từ chối; bằng chứng freeze ký trước T vẫn dùng được. Sau 24 giờ: lần nới có hiệu lực không cần giao dịch của chủ ví. Một node mới đồng bộ từ genesis tới cùng head hash.
+7. Thông báo cho chủ ví: muốn nới ngay thì đặt bằng `setMandateV2` trước T; sau T nới phải chờ 24 giờ; authenticator không có UV chỉ còn freeze được.
+
+Mạng local: `SEALED_RULE_V2_AT=0 SEALED_RULE_V3_AT=+200 SEALED_LOOSEN_DELAY=60 bash scripts/localnet.sh up` (v3 sau 200 giây, chờ nới 60 giây), rồi `pnpm --filter attacks rule-v3-switch` (kiểm qua lần chuyển: bằng chứng chặt, UV, meet và lịch nới, số lần, hạn mức payee, guardian, sweep, ba node cùng block). Kho clientDataJSON trên Fuji (chỉ đọc): `SEALED_RPC=<RPC của L1> pnpm --filter attacks export-clientdata-corpus` ghi `chain/testvectors/fuji-clientdata-pre-v3.json`.
+
+Fuzz lâu hơn: `SEALED_FUZZTIME=30m bash chain/scripts/test.sh` (mặc định 60 giây mỗi đích; `0` để bỏ).
 
 ## 8. Cổng RPC và thử thách mở
 ```bash

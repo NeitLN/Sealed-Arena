@@ -133,14 +133,24 @@ const ownerKey = createPrivateKey({
 
 const sha256 = (b: Buffer) => createHash("sha256").update(b).digest();
 
-/** A WebAuthn assertion over `challenge`, as an authenticator with the owner's passkey would make. */
-export function ownerProof(challenge: Hex): Hex {
+/**
+ * A WebAuthn assertion over `challenge`, as an authenticator with the owner's passkey would make.
+ * `flags` is the authenticator flags byte (default UP and UV); `clientData` builds another
+ * clientDataJSON from the base64url challenge (tests of the rule v3 parser).
+ */
+export function ownerProof(
+  challenge: Hex,
+  o: { flags?: number; clientData?: (b64: string) => string } = {},
+): Hex {
   const authenticatorData = Buffer.concat([
     sha256(Buffer.from("localhost")),
-    Buffer.from([0x05, 0, 0, 0, 1]),
+    Buffer.from([o.flags ?? 0x05, 0, 0, 0, 1]),
   ]);
+  const b64 = challengeToBase64Url(challenge);
   const clientData = Buffer.from(
-    `{"type":"webauthn.get","challenge":"${challengeToBase64Url(challenge)}","origin":"http://localhost"}`,
+    o.clientData
+      ? o.clientData(b64)
+      : `{"type":"webauthn.get","challenge":"${b64}","origin":"http://localhost"}`,
   );
   const sig = sign("sha256", Buffer.concat([authenticatorData, sha256(clientData)]), {
     key: ownerKey,
@@ -257,6 +267,7 @@ export async function setMandate(n: Node, agent: Address, m: MandateInput): Prom
   return sendAndWait(n, accounts.relayer, {
     to: AGENT_POLICY_ADDRESS,
     data: req.data(ownerProof(req.challenge)),
+    gas: 2_000_000n, // setMandateV3 costs 1.7M (rule v3)
   });
 }
 
@@ -266,7 +277,7 @@ export async function setFrozen(n: Node, agent: Address, frozen: boolean): Promi
     policyIds(n),
     readPolicy.ownerNonce(n, agent),
   ]);
-  const freezeEpoch = v === 2 ? await readFreezeEpoch(n.client, agent) : 0n;
+  const freezeEpoch = v >= 2 ? await readFreezeEpoch(n.client, agent) : 0n;
   const req = setFrozenRequest(v, ids, agent, frozen, { ownerNonce, freezeEpoch });
   await sendAndWait(n, accounts.relayer, {
     to: AGENT_POLICY_ADDRESS,

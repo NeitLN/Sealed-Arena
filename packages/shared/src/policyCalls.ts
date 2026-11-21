@@ -1,28 +1,37 @@
-// Owner actions on AgentPolicy for both rule versions. Before agent rule v2 is active the
+// Owner actions on AgentPolicy for every rule version. Before agent rule v2 is active the
 // precompile takes v1 proofs (bound to the EVM chain id); from its activation it takes only v2
-// proofs (bound to the Avalanche network and blockchain ids) and setMandateV2. Callers read the
+// proofs (bound to the Avalanche network and blockchain ids) and setMandateV2. From rule v3 on,
+// mandates are set with setMandateV3 (a loosening waits loosenDelay()), owner proofs need the
+// user-verified flag except for freeze, and the guardian and sweep actions exist. Callers read the
 // version from the chain (readRuleVersion) and build their call with the helpers below, so the
-// same code works before and after the switch.
+// same code works before and after each switch.
 import { type Address, encodeFunctionData, type Hex, hexToBytes, type PublicClient } from "viem";
 import {
   AGENT_POLICY_ADDRESS,
   agentPolicyAbi,
+  cancelPendingChallenge,
   cb58ToHex,
   domainV2,
   freezeChallenge,
   freezeChallengeV2,
   type Mandate,
   type MandateV2,
+  type MandateV3,
+  NO_PAYEE_CAP,
   registerDigest,
   registerDigestV2,
+  setGuardianChallenge,
   setMandateChallenge,
   setMandateV2Challenge,
+  setMandateV3Challenge,
+  sweepChallenge,
+  UNLIMITED_PAYMENTS,
   unfreezeChallenge,
   unfreezeChallengeV2,
 } from "./agentPolicy.js";
 import { CHAIN_ID } from "./chain.js";
 
-export type RuleVersion = 1 | 2;
+export type RuleVersion = 1 | 2 | 3;
 
 /** What a v2 proof is bound to. */
 export type PolicyIds = { chainId: bigint; networkId: number; blockchainId: Hex };
@@ -48,9 +57,10 @@ export function blockchainIdFromRpc(rpc: string): string | undefined {
 export const NOT_ACTIVE_SELECTOR = /invalid (non-activated )?function selector/i;
 
 /**
- * The rule version in force at the head. ruleVersion() exists only under v2: before, the node
+ * The rule version in force at the head. ruleVersion() exists from v2 on: before, the node
  * refuses it as a selector that is not active, which means v1. Any other failure (the node is
- * down, a rate limit) throws, so a client never signs a v1 proof by mistake.
+ * down, a rate limit) throws, so a client never signs a v1 proof by mistake; so does a version
+ * this code does not know (it would build calls the chain refuses).
  */
 export async function readRuleVersion(client: PublicClient): Promise<RuleVersion> {
   try {
@@ -59,10 +69,19 @@ export async function readRuleVersion(client: PublicClient): Promise<RuleVersion
       abi: agentPolicyAbi,
       functionName: "ruleVersion",
     });
-    return Number(v) >= 2 ? 2 : 1;
+    const n = Number(v);
+    if (n === 2 || n === 3) return n;
+    throw new UnknownRuleVersionError(n);
   } catch (err) {
+    if (err instanceof UnknownRuleVersionError) throw err;
     if (NOT_ACTIVE_SELECTOR.test(errorText(err))) return 1;
     throw err;
+  }
+}
+
+export class UnknownRuleVersionError extends Error {
+  constructor(readonly version: number) {
+    super(`agent rule version ${version} is not supported by this client`);
   }
 }
 
@@ -87,8 +106,15 @@ export async function readFreezeEpoch(client: PublicClient, agent: Address): Pro
   });
 }
 
-/** A mandate as the owner sets it; dailyFeeCap counts only under v2. */
-export type MandateInput = Mandate & { dailyFeeCap?: bigint };
+/**
+ * A mandate as the owner sets it; dailyFeeCap counts from v2 on, payeeDailyCaps (same order as
+ * payees; NO_PAYEE_CAP = none) and maxPaymentsPerDay from v3 on.
+ */
+export type MandateInput = Mandate & {
+  dailyFeeCap?: bigint;
+  payeeDailyCaps?: readonly bigint[];
+  maxPaymentsPerDay?: number;
+};
 
 /** Default daily cap on fees when a caller gives none: a twentieth of the daily cap. */
 export const defaultDailyFeeCap = (dailyCap: bigint) => dailyCap / 20n;
@@ -101,7 +127,40 @@ const toV2 = (m: MandateInput): MandateV2 => ({
   expiry: m.expiry,
 });
 
+const toV3 = (m: MandateInput): MandateV3 => ({
+  payees: m.payees,
+  payeeDailyCaps: m.payeeDailyCaps ?? m.payees.map(() => NO_PAYEE_CAP),
+  perTxCap: m.perTxCap,
+  dailyCap: m.dailyCap,
+  dailyFeeCap: m.dailyFeeCap ?? defaultDailyFeeCap(m.dailyCap),
+  maxPaymentsPerDay: m.maxPaymentsPerDay ?? UNLIMITED_PAYMENTS,
+  expiry: m.expiry,
+});
+
 const domainOf = (ids: PolicyIds) => domainV2(ids.networkId, ids.blockchainId, ids.chainId);
+
+/**
+ * Whether the chain requires the authenticator's user-verified flag for this owner action: from
+ * rule v3 on, for every action except freeze. Request userVerification "required" and check the
+ * flag before sending (hasUserVerified).
+ */
+export function requiresUserVerification(v: RuleVersion, action: OwnerAction): boolean {
+  return v >= 3 && action !== "freeze";
+}
+
+export type OwnerAction =
+  | "setMandate"
+  | "freeze"
+  | "unfreeze"
+  | "cancelPending"
+  | "setGuardian"
+  | "sweep";
+
+/** The UP (bit 0) and UV (bit 2) flags of a WebAuthn authenticatorData (byte 32). */
+export function hasUserVerified(authenticatorData: Hex): boolean {
+  const b = hexToBytes(authenticatorData);
+  return b.length >= 37 && ((b[32] ?? 0) & 0x05) === 0x05;
+}
 
 /** The digest the agent key signs to be registered. */
 export function registerDigestFor(
@@ -111,7 +170,7 @@ export function registerDigestFor(
   ownerX: Hex,
   ownerY: Hex,
 ): Hex {
-  return v === 2
+  return v >= 2
     ? registerDigestV2(domainOf(ids), agent, ownerX, ownerY)
     : registerDigest(ids.chainId, agent, ownerX, ownerY);
 }
@@ -134,6 +193,18 @@ export function setMandateRequest(
   m: MandateInput,
   nonce: bigint,
 ): OwnerRequest {
+  if (v >= 3) {
+    const m3 = toV3(m);
+    return {
+      challenge: setMandateV3Challenge(domainOf(ids), agent, m3, nonce),
+      data: (auth) =>
+        encodeFunctionData({
+          abi: agentPolicyAbi,
+          functionName: "setMandateV3",
+          args: [agent, m3, nonce, auth],
+        }),
+    };
+  }
   if (v === 2) {
     const m2 = toV2(m);
     return {
@@ -175,9 +246,9 @@ export function setFrozenRequest(
   s: { ownerNonce: bigint; freezeEpoch: bigint },
 ): OwnerRequest {
   const fn = frozen ? "freeze" : "unfreeze";
-  const arg = v === 2 && frozen ? s.freezeEpoch : s.ownerNonce;
+  const arg = v >= 2 && frozen ? s.freezeEpoch : s.ownerNonce;
   let challenge: Hex;
-  if (v === 2) {
+  if (v >= 2) {
     challenge = frozen
       ? freezeChallengeV2(domainOf(ids), agent, s.freezeEpoch)
       : unfreezeChallengeV2(domainOf(ids), agent, s.ownerNonce, s.freezeEpoch);
@@ -189,6 +260,74 @@ export function setFrozenRequest(
     data: (auth) =>
       encodeFunctionData({ abi: agentPolicyAbi, functionName: fn, args: [agent, arg, auth] }),
   };
+}
+
+// ---- rule v3 owner actions -------------------------------------------------------------------
+
+/** Cancels a scheduled mandate (one not yet in force) and a scheduled sweep (rule v3). */
+export function cancelPendingRequest(ids: PolicyIds, agent: Address, nonce: bigint): OwnerRequest {
+  return {
+    challenge: cancelPendingChallenge(domainOf(ids), agent, nonce),
+    data: (auth) =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "cancelPending",
+        args: [agent, nonce, auth],
+      }),
+  };
+}
+
+/** Sets, rotates or (zero address) clears the guardian, at once (rule v3). */
+export function setGuardianRequest(
+  ids: PolicyIds,
+  agent: Address,
+  guardian: Address,
+  nonce: bigint,
+): OwnerRequest {
+  return {
+    challenge: setGuardianChallenge(domainOf(ids), agent, guardian, nonce),
+    data: (auth) =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "setGuardian",
+        args: [agent, guardian, nonce, auth],
+      }),
+  };
+}
+
+/**
+ * Schedules moving a frozen agent's whole balance to `to` after loosenDelay() (rule v3). The proof
+ * is bound to the freeze epoch: an unfreeze cancels it.
+ */
+export function sweepRequest(
+  ids: PolicyIds,
+  agent: Address,
+  to: Address,
+  s: { ownerNonce: bigint; freezeEpoch: bigint },
+): OwnerRequest {
+  return {
+    challenge: sweepChallenge(domainOf(ids), agent, to, s.ownerNonce, s.freezeEpoch),
+    data: (auth) =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "sweep",
+        args: [agent, to, s.ownerNonce, auth],
+      }),
+  };
+}
+
+/** Carries out a scheduled sweep once its time has come; anyone may send it (rule v3). */
+export function executeSweepData(agent: Address): Hex {
+  return encodeFunctionData({ abi: agentPolicyAbi, functionName: "executeSweep", args: [agent] });
+}
+
+/** A guardian freeze: `sig` is the guardian key's signature over guardianFreezeDigest (rule v3). */
+export function guardianFreezeData(agent: Address, epoch: bigint, sig: Hex): Hex {
+  return encodeFunctionData({
+    abi: agentPolicyAbi,
+    functionName: "guardianFreeze",
+    args: [agent, epoch, sig],
+  });
 }
 
 // ---- agent payments under rule v2 ----------------------------------------------------------

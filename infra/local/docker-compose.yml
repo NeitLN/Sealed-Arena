@@ -11,6 +11,8 @@ services:
       SEALED_NODE_COUNT: ${SEALED_NODE_COUNT:-3}
       SEALED_GENESIS: /sealed/genesis/${SEALED_GENESIS_FILE:-sealed-local.json}
       SEALED_RULE_V2_AT: ${SEALED_RULE_V2_AT:-}
+      SEALED_RULE_V3_AT: ${SEALED_RULE_V3_AT:-}
+      SEALED_LOOSEN_DELAY: ${SEALED_LOOSEN_DELAY:-60}
     volumes:
       - ../../chain/genesis:/sealed/genesis:ro
       - data:/data

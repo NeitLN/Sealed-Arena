@@ -20,6 +20,9 @@
 //	SEALED_RULE_V2_AT   schedules agent rule v2 (agentRuleV2Config) in the genesis of a new
 //	                    network: "0" from the start, "+90" 90 seconds after the network is
 //	                    created, or a unix time; empty by default (rule v1 only)
+//	SEALED_RULE_V3_AT   schedules agent rule v3 (agentRuleV3Config) the same way; needs
+//	                    SEALED_RULE_V2_AT at or before it; empty by default
+//	SEALED_LOOSEN_DELAY rule v3's loosening delay in seconds (default 60; Fuji uses 86400)
 package main
 
 import (
@@ -130,8 +133,9 @@ func newNetwork() (*tmpnet.Network, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read genesis: %w", err)
 	}
+	now := time.Now()
 	if at := env("SEALED_RULE_V2_AT", ""); at != "" {
-		ts, err := ruleV2Time(at, time.Now())
+		ts, err := ruleTime("SEALED_RULE_V2_AT", at, now)
 		if err != nil {
 			return nil, err
 		}
@@ -139,6 +143,23 @@ func newNetwork() (*tmpnet.Network, error) {
 			return nil, err
 		}
 		fmt.Printf("sealed-localnet: agent rule v2 from unix time %d\n", ts)
+	}
+	if at := env("SEALED_RULE_V3_AT", ""); at != "" {
+		if env("SEALED_RULE_V2_AT", "") == "" {
+			return nil, errors.New("SEALED_RULE_V3_AT needs SEALED_RULE_V2_AT")
+		}
+		ts, err := ruleTime("SEALED_RULE_V3_AT", at, now)
+		if err != nil {
+			return nil, err
+		}
+		delay, err := strconv.ParseUint(env("SEALED_LOOSEN_DELAY", "60"), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid SEALED_LOOSEN_DELAY")
+		}
+		if genesisBytes, err = withRuleV3(genesisBytes, ts, delay); err != nil {
+			return nil, err
+		}
+		fmt.Printf("sealed-localnet: agent rule v3 from unix time %d, loosening delay %d s\n", ts, delay)
 	}
 	vmID, err := ids.FromString(subnetEVMID)
 	if err != nil {
@@ -187,8 +208,8 @@ func newNetwork() (*tmpnet.Network, error) {
 		Subnets: []*tmpnet.Subnet{{
 			Name: subnetName,
 			Chains: []*tmpnet.Chain{{
-				VMID:         vmID,
-				Genesis:      genesisBytes,
+				VMID:    vmID,
+				Genesis: genesisBytes,
 				// The ewoq key is the admin account funded in chain/genesis/sealed-local.json.
 				PreFundedKey: genesis.EWOQKey,
 			}},
@@ -273,19 +294,19 @@ func env(key, def string) string {
 	return def
 }
 
-
-// ruleV2Time parses SEALED_RULE_V2_AT: "+N" is N seconds from now, anything else a unix time.
-func ruleV2Time(at string, now time.Time) (uint64, error) {
+// ruleTime parses SEALED_RULE_V2_AT or SEALED_RULE_V3_AT: "+N" is N seconds from now, anything
+// else a unix time.
+func ruleTime(name, at string, now time.Time) (uint64, error) {
 	if rest, ok := strings.CutPrefix(at, "+"); ok {
 		n, err := strconv.ParseUint(rest, 10, 64)
 		if err != nil {
-			return 0, fmt.Errorf("invalid SEALED_RULE_V2_AT %q", at)
+			return 0, fmt.Errorf("invalid %s %q", name, at)
 		}
 		return uint64(now.Unix()) + n, nil
 	}
 	ts, err := strconv.ParseUint(at, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid SEALED_RULE_V2_AT %q", at)
+		return 0, fmt.Errorf("invalid %s %q", name, at)
 	}
 	return ts, nil
 }
@@ -301,5 +322,20 @@ func withRuleV2(genesisBytes []byte, ts uint64) ([]byte, error) {
 		return nil, errors.New("genesis has no config")
 	}
 	cfg["agentRuleV2Config"] = map[string]any{"blockTimestamp": ts}
+	return json.Marshal(g)
+}
+
+// withRuleV3 adds agentRuleV3Config with the given activation time and loosening delay to the
+// genesis chain config.
+func withRuleV3(genesisBytes []byte, ts, loosenDelay uint64) ([]byte, error) {
+	var g map[string]any
+	if err := json.Unmarshal(genesisBytes, &g); err != nil {
+		return nil, fmt.Errorf("parse genesis: %w", err)
+	}
+	cfg, ok := g["config"].(map[string]any)
+	if !ok {
+		return nil, errors.New("genesis has no config")
+	}
+	cfg["agentRuleV3Config"] = map[string]any{"blockTimestamp": ts, "loosenDelay": loosenDelay}
 	return json.Marshal(g)
 }

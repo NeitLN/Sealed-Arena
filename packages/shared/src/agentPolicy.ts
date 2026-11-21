@@ -202,6 +202,129 @@ export function unfreezeChallengeV2(
   );
 }
 
+// ---- rule v3 (agentRuleV3Config active) --------------------------------------------------
+
+/** Per-payee cap value meaning "no per-payee cap" (type(uint256).max). */
+export const NO_PAYEE_CAP = 2n ** 256n - 1n;
+/** maxPaymentsPerDay value meaning "no limit" (type(uint32).max). */
+export const UNLIMITED_PAYMENTS = 2 ** 32 - 1;
+
+/**
+ * The v3 mandate: a daily value cap per payee (same order as payees; NO_PAYEE_CAP = none) and a
+ * limit on payments per UTC day. Tightening applies at once, loosening after loosenDelay().
+ */
+export type MandateV3 = {
+  payees: readonly Address[];
+  payeeDailyCaps: readonly bigint[];
+  perTxCap: bigint;
+  dailyCap: bigint;
+  dailyFeeCap: bigint;
+  maxPaymentsPerDay: number;
+  expiry: bigint;
+};
+
+const mandateV3Tuple = {
+  type: "tuple",
+  components: [
+    { name: "payees", type: "address[]" },
+    { name: "payeeDailyCaps", type: "uint256[]" },
+    { name: "perTxCap", type: "uint256" },
+    { name: "dailyCap", type: "uint256" },
+    { name: "dailyFeeCap", type: "uint256" },
+    { name: "maxPaymentsPerDay", type: "uint32" },
+    { name: "expiry", type: "uint64" },
+  ],
+} as const;
+
+export function mandateV3Hash(m: MandateV3): Hex {
+  return keccak256(encodeAbiParameters([mandateV3Tuple], [m]));
+}
+
+/** Signed by the owner (with user verification) to set a v3 mandate. */
+export function setMandateV3Challenge(
+  domain: Hex,
+  agent: Address,
+  m: MandateV3,
+  nonce: bigint,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: "string" },
+        { type: "bytes32" },
+        { type: "address" },
+        { type: "bytes32" },
+        { type: "uint256" },
+      ],
+      ["SealedArena:setMandateV3", domain, agent, mandateV3Hash(m), nonce],
+    ),
+  );
+}
+
+/** Signed by the owner to cancel a scheduled mandate and a scheduled sweep. */
+export function cancelPendingChallenge(domain: Hex, agent: Address, nonce: bigint): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [{ type: "string" }, { type: "bytes32" }, { type: "address" }, { type: "uint256" }],
+      ["SealedArena:cancelPending", domain, agent, nonce],
+    ),
+  );
+}
+
+/** Signed by the owner to set, rotate or clear (zero address) the guardian. */
+export function setGuardianChallenge(
+  domain: Hex,
+  agent: Address,
+  guardian: Address,
+  nonce: bigint,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: "string" },
+        { type: "bytes32" },
+        { type: "address" },
+        { type: "address" },
+        { type: "uint256" },
+      ],
+      ["SealedArena:setGuardian", domain, agent, guardian, nonce],
+    ),
+  );
+}
+
+/** Signed by the owner to schedule a sweep of a frozen agent; bound to the freeze epoch. */
+export function sweepChallenge(
+  domain: Hex,
+  agent: Address,
+  to: Address,
+  nonce: bigint,
+  epoch: bigint,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: "string" },
+        { type: "bytes32" },
+        { type: "address" },
+        { type: "address" },
+        { type: "uint256" },
+        { type: "uint256" },
+      ],
+      ["SealedArena:sweep", domain, agent, to, nonce, epoch],
+    ),
+  );
+}
+
+/** Signed by the guardian key (secp256k1, 65 bytes, low s) to freeze during `epoch`. */
+export function guardianFreezeDigest(domain: Hex, agent: Address, epoch: bigint): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [{ type: "string" }, { type: "bytes32" }, { type: "address" }, { type: "uint256" }],
+      ["SealedArena:guardianFreeze", domain, agent, epoch],
+    ),
+  );
+}
+
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 /** An Avalanche id in cb58 (base58 with a 4-byte checksum) as 32 bytes of hex. */

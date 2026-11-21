@@ -392,7 +392,12 @@ export default function OwnerPage() {
           setReview(undefined);
           void act("setMandate", async () => {
             const req = setMandateRequest(view.version, ids, agent, draft, view.nonce);
-            return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
+            return req.data(
+              await signWithPasskey(req.challenge, passkey.credentialId, {
+                version: view.version,
+                action: "setMandate",
+              }),
+            );
           });
         },
       });
@@ -417,7 +422,12 @@ export default function OwnerPage() {
             ownerNonce: view.nonce,
             freezeEpoch: view.freezeEpoch,
           });
-          return req.data(await signWithPasskey(req.challenge, passkey.credentialId));
+          return req.data(
+            await signWithPasskey(req.challenge, passkey.credentialId, {
+              version: view.version,
+              action: freeze ? "freeze" : "unfreeze",
+            }),
+          );
         });
       },
     });
@@ -510,7 +520,7 @@ export default function OwnerPage() {
                 <Text type="supporting" color="secondary">
                   {t("resetsNote")}
                 </Text>
-                {view.version === 2 && !view.feeCapSet ? (
+                {view.version >= 2 && !view.feeCapSet ? (
                   <Banner status="warning" title={t("feeCapNotSet")} />
                 ) : null}
                 <Divider />
@@ -804,7 +814,7 @@ export default function OwnerPage() {
                         {t("demoSellerNote").replace("{address}", shortAddress(ARENA.demoSeller))}
                       </Text>
                     </HStack>
-                    <Grid columns={isMobile ? 1 : view?.version === 2 ? 4 : 3} gap={3}>
+                    <Grid columns={isMobile ? 1 : (view?.version ?? 1) >= 2 ? 4 : 3} gap={3}>
                       <TextInput
                         label={t("perTxCapFee")}
                         value={perTx}
@@ -817,7 +827,7 @@ export default function OwnerPage() {
                         onChange={touch(setDaily)}
                         inputMode="decimal"
                       />
-                      {view?.version === 2 ? (
+                      {(view?.version ?? 1) >= 2 ? (
                         <TextInput
                           label={t("dailyFeeCapOptional")}
                           description={t("dailyFeeCapHelp")}

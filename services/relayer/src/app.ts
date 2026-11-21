@@ -22,8 +22,26 @@ import {
   recoverAddress,
 } from "viem";
 
-/** The owner actions the relayer sends. Each carries the owner's passkey proof, checked by the precompile. */
-export const RELAYED = new Set(["register", "setMandate", "setMandateV2", "freeze", "unfreeze"]);
+/**
+ * The AgentPolicy calls the relayer sends. Each owner action carries the owner's passkey proof and
+ * guardianFreeze the guardian key's signature, both checked by the precompile; executeSweep needs
+ * no proof but does only what the owner scheduled (after the timelock). The rule v3 calls exist
+ * on the chain only from its activation; before, the simulation refuses them.
+ */
+export const RELAYED = new Set([
+  "register",
+  "setMandate",
+  "setMandateV2",
+  "freeze",
+  "unfreeze",
+  // rule v3
+  "setMandateV3",
+  "cancelPending",
+  "setGuardian",
+  "guardianFreeze",
+  "sweep",
+  "executeSweep",
+]);
 
 /** What the relayer needs from the chain; the real one is in chain.ts. */
 export type RelayChain = {
@@ -64,9 +82,9 @@ export type RelayerOptions = {
   arenaRecorder?: Address;
   /** Minimum time between two sends of the same arena action for the same agent (default 60 s). */
   arenaCooldownMs?: number;
-  /** Minimum time between two owner actions (/relay, except freeze) for the same agent (default 15 s). */
+  /** Minimum time between two owner actions (/relay, except freezes) for the same agent (default 15 s). */
   agentGapMs?: number;
-  /** Owner actions (/relay, except freeze) per agent in any hour (default 20). */
+  /** Owner actions (/relay, except freezes) per agent in any hour (default 20). */
   agentPerHour?: number;
   /** Clock, for tests. */
   now?: () => number;
@@ -192,12 +210,13 @@ export function createRelayerApp(o: RelayerOptions) {
 
     // Every owner action names its agent first. One owner of one agent could otherwise loop
     // setMandateV2 or unfreeze and spend the relayer's gas for everyone, so each agent gets a few
-    // sends per hour, whoever asks. Freezing is never limited: it is the owner's stop button.
+    // sends per hour, whoever asks. Freezing (the owner's or, in rule v3, the guardian's) is
+    // never limited: it is the stop button.
     // The slot is checked and taken only after the simulation passed (so a request with a junk
     // proof never holds one), with no await in between (so two requests cannot both pass), and
     // given back if the send fails.
     let release = () => {};
-    if (name !== "freeze") {
+    if (name !== "freeze" && name !== "guardianFreeze") {
       const key = String(args?.[0]).toLowerCase();
       const at = clock();
       const sends = (agentSends.get(key) ?? []).filter((s) => at - s < HOUR);
