@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "at": "2026-11-20T23:49:51.236Z",
+  "network": "local Sealed L1 (3 nodes, scripts/localnet.sh, SEALED_RULE_V2_AT=0)",
+  "ruleVersion": 2,
+  "mandate": {
+    "perTxCap": "1",
+    "dailyCap": "3",
+    "dailyFeeCap": "0.15",
+    "funding": "10"
+  },
+  "results": [
+    {
+      "id": "a",
+      "title": "spending up to dailyCap just before and again just after 00:00 UTC",
+      "verdict": "PASS",
+      "expected": "before: payments up to dailyCap included, the next refused (agent: budget exceeded); after the day changes: the same again",
+      "steps": [
+        "waiting 564 s until 45 s before 00:00 UTC",
+        "before 00:00 UTC: included in block 6 (success) | included in block 7 (success) | included in block 8 (success) | refused: agent: budget exceeded: spentToday 2970084000000063000 + charge 990029400000021000 above dailyCap 3000000000000000000; block days 20777,20777,20777,-; spentToday 2.970084000000063 on day 20777",
+        "after 00:00 UTC: included in block 17 (success) | included in block 18 (success) | included in block 19 (success) | refused: agent: budget exceeded: spentToday 2970088200000063000 + charge 990029400000021000 above dailyCap 3000000000000000000; block days 20778,20778,20778,-; spentToday 2.970088200000063 on day 20778"
+      ]
+    },
+    {
+      "id": "b1",
+      "title": "type 2 payment with a 10 gwei tip",
+      "verdict": "PASS",
+      "expected": "refused: agent: tip too high",
+      "steps": ["refused: agent: tip too high: 10000000000 above 1000000000"]
+    },
+    {
+      "id": "b2",
+      "title": "legacy payment with a gas price 10 gwei above the base fee (the whole margin is tip)",
+      "verdict": "PASS",
+      "expected": "refused: agent: tip too high",
+      "steps": ["refused: agent: tip too high: 10000000000 above 1000000000"]
+    },
+    {
+      "id": "b3",
+      "title": "1 gwei tip, fee cap with a maximum fee of 0.2 (dailyFeeCap 0.15)",
+      "verdict": "PASS",
+      "expected": "refused: agent: fee budget exceeded",
+      "steps": [
+        "refused: agent: fee budget exceeded: fees today 0 + fee 199999999999989000 above dailyFeeCap 150000000000000000"
+      ]
+    },
+    {
+      "id": "b4",
+      "title": "1 gwei tip, fee cap with a maximum fee of 1.1 (perTxCap 1)",
+      "verdict": "PASS",
+      "expected": "refused: agent: budget exceeded",
+      "steps": [
+        "refused: agent: budget exceeded: charge 1109999999999992000 above perTxCap 1000000000000000000"
+      ]
+    },
+    {
+      "id": "b5",
+      "title": "1 gwei tip, fee cap with a maximum fee of 0.1 (inside perTxCap and dailyFeeCap)",
+      "verdict": "PASS",
+      "expected": "included; fee paid is base fee + at most 1 gwei tip; the maximum fee counts toward the caps",
+      "steps": [
+        "included in block 24 (success)",
+        "fee paid 0.000042 (effective gas price 2000000000 wei = base fee 1000000000 + tip 1000000000); maximum fee allowed by the fee cap 0.099999999999984",
+        "balance drop 0.010042 = value 0.01 + fee paid; counted toward dailyCap 0.109999999999984 (value + gas limit x fee cap)"
+      ]
+    },
+    {
+      "id": "c",
+      "title": "payment in the pool when the owner freezes",
+      "verdict": "PASS",
+      "expected": "not included once the freeze is in a block, and not kept in the pool",
+      "steps": [
+        "trial 1: payment in the pool when the freeze was sent: true; freeze in block 29 (success, frozen true); payment: accepted, not in a block (dropped by the pool)",
+        "trial 2: payment in the pool when the freeze was sent: true; freeze in block 37 (success, frozen true); payment: accepted, not in a block (dropped by the pool)",
+        "trial 3: payment in the pool when the freeze was sent: true; freeze in block 45 (success, frozen true); payment: accepted, not in a block (dropped by the pool)",
+        "trial 4: payment in the pool when the freeze was sent: true; freeze in block 53 (success, frozen true); payment: accepted, not in a block (dropped by the pool)",
+        "trial 5: payment in the pool when the freeze was sent: true; freeze in block 61 (success, frozen true); payment: accepted, not in a block (dropped by the pool)",
+        "5 trials raced the freeze; included after or with the freeze: 0; still in the pool: 0"
+      ]
+    },
+    {
+      "id": "d",
+      "title": "listed payee that gets code after it was listed",
+      "verdict": "PASS",
+      "expected": "first payment included; after the deploy refused: agent: payee has code",
+      "steps": [
+        "0x8464135c8F25Da09e49BC8782676a84730C318bC listed, no code yet: included in block 69 (success)",
+        "deployer created a contract at 0x8464135c8F25Da09e49BC8782676a84730C318bC: code 0x00",
+        "same payee after it got code: refused: agent: payee has code: 0x8464135c8F25Da09e49BC8782676a84730C318bC"
+      ]
+    },
+    {
+      "id": "e",
+      "title": "control: an allowed sender that is not a registered agent",
+      "verdict": "PASS",
+      "expected": "included: the agent rule does not apply",
+      "steps": [
+        "isAgent false; 10 coins to a stranger with a 10 gwei tip, 64 bytes of data, gas 60000, an access list: included in block 73 (success); stranger balance 10"
+      ]
+    },
+    {
+      "id": "inv",
+      "title": "balance >= funded - totalCharged for every agent of the run",
+      "verdict": "PASS",
+      "expected": "holds for every agent",
+      "steps": [
+        "0xFe9e8E405502F63b55c4b3DBEA2963Fc7c94adc9: balance 4.059827799999874 >= funded 10 - totalCharged 5.940172200000126: true",
+        "0xEbb59E1d0818De9623f312e1EFEbde543c3719Ed: balance 9.989958 >= funded 10 - totalCharged 0.109999999999984: true",
+        "0x1A986c0210E938506eE67e18e9130c4a1bF0ACC6: balance 10 >= funded 10 - totalCharged 0: true",
+        "0x97eBC1E4eD5Bdbd159055108455fD7Ed5FD74B66: balance 10 >= funded 10 - totalCharged 0: true",
+        "0x685e086a0CddB1013d088008a669D7231821E64a: balance 10 >= funded 10 - totalCharged 0: true",
+        "0x4E2A46a5f46BcF815c8783Fc1FB896B696dACD84: balance 10 >= funded 10 - totalCharged 0: true",
+        "0xcC10839Db9D2651ED712FAda5243C8be8613D968: balance 10 >= funded 10 - totalCharged 0: true",
+        "0xF6C25449aa0931695fCc28623a07fe27616cfE94: balance 9.989970599999979 >= funded 10 - totalCharged 0.010029400000021: true"
+      ]
+    }
+  ],
+  "ok": true
+}
