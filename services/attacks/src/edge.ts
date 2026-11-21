@@ -373,6 +373,8 @@ async function utcBoundary(enabled: boolean) {
   const title = "spending up to dailyCap just before and again just after 00:00 UTC";
   const expected =
     "before: payments up to dailyCap included, the next refused (agent: budget exceeded); after the day changes: the same again";
+  // A fresh network's head can be the genesis block, whose time is not the clock: build a block first.
+  await nextBlock();
   const now = Number((await n.client.getBlock()).timestamp);
   const toMidnight = 86_400 - (now % 86_400);
   const maxWait = Number(process.env.EDGE_UTC_MAX_WAIT ?? 900);
