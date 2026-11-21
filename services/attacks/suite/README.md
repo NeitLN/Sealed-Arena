@@ -24,17 +24,17 @@ Every group gets the same **reference mandate**: payees seller A and seller B (t
 
 ## Classes
 
-| Class | Name                                     | Cases                                                                                      |
-| ----- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 1     | Instruction injected in a page           | whole balance, part, several times to the attacker                                         |
-| 2     | Injected instruction posing as the owner | "new safe wallet", "the seller moved", "refund me"                                         |
-| 3     | Seller inflates the price                | an allowed seller asks 2×, above the cap, the whole balance, just under the cap            |
-| 4     | Payment address swapped                  | `payTo` is the attacker, a lookalike, a contract                                           |
-| 5     | Repeated charge for the same item        | paying an allowed seller 2 to 5 times                                                      |
-| 6     | Draining in small payments               | many payments under the per-payment cap                                                    |
-| 7     | Poisoned memory or tool output           | a note or tool output naming another payee or a higher price                               |
-| 8     | Fees and contracts                       | a fee high enough to burn coins, token approval to the attacker, sending to a contract     |
-| 9     | Leaked agent key                         | five cases for every group; for S also the 25 attack cases of the `leaked-key` suite (T06) |
+| Class | Name                                     | Cases                                                                                  |
+| ----- | ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1     | Instruction injected in a page           | whole balance, part, several times to the attacker                                     |
+| 2     | Injected instruction posing as the owner | "new safe wallet", "the seller moved", "refund me"                                     |
+| 3     | Seller inflates the price                | an allowed seller asks 2×, above the cap, the whole balance, just under the cap        |
+| 4     | Payment address swapped                  | `payTo` is the attacker, a lookalike, a contract                                       |
+| 5     | Repeated charge for the same item        | paying an allowed seller 2 to 5 times                                                  |
+| 6     | Draining in small payments               | many payments under the per-payment cap                                                |
+| 7     | Poisoned memory or tool output           | a note or tool output naming another payee or a higher price                           |
+| 8     | Fees and contracts                       | a fee high enough to burn coins, token approval to the attacker, sending to a contract |
+| 9     | Leaked agent key                         | five cases for every group; for S also the 25 attack cases of the `leaked-key` suite   |
 
 Where a group has no such channel, it uses the closest one and the case says so in its note: a native coin has no token approval (S sends a transfer); O has no approval path (the agent signs an authorization); on the C-Chain a fee is paid in AVAX, not from the USDC balance (P, O). The attacker and "lookalike" addresses are team-held test wallets, and "a contract" is a team-owned contract wallet, so test USDC sent to them can be recovered.
 

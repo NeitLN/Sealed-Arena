@@ -1,8 +1,8 @@
 # ARCHITECTURE
 
 Tài liệu này chỉ ghi các contract giữa các thành phần và các quyết định mà hai task có thể làm mâu thuẫn nhau.
-Chi tiết bên trong mỗi thành phần do người code quyết định trong phạm vi phiếu việc.
-Điều nào đánh dấu **[cần kiểm]** là thiết kế dự kiến, phải được xác nhận ở task nêu kèm; dấu chỉ được bỏ trong PR của task đó, kèm bằng chứng, sau khi người review kiểm.
+Chi tiết bên trong mỗi thành phần nằm trong mã nguồn của thành phần đó.
+Điều nào đánh dấu **[cần kiểm]** là thiết kế dự kiến, chưa được xác nhận bằng bằng chứng.
 
 ## 1. Tổng quan
 
@@ -43,7 +43,7 @@ Quy tắc ranh giới:
 
 - Nền: avalanchego tag `v1.15.3`, VM là `graft/subnet-evm` trong chính repo đó (kho `precompile-evm` đã bị lưu trữ, không dùng).
 - Chain id: `261126`. Tên: `Sealed`. Ký hiệu coin gốc: `USDC` (18 chữ số thập phân ở tầng EVM).
-- Precompile bật từ genesis: TxAllowList, ContractDeployerAllowList, NativeMinter, Warp, AgentPolicy. secp256r1 (ACP-204, `0x100`) có sẵn trên Subnet-EVM ở tag này từ nâng cấp Granite: đã kiểm ở T04 bằng `eth_call` trên mạng local (`docs/decisions/D4.md`). AgentPolicy không gọi sang `0x100`; nó kiểm P-256 bằng thư viện chuẩn của Go.
+- Precompile bật từ genesis: TxAllowList, ContractDeployerAllowList, NativeMinter, Warp, AgentPolicy. secp256r1 (ACP-204, `0x100`) có sẵn trên Subnet-EVM ở tag này từ nâng cấp Granite: đã kiểm bằng `eth_call` trên mạng local (`docs/decisions/D4.md`). AgentPolicy không gọi sang `0x100`; nó kiểm P-256 bằng thư viện chuẩn của Go.
 - TxAllowList: chỉ các địa chỉ sau được gửi giao dịch: admin, người triển khai contract, relayer (gửi hộ thao tác passkey của chủ ví), relayer ICM, và mỗi địa chỉ agent được admin hoặc khoá quản lý demo bật. Genesis local có thêm một địa chỉ dành sẵn cho facilitator (khoá dev); genesis Fuji không có: dịch vụ facilitator không giữ và không dùng khoá nào, nó chỉ gọi `eth_sendRawTransaction` với giao dịch agent đã ký. Khoá quản lý demo (vai manager của TxAllowList, trên máy relayer) bật được quyền gửi cho bất kỳ địa chỉ nào; relayer chỉ dùng khoá này sau khi agent đã đăng ký với passkey của khách (README, giới hạn 13; RUNBOOK §8).
 - ContractDeployerAllowList: chỉ admin và người triển khai. Agent không bao giờ có trong danh sách này.
 - Phí: phí cơ sở tối thiểu đặt thấp. Người gửi trả gas bằng coin gốc.
@@ -51,7 +51,7 @@ Quy tắc ranh giới:
 
 ### 3.1 Quy tắc hợp lệ (phần lõi)
 
-Chèn ở đúng hai chỗ, ngay cạnh kiểm tra TxAllowList có sẵn (đã xác nhận vị trí trên tag `v1.15.3` ở T02, `docs/decisions/D1.md`):
+Chèn ở đúng hai chỗ, ngay cạnh kiểm tra TxAllowList có sẵn (đã xác nhận vị trí trên tag `v1.15.3` trong `docs/decisions/D1.md`):
 
 | File (trong `graft/subnet-evm/`) | Hàm | Dòng tham chiếu | Việc phải làm |
 |---|---|---|---|
@@ -76,7 +76,7 @@ Khi qua (chỉ ở `preCheck`): `spentToday += charge`, `totalCharged += charge`
 Lỗi trả về dùng các biến lỗi riêng (`ErrAgentPayeeNotAllowed`, `ErrAgentBudgetExceeded`, `ErrAgentFrozen`, `ErrAgentMandateExpired`, `ErrAgentContractCreation`, `ErrAgentPayeeHasCode`, `ErrAgentTxTypeNotAllowed`) để cổng RPC và giao diện hiển thị đúng lý do.
 Chuỗi lỗi qua RPC có tiền tố `agent:` (ví dụ `agent: payee not allowed: 0x…`, `agent: budget exceeded: …`, `agent: frozen`). Txpool chỉ nhận giao dịch loại 0, 1, 2 từ agent. Ở `preCheck`, giao dịch có blob hash trả `ErrAgentTxTypeNotAllowed`; `preCheck` không xét loại theo cách nào khác. Ở phiên bản node đã ghim, không loại nào trên 3 decode được (README, giới hạn 14).
 
-Đã triển khai ở T05 (`chain/patches/0003-agent-rule.patch`): hàm chung `core.CheckAgentTx`. `preCheck` kiểm ngay sau TxAllowList và ghi bộ đếm ở bước cuối, sau `buyGas`. Txpool kiểm chỉ đọc theo `max(thời gian block đầu chain, đồng hồ máy)` (trường `Time` mới của `ValidationOptionsWithState`, hàm `txpool.PoolTime`), để sang ngày mới thì pool nhận lại thanh toán kể cả khi chain đứng yên; `preCheck` luôn dùng thời gian block.
+Đã triển khai trong `chain/patches/0003-agent-rule.patch`: hàm chung `core.CheckAgentTx`. `preCheck` kiểm ngay sau TxAllowList và ghi bộ đếm ở bước cuối, sau `buyGas`. Txpool kiểm chỉ đọc theo `max(thời gian block đầu chain, đồng hồ máy)` (trường `Time` mới của `ValidationOptionsWithState`, hàm `txpool.PoolTime`), để sang ngày mới thì pool nhận lại thanh toán kể cả khi chain đứng yên; `preCheck` luôn dùng thời gian block.
 
 Precompile có trạng thái (dải `0x02…`, `0x03…`, kể cả AgentPolicy) có code giữ chỗ, nên điều kiện 3 từ chối chúng. Precompile gốc của EVM (`0x01`–`0x0a`, `0x100`) không có code trong state: chủ ví có thể đưa chúng vào danh sách người nhận, và một lời gọi tới chúng có thể thất bại lúc thực thi. Khi đó giao dịch vẫn vào block với receipt thất bại và vẫn bị tính đủ `charge` (bộ đếm được ghi trong `preCheck`, trước khi thực thi). Coin gửi tới địa chỉ precompile thì không lấy lại được; giao diện chủ ví nên cảnh báo khi danh sách người nhận có địa chỉ precompile.
 
@@ -86,14 +86,14 @@ Mọi đường làm tiền rời tài khoản mà không qua quy tắc sẽ ph�
 Ngoài quy tắc (không phải giao dịch): state upgrade (`stateupgrade/state_upgrade.go:33–44`) và genesis `alloc` có thể đổi số dư hoặc code của agent. Đây là quyền của người vận hành; README phải cam kết không phát hành state upgrade nào đụng tới địa chỉ agent (D1).
 
 Rủi ro đã biết phải có test:
-- Txpool kiểm trên trạng thái hiện tại, nên nhiều giao dịch đang chờ có thể cùng qua txpool. Khi vào block, giao dịch vượt ngân sách phải bị `preCheck` loại và bị người dựng block bỏ qua, không làm hỏng block. Đã kiểm ở T02 bằng đọc mã: người dựng block gặp lỗi thì bỏ giao dịch và các giao dịch sau của cùng người gửi, dựng tiếp (`miner/worker.go:469–484`, D1 câu 4). Test 20 giao dịch đồng thời là việc của T05.
-- Ở tag này Subnet-EVM **không** dùng cơ chế thực thi tách khỏi đồng thuận (ACP-194 chỉ dùng cho C-Chain qua `vms/saevm`). Lỗi ở `preCheck` làm block không hợp lệ: đã kiểm ở T02 (`docs/decisions/D1.md`).
+- Txpool kiểm trên trạng thái hiện tại, nên nhiều giao dịch đang chờ có thể cùng qua txpool. Khi vào block, giao dịch vượt ngân sách phải bị `preCheck` loại và bị người dựng block bỏ qua, không làm hỏng block. Đã kiểm bằng đọc mã: người dựng block gặp lỗi thì bỏ giao dịch và các giao dịch sau của cùng người gửi, dựng tiếp (`miner/worker.go:469–484`, D1 câu 4). Test 20 giao dịch đồng thời nằm trong `0003-agent-rule.patch` (test ở mức VM).
+- Ở tag này Subnet-EVM **không** dùng cơ chế thực thi tách khỏi đồng thuận (ACP-194 chỉ dùng cho C-Chain qua `vms/saevm`). Lỗi ở `preCheck` làm block không hợp lệ: đã kiểm trong `docs/decisions/D1.md`.
 - `eth_call` và `eth_estimateGas` chạy với `SkipAccountChecks: true` nên không áp quy tắc. Không dùng chúng để đoán giao dịch có hợp lệ không.
 - Hai node chạy bản khác nhau sẽ tách chain. Mọi node dùng cùng một image.
 
 ### 3.2 Precompile AgentPolicy
 
-Địa chỉ: `0x0300000000000000000000000000000000000001`, trong dải `0x0300…00–0x0300…ff` dành cho precompile tự định nghĩa (`precompile/modules/registerer.go:22–35`). Khoá cấu hình genesis: `"agentPolicyConfig": {"blockTimestamp": 0}` trong `config`. Đã kiểm ở T04 (`docs/decisions/D4.md`).
+Địa chỉ: `0x0300000000000000000000000000000000000001`, trong dải `0x0300…00–0x0300…ff` dành cho precompile tự định nghĩa (`precompile/modules/registerer.go:22–35`). Khoá cấu hình genesis: `"agentPolicyConfig": {"blockTimestamp": 0}` trong `config`. Đã kiểm trong `docs/decisions/D4.md`.
 
 Giao diện (Solidity, dùng để sinh binding và để web gọi):
 
@@ -134,13 +134,13 @@ Quyết định đã chốt:
 - `nonce` phải bằng `ownerNonce(agent)` và tăng 1 sau mỗi thao tác thành công, để chống phát lại.
 - Một agent mới đăng ký chưa có uỷ quyền: mọi giao dịch của nó đều không hợp lệ cho tới khi `setMandate`.
 - Không có hàm nào cho phép gỡ đăng ký.
-- `register` ai đến trước thì được, chỉ cần khoá agent. Agent thử thách phải được đăng ký và đặt uỷ quyền **trước** khi khoá được công khai; nếu không, người cầm khoá đăng ký passkey của chính họ (T06, T11).
-- Precompile không kiểm `rpIdHash` hay `origin` trong bằng chứng WebAuthn (đúng 3.3). Trang nào lừa được chủ ví ký đúng challenge của mình cũng tạo được bằng chứng hợp lệ. Ghi vào giới hạn ở T09.
-- Tên giá trị trả về `registered` và `nonce` được thêm ở T04 cho công cụ sinh khung; selector và cách mã hoá không đổi.
-- `getSpend` trả bộ đếm tính theo thời điểm block hiện tại: sang ngày UTC mới thì `spentToday` đọc là 0 và `dayIndex` là ngày hiện tại, khớp với cách quy tắc sẽ áp ở T05.
+- `register` ai đến trước thì được, chỉ cần khoá agent. Agent thử thách phải được đăng ký và đặt uỷ quyền **trước** khi khoá được công khai; nếu không, người cầm khoá đăng ký passkey của chính họ.
+- Precompile không kiểm `rpIdHash` hay `origin` trong bằng chứng WebAuthn (đúng 3.3). Trang nào lừa được chủ ví ký đúng challenge của mình cũng tạo được bằng chứng hợp lệ. Đã ghi vào giới hạn 11 của README.
+- Tên giá trị trả về `registered` và `nonce` được thêm cho công cụ sinh khung; selector và cách mã hoá không đổi.
+- `getSpend` trả bộ đếm tính theo thời điểm block hiện tại: sang ngày UTC mới thì `spentToday` đọc là 0 và `dayIndex` là ngày hiện tại, khớp với cách quy tắc áp (3.1).
 - `register` cần chữ ký 65 byte `r || s || v` (v là 0, 1, 27 hoặc 28), `s` ở nửa thấp.
 - Lỗi của precompile (chuỗi trả về qua RPC, tiền tố `agentpolicy:`): `ErrNotRegistered`, `ErrAlreadyRegistered`, `ErrBadAgentSignature`, `ErrBadOwnerKey`, `ErrBadNonce`, `ErrBadAuthEncoding`, `ErrBadClientData`, `ErrBadClientDataType`, `ErrChallengeMismatch`, `ErrUserNotPresent`, `ErrHighS`, `ErrBadOwnerSignature`, `ErrTooManyPayees`, `ErrPerTxAboveDaily`, `ErrNonceExhausted`, `ErrAuthTooLarge` (`auth` tối đa 2048 byte).
-- Hàm Go nội bộ cho T05 (không có trong ABI): `GetMandateForRule(state, agent)` chỉ đọc; `SpendForDay(state, agent, timestamp)` chỉ đọc; `ChargeSpend(state, agent, charge, timestamp)` ghi bộ đếm.
+- Hàm Go nội bộ cho quy tắc ở 3.1 (không có trong ABI): `GetMandateForRule(state, agent)` chỉ đọc; `SpendForDay(state, agent, timestamp)` chỉ đọc; `ChargeSpend(state, agent, charge, timestamp)` ghi bộ đếm.
 
 ### 3.3 Bằng chứng WebAuthn (`auth`)
 
@@ -155,7 +155,7 @@ Precompile kiểm: `auth` mã hoá đúng chuẩn (mã hoá lại phải ra đú
 
 Hàm mã hoá challenge ở phía TypeScript đặt trong `packages/shared/` và phải có test đối chiếu với Go bằng cùng bộ vector.
 
-### 3.4 Bản trên Fuji (T12)
+### 3.4 Bản trên Fuji
 
 Mã định danh và địa chỉ: `services/fuji-ops/deployments/fuji.json`.
 
@@ -169,7 +169,9 @@ Mã định danh và địa chỉ: `services/fuji-ops/deployments/fuji.json`.
 
 Bật bằng khoá cấu hình riêng `agentRuleV2Config` (precompile không có hàm ở `0x0300…02`) lên lịch trong `precompileUpgrades` tại thời điểm T. Block trước T giữ nghĩa v1 khi chạy lại lịch sử; từ block đầu tiên có thời gian ≥ T mọi node áp v2. Bật một chiều: `Verify` từ chối `disable`. Mạng local: biến `SEALED_RULE_V2_AT` của `chain/localnet` (`0`, `+90` hoặc unix giây) thêm khoá này vào genesis. Fuji: RUNBOOK §7.1.
 
-**Giao dịch của agent** (kiểm sau mọi điều kiện ở 3.1, nên lý do từ chối của v1 không đổi; pool và `preCheck` cùng phiên bản theo `PoolTime`):
+Phiên bản luật đi theo thời gian block: `preCheck` theo block đang kiểm, pool theo thời gian của head block (`Rules` dựng từ `currentHead.Time`, cả trong `validateTx` lẫn `pruneAgentTxs`). `PoolTime` chỉ dùng ở pool cho phần kiểm hạn dùng và ngày (`expiry`, `spentToday`, bộ đếm phí), không dùng để chọn phiên bản.
+
+**Giao dịch của agent** (kiểm sau mọi điều kiện ở 3.1, nên lý do từ chối của v1 không đổi):
 - loại 0, 1, 2; không access list;
 - call data rỗng, hoặc đúng 32 byte (tham chiếu thanh toán x402, mục 4); payee vẫn phải là tài khoản không có code nên data không được thực thi;
 - `gasLimit` đúng bằng gas nội tại của data: `21000 + 16 × byte khác 0 + 4 × byte 0` (`core.AgentPaymentGas`, tối đa 21512);
@@ -247,13 +249,13 @@ Hệ quả phải ghi trong README: người bán phải thêm mạng L1 và tr�
 - `fund(agent)` payable: nạp coin gốc cho agent qua recorder để cộng `funded[agent]`. Tiền gửi thẳng cho agent không được tính.
 - `checkpoint(agent)` (ai cũng gọi được): kiểm bất biến ở mục 3.1 dưới dạng `balance(agent) ≥ funded − (totalCharged − totalCharged lúc enroll)`; nếu giữ thì cộng `score += min(balance, funded − charged) × (now − lastCheckpoint)`. Bất biến vỡ thì ghi `breached = true`, `score = 0`, ghi người gọi là người tìm ra, phát `Breach`. Vi phạm là vĩnh viễn: sau đó `checkpoint` không đổi gì, `fund` bị từ chối.
 - `reportBreach(agent)`: như `checkpoint`, tên dành cho người đi tìm vi phạm.
-- `publish(agent)`: `checkpoint` rồi gửi `abi.encode(agent, score, breached, lastCheckpoint, block.chainid)` qua `IReputationPublisher` do admin đặt (`setPublisher`). Adapter Teleporter tới ReputationReceiver trên Fuji làm ở T13.
+- `publish(agent)`: `checkpoint` rồi gửi `abi.encode(agent, score, breached, lastCheckpoint, block.chainid)` qua `IReputationPublisher` do admin đặt (`setPublisher`). Adapter Teleporter tới ReputationReceiver trên Fuji: xem bên dưới và D7.
 - `enroll` đòi agent đã đăng ký trong AgentPolicy. Số dư agent đang có lúc enroll được tính vào `funded` (để nó không che được khoản rò sau này); khoản đã tính trước khi enroll không được trừ.
 - Giới hạn: tiền gửi thẳng cho agent sau khi enroll không tăng `funded` và không tăng điểm, nhưng làm tăng `balance`, nên một khoản rò nhỏ hơn số tiền gửi thẳng sẽ không lộ ra. Thử thách chỉ nạp tiền qua `fund`. Tương tự, quy tắc tính gas theo mức tối đa, nên phần gas không dùng tạo một độ hở nhỏ (khoảng 0,0034 coin sau toàn bộ bộ leaked-key): khoản rò nhỏ hơn độ hở này không lộ ra.
-- Đã triển khai ở T10: `contracts/src/ArenaRecorder.sol`, ABI ở `packages/shared/src/arenaRecorderAbi.ts`.
+- Đã triển khai: `contracts/src/ArenaRecorder.sol`, ABI ở `packages/shared/src/arenaRecorderAbi.ts`.
 - Số lượt thử không nằm trong contract (giao dịch bị từ chối không vào chain). Cổng RPC đếm ở ngoài chain và giao diện ghi rõ đó là số đo ngoài chain.
 
-Đường đi (T13, quyết định D7): `ArenaRecorder.publish(agent)` → `TeleporterPublisher` (L1; chỉ ArenaRecorder gọi được) → TeleporterMessenger → relayer ICM → `ReputationReceiver` (Fuji C-Chain) → `ReputationRegistry.giveFeedback` của ERC-8004. ReputationReceiver chỉ nhận tin khi người gọi là TeleporterMessenger, chain nguồn là L1 Sealed và người gửi gốc là TeleporterPublisher; bỏ tin không mới hơn tin đã nhận. Giá trị: coin·giờ sống sót, tag `sealed-arena`/`survival`; vi phạm ghi `-1`, tag `breached`. Danh tính ERC-8004 của agent do ví vận hành đăng ký (registry cấm chủ sở hữu tự ghi feedback). Teleporter đang chạy là bản có `feeInfo`.
+Đường đi (quyết định D7): `ArenaRecorder.publish(agent)` → `TeleporterPublisher` (L1; chỉ ArenaRecorder gọi được) → TeleporterMessenger → relayer ICM → `ReputationReceiver` (Fuji C-Chain) → `ReputationRegistry.giveFeedback` của ERC-8004. ReputationReceiver chỉ nhận tin khi người gọi là TeleporterMessenger, chain nguồn là L1 Sealed và người gửi gốc là TeleporterPublisher; bỏ tin không mới hơn tin đã nhận. Giá trị: coin·giờ sống sót, tag `sealed-arena`/`survival`; vi phạm ghi `-1`, tag `breached`. Danh tính ERC-8004 của agent do ví vận hành đăng ký (registry cấm chủ sở hữu tự ghi feedback). Teleporter đang chạy là bản có `feeInfo`.
 
 Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. README phải nói điều này.
 
@@ -265,7 +267,7 @@ Bản ghi sống sót chỉ đáng tin bằng địa chỉ ReputationReceiver. R
 - Giới hạn tốc độ theo IP.
 - API đọc: `GET /attempts/summary` trả tổng lượt thử, số bị từ chối theo lý do, số người gửi phân biệt (theo hash của IP).
 
-Đã triển khai ở T11 (`services/rpc-gateway`): batch tối đa 20 yêu cầu, `eth_getLogs` tối đa 2048 block, 600 lệnh/phút (mỗi lệnh trong batch tính một; đổi bằng `GATEWAY_PER_MINUTE`) và 20 `eth_sendRawTransaction`/phút cho mỗi khách. Trang web đọc chain mỗi 15 giây trong một batch, `/attempts` mỗi 5 giây, chờ lâu dần khi lỗi và ngừng khi tab bị ẩn (`web/src/poll.ts`): người cùng một sự kiện dùng chung IP; lượt thử lưu bằng `node:sqlite`; IP chỉ lưu dưới dạng HMAC-SHA256 có muối bí mật (`GATEWAY_IP_SALT`). `GET /attempts/recent` trả các lượt gần nhất (không có hash IP); cả hai API đọc nhận `?from=<địa chỉ>` để lọc theo agent.
+Đã triển khai trong `services/rpc-gateway`: batch tối đa 20 yêu cầu, `eth_getLogs` tối đa 2048 block, 600 lệnh/phút (mỗi lệnh trong batch tính một; đổi bằng `GATEWAY_PER_MINUTE`) và 20 `eth_sendRawTransaction`/phút cho mỗi khách. Trang web đọc chain mỗi 15 giây trong một batch, `/attempts` mỗi 5 giây, chờ lâu dần khi lỗi và ngừng khi tab bị ẩn (`web/src/poll.ts`): người cùng một sự kiện dùng chung IP; lượt thử lưu bằng `node:sqlite`; IP chỉ lưu dưới dạng HMAC-SHA256 có muối bí mật (`GATEWAY_IP_SALT`). `GET /attempts/recent` trả các lượt gần nhất (không có hash IP); cả hai API đọc nhận `?from=<địa chỉ>` để lọc theo agent.
 
 Trang `/arena` và `/arena/rules` (web). Người chơi không có trong TxAllowList, nên `checkpoint` và `reportBreach` của ArenaRecorder đi qua relayer (`POST /relayer/arena`, relayer tự dựng calldata); trên chain người gọi là relayer. Agent thử thách được đăng ký dưới một khoá chủ ví P-256 bí mật (không dùng khoá thử công khai), uỷ quyền tới hai người nhận do đội giữ khoá.
 
@@ -285,12 +287,12 @@ Trang `/arena` và `/arena/rules` (web). Người chơi không có trong TxAllow
 
 Không dùng lại khoá agent thử thách cho bất kỳ vai nào khác, trên bất kỳ chain nào.
 
-### 7.1 Trang chủ ví và relayer (T09)
+### 7.1 Trang chủ ví và relayer
 
 - `web/` (Vite, React, thư viện giao diện Astryx): chủ ví tạo passkey (WebAuthn, ES256), gắn agent, đặt uỷ quyền, dừng và mở lại. Trang đọc chain trực tiếp qua RPC. Giao diện song ngữ Anh/Việt.
 - Passkey: `(x, y)` lấy từ `getPublicKey()` (SPKI P-256). Chữ ký DER của trình duyệt được đổi sang `(r, s)` với `s` ở nửa thấp, rồi thành `auth` theo mục 3.3 (`packages/shared/src/webauthn.ts`). RP ID là tên miền của trang, nên trang phải chạy trên tên miền (hoặc `localhost`), không chạy trên địa chỉ IP.
 - Gắn agent: khoá agent ký `registerDigest` (hash thô, không tiền tố). Trên mạng local được dán private key của agent để ký ngay trong trình duyệt; khoá không được gửi đi.
-- `services/relayer` (Hono): `POST /relay { data }` chỉ nhận `register`, `setMandate`, `freeze`, `unfreeze` tới `0x0300…01`; chạy thử bằng `eth_call` trước, nếu chain sẽ từ chối thì trả lý do và không gửi; giới hạn 10 yêu cầu/phút mỗi địa chỉ khách. `GET /info` trả địa chỉ relayer, chain id và URL RPC cho trang. Relayer không làm giả được thao tác (precompile kiểm passkey) nhưng có thể từ chối gửi. TxAllowList đang bật, nên chỉ địa chỉ có trong TxAllowList (mục 3) mới tự gửi được cùng dữ liệu; chủ ví không có địa chỉ như vậy thì relayer là đường duy nhất.
+- `services/relayer` (Hono): `POST /relay { data }` chỉ nhận `register`, `setMandate`, `freeze`, `unfreeze` tới `0x0300…01`; chạy thử bằng `eth_call` trước, nếu chain sẽ từ chối thì trả lý do và không gửi; giới hạn 10 yêu cầu/phút mỗi địa chỉ khách, và mỗi agent (tham số đầu của thao tác) tối đa 1 thao tác mỗi 15 giây và 20 thao tác mỗi giờ, bất kể ai gọi (429 `agent_rate_limited` kèm `retryAfter` tính bằng giây). `freeze` (và `guardianFreeze` của rule v3) không bị giới hạn này. Lượt chỉ được giữ sau khi chạy thử thành công, nên thao tác bị chain từ chối (ví dụ chữ ký rác) không giữ và không tính lượt. `GET /info` trả địa chỉ relayer, chain id và URL RPC cho trang. Relayer không làm giả được thao tác (precompile kiểm passkey) nhưng có thể từ chối gửi. TxAllowList đang bật, nên chỉ địa chỉ có trong TxAllowList (mục 3) mới tự gửi được cùng dữ liệu; chủ ví không có địa chỉ như vậy thì relayer là đường duy nhất.
 
 ## 8. Quy ước
 
@@ -310,4 +312,4 @@ Không dùng lại khoá agent thử thách cho bất kỳ vai nào khác, trên
 
 Ở mọi bậc, giao diện giữa lớp thực thi và phần còn lại là: `getMandate`, `getSpend`, `setMandate/freeze` bằng passkey, và bất biến `balance ≥ funded − totalCharged`. Agent, người bán, facilitator, web, ArenaRecorder và bộ tấn công không phải viết lại khi đổi bậc; chỉ đổi adapter trong `packages/shared/`.
 
-Điều kiện lùi xuống bậc 2: tới cuối ngày 19/11, T05 chưa có kết quả `PASS` trên mạng local nhiều node, hoặc T02 kết luận lỗi ở `preCheck` không làm giao dịch bị loại khỏi block.
+Điều kiện lùi xuống bậc 2: tới cuối ngày 19/11, quy tắc chưa có kết quả `PASS` trên mạng local nhiều node, hoặc D1 kết luận lỗi ở `preCheck` không làm giao dịch bị loại khỏi block.

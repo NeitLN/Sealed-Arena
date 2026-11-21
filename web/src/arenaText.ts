@@ -32,7 +32,7 @@ const en = {
   breached: "BREACHED",
   mandateTitle: "Mandate",
   payees: "Allowed payees",
-  perTx: "Per payment · maximum fee included",
+  perTx: "Per payment (fee incl.)",
   perDay: "Per UTC day",
   expires: "Expires",
   frozen: "Frozen",
@@ -117,7 +117,7 @@ const en = {
   beforeTitle: "Before you start",
   beforeItems: [
     "Only addresses on the L1's allow-list can send. The challenge agent's key is one of them; your own address is not.",
-    "The node's pool takes transaction types 0, 1 and 2 from an agent. A block also refuses an agent transaction that carries blob hashes.",
+    "Under rule v2 an agent payment must be type 0, 1 or 2 with no access list; its gas limit must equal its intrinsic gas; its tip is at most 1 gwei; its data is empty or exactly 32 bytes; its maximum fee counts toward the mandate's daily fee cap; and a set-code authority may not be an agent. The node checks this in the pool and again in every block.",
     "The fee counts toward the caps: the charge is value + gas limit × max fee per gas.",
     "The public RPC limits each IP to 600 calls a minute. Refused transactions are counted off chain by the gateway.",
     "Payees with code (contracts and the precompiles) are refused, and so is contract creation.",
@@ -142,7 +142,7 @@ const en = {
   tryNode: "The node answered with an error that is not the mandate rule",
   tryNote:
     "This shows the node refusing the transaction when it arrives. A block that contains such a transaction is also invalid under the patched block-validity rule:",
-  tryNoteLink: "decision D1",
+  tryNoteLink: "decision D1 (English summary, details in Vietnamese)",
   verifyTitle: "Verify it yourself",
   verifyIntro:
     "The page read the agent's account from the public RPC before sending, and again 8 seconds after the answer. Every read can be repeated with the command below.",
@@ -199,7 +199,7 @@ const vi: Text = {
   breached: "ĐÃ VI PHẠM",
   mandateTitle: "Uỷ quyền",
   payees: "Người nhận được phép",
-  perTx: "Mỗi lần · đã gồm phí tối đa",
+  perTx: "Mỗi lần (gồm phí)",
   perDay: "Mỗi ngày UTC",
   expires: "Hết hạn",
   frozen: "Đã dừng",
@@ -255,7 +255,7 @@ const vi: Text = {
   reportTitle: "Tìm ra điều gì?",
   report:
     'Vi phạm T0 của agent thử thách: bấm "Báo vi phạm" rồi mở issue công khai trên GitHub kèm hash giao dịch. Vấn đề khác (precompile, contract, dịch vụ): báo riêng, xem SECURITY.md.',
-  tryAllowed: "Trả người bán được phép 0,01 USDC (đối chứng)",
+  tryAllowed: "Trả người bán được phép 0.01 USDC (đối chứng)",
   tryLoading: "Đang đọc uỷ quyền từ chain… hai nút người bán cần số liệu này.",
   trySlow: "RPC công khai không trả lời trong 10 giây. Hãy thử lại.",
   expectAccepted: "được nhận, rồi vào block (trong uỷ quyền)",
@@ -282,7 +282,7 @@ const vi: Text = {
   beforeTitle: "Trước khi bắt đầu",
   beforeItems: [
     "Chỉ địa chỉ trong allow-list của L1 mới gửi được. Khoá của agent thử thách có trong đó; địa chỉ riêng của bạn thì không.",
-    "Pool của node nhận giao dịch loại 0, 1 và 2 từ agent. Block cũng từ chối giao dịch của agent có blob hash.",
+    "Với luật v2, khoản trả của agent phải là loại 0, 1 hoặc 2, không có access list; gas limit bằng đúng gas tối thiểu của nó; tip tối đa 1 gwei; data rỗng hoặc đúng 32 byte; phí tối đa tính vào hạn mức phí ngày của uỷ quyền; và set-code authority không được là agent. Node kiểm điều này ở pool và lại ở mỗi block.",
     "Phí tính vào hạn mức: số bị tính là value + gas limit × max fee per gas.",
     "RPC công khai giới hạn mỗi IP 600 lệnh mỗi phút. Giao dịch bị từ chối do cổng RPC đếm, ngoài chain.",
     "Người nhận có code (contract và các precompile) bị từ chối, tạo contract cũng vậy.",
@@ -292,7 +292,7 @@ const vi: Text = {
   tryTitle: "Thử một khoản trả bị cấm",
   tryIntro:
     "Mỗi nút ký một giao dịch thật bằng private key đã công bố của agent, ngay trong trình duyệt của bạn, rồi gửi tới Sealed L1 trên Fuji qua RPC công khai. Câu trả lời bên dưới là đúng những gì node gửi về; lượt thử cũng được thêm vào danh sách phía dưới. Chỉ dùng USDC thử, và giao dịch bị từ chối không tốn gì.",
-  tryStranger: "Trả 0,01 USDC cho người lạ",
+  tryStranger: "Trả 0.01 USDC cho người lạ",
   tryOverCap: "Trả người bán được phép, vượt hạn mức",
   trySending: "Đang gửi…",
   trySent: "Đã gửi",

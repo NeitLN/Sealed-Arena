@@ -21,27 +21,50 @@ function setup(
     perDay?: number;
     ready?: boolean;
     version?: 1 | 2;
+    perClientMs?: number;
+    /** The first this many policy() reads fail (the node is briefly unreachable). */
+    policyFails?: number;
+    /** How the first register send ends instead of succeeding. */
+    firstSend?: "reverted" | "throws";
+    /** The first enable fails after the register was sent. */
+    enableFails?: boolean;
   } = {},
 ) {
   const steps: string[] = [];
   const sent: Hex[] = [];
+  let policyFails = o.policyFails ?? 0;
+  let firstSend = o.firstSend;
+  let enableFails = o.enableFails ?? false;
   const chain: RelayChain = {
     relayer: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
     chainId: 261126,
-    policy: async () => ({ version: o.version ?? 1, ids: IDS }),
+    policy: async () => {
+      if (policyFails > 0) {
+        policyFails--;
+        throw new Error("fetch failed");
+      }
+      return { version: o.version ?? 1, ids: IDS };
+    },
     simulate: async () => {
       if (o.revert) throw new Error(o.revert);
     },
     canSend: async () => false,
     send: async (data) => {
+      const mode = firstSend;
+      firstSend = undefined;
+      if (mode === "throws") throw new Error("nonce too low");
       sent.push(data);
       steps.push("register");
-      return { transaction: "0xaaa", status: "success" };
+      return { transaction: "0xaaa", status: mode === "reverted" ? "reverted" : "success" };
     },
   };
   const issuer: DemoIssuer = {
     ready: async () => o.ready ?? true,
     enable: async (a) => {
+      if (enableFails) {
+        enableFails = false;
+        throw new Error("manager role missing");
+      }
       steps.push(`enable ${a}`);
       return "0xbbb";
     },
@@ -53,7 +76,12 @@ function setup(
   const app = createRelayerApp({
     chain,
     trustProxy: true,
-    demo: { issuer, funding: 5n, ...(o.perDay ? { perDay: o.perDay } : {}) },
+    demo: {
+      issuer,
+      funding: 5n,
+      ...(o.perDay ? { perDay: o.perDay } : {}),
+      ...(o.perClientMs ? { perClientMs: o.perClientMs } : {}),
+    },
     ...(o.now ? { now: o.now } : {}),
   });
   return { app, steps, sent };
@@ -187,6 +215,91 @@ describe("demo agents", () => {
     const res = await claim(app, { ownerX: X, ownerY: Y }, "3.3.3.3");
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ error: "demo_cap" });
+  });
+
+  it("answers the per-address wait as demo_rate_limited with retryAfter in seconds and the window", async () => {
+    let t = 1_000_000;
+    const { app } = setup({ now: () => t });
+    expect((await claim(app, { ownerX: X, ownerY: Y })).status).toBe(200);
+    t += 60_000;
+    const res = await claim(app, { ownerX: X, ownerY: Y });
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("540");
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "demo_rate_limited",
+      retryAfter: 540,
+      windowMs: 600_000,
+    });
+  });
+
+  it("takes the per-address window from the options", async () => {
+    let t = 1_000_000;
+    const { app } = setup({ now: () => t, perClientMs: 60_000 });
+    expect((await claim(app, { ownerX: X, ownerY: Y })).status).toBe(200);
+    const res = await claim(app, { ownerX: X, ownerY: Y });
+    expect(await res.json()).toMatchObject({ retryAfter: 60, windowMs: 60_000 });
+    t += 60_000;
+    expect((await claim(app, { ownerX: X, ownerY: Y })).status).toBe(200);
+  });
+
+  it("lets two claims from one address arriving together pass only once", async () => {
+    const { app, steps } = setup();
+    const [a, b] = await Promise.all([
+      claim(app, await browserClaim()),
+      claim(app, await browserClaim()),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 429]);
+    expect(steps.filter((s) => s === "register")).toHaveLength(1);
+  });
+
+  it("does not use the address slot or the day cap when the signature is wrong", async () => {
+    const { app } = setup({ perDay: 1 });
+    const bad = await browserClaim();
+    bad.agentSig = await privateKeyToAccount(generatePrivateKey()).sign({
+      hash: registerDigestFor(1, IDS, bad.agent, X, Y),
+    });
+    expect((await claim(app, bad)).status).toBe(400);
+    // Same address, and the only claim of the day: both still free.
+    expect((await claim(app, { ownerX: X, ownerY: Y })).status).toBe(200);
+  });
+
+  it("does not use the address slot or the day cap when reading the policy fails", async () => {
+    const { app } = setup({ policyFails: 1, perDay: 1 });
+    const first = await claim(app, await browserClaim());
+    expect(first.status).toBe(502);
+    expect(await first.json()).toMatchObject({ error: "send_failed" });
+    expect((await claim(app, await browserClaim())).status).toBe(200);
+  });
+
+  it("does not use the address slot when the simulation refuses the register", async () => {
+    const { app } = setup({ revert: "execution reverted: bad key", perDay: 1 });
+    expect((await claim(app, await browserClaim())).status).toBe(422);
+    const again = await claim(app, await browserClaim());
+    expect(again.status).toBe(422);
+    expect(await again.json()).toMatchObject({ error: "reverted" });
+  });
+
+  it("does not use the address slot when the register send fails", async () => {
+    const { app } = setup({ firstSend: "throws", perDay: 1 });
+    expect((await claim(app, await browserClaim())).status).toBe(502);
+    expect((await claim(app, await browserClaim())).status).toBe(200);
+  });
+
+  it("keeps the slot once a register transaction was sent, even if it reverted", async () => {
+    const { app } = setup({ firstSend: "reverted" });
+    expect((await claim(app, await browserClaim())).status).toBe(422);
+    const again = await claim(app, await browserClaim());
+    expect(again.status).toBe(429);
+    expect(await again.json()).toMatchObject({ error: "demo_rate_limited" });
+  });
+
+  it("keeps the slot once registered, even if allowing the agent fails", async () => {
+    const { app } = setup({ enableFails: true });
+    const first = await claim(app, await browserClaim());
+    expect(first.status).toBe(502);
+    expect(await first.json()).toMatchObject({ error: "issue_failed" });
+    expect((await claim(app, await browserClaim())).status).toBe(429);
   });
 });
 

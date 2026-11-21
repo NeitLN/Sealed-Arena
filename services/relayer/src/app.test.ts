@@ -126,11 +126,171 @@ describe("relayer", () => {
 
   it("limits requests per client address", async () => {
     const { c } = chain();
-    const app = createRelayerApp({ chain: c, trustProxy: true, perMinute: 3 });
+    const app = createRelayerApp({ chain: c, trustProxy: true, perMinute: 3, agentGapMs: 0 });
     const codes = [];
     for (let i = 0; i < 4; i++) codes.push((await post(app, { data: freezeData })).status);
     expect(codes).toEqual([200, 200, 200, 429]);
     expect((await post(app, { data: freezeData }, "5.6.7.8")).status).toBe(200);
+  });
+
+  describe("owner actions per agent", () => {
+    const other = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+    const JUNK = "0xdead" as Hex;
+    const unfreezeOf = (who: string, auth: Hex = "0x") =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "unfreeze",
+        args: [who as `0x${string}`, 0n, auth],
+      });
+    const freezeOf = (who: string, auth: Hex = "0x") =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "freeze",
+        args: [who as `0x${string}`, 0n, auth],
+      });
+    const mandateOf = (who: string, auth: Hex = "0x") =>
+      encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "setMandate",
+        args: [
+          who as `0x${string}`,
+          { payees: [], perTxCap: 1n, dailyCap: 1n, expiry: 1n },
+          0n,
+          auth,
+        ],
+      });
+    const unfreezeData = unfreezeOf(agent);
+
+    /** A chain whose simulation refuses any action carrying the junk proof, after `hold` resolves. */
+    function junkChain(hold: Promise<void> = Promise.resolve()) {
+      const r = chain();
+      const ok = r.c.simulate;
+      r.c.simulate = async (data, to) => {
+        if (data.endsWith("dead".padEnd(64, "0"))) {
+          await hold;
+          throw new Error("execution reverted: agentpolicy: owner signature invalid");
+        }
+        return ok(data, to);
+      };
+      return r;
+    }
+
+    it("sends at most one limited action per agent every 15 s, whoever asks; other agents are not held back", async () => {
+      const { c, sent } = chain();
+      let t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t });
+      expect((await post(app, { data: unfreezeData }, "1.1.1.1")).status).toBe(200);
+      t += 1_000;
+      const again = await post(app, { data: mandateOf(agent.toLowerCase()) }, "2.2.2.2");
+      expect(again.status).toBe(429);
+      expect(again.headers.get("retry-after")).toBe("14");
+      expect(await again.json()).toEqual({
+        ok: false,
+        error: "agent_rate_limited",
+        retryAfter: 14,
+      });
+      expect((await post(app, { data: unfreezeOf(other) }, "1.1.1.1")).status).toBe(200);
+      expect(sent).toHaveLength(2);
+      t += 14_000;
+      expect((await post(app, { data: unfreezeData }, "3.3.3.3")).status).toBe(200);
+    });
+
+    it("sends at most the hourly number of limited actions per agent", async () => {
+      const { c } = chain();
+      let t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t, agentPerHour: 2 });
+      expect((await post(app, { data: mandateOf(agent) }, "1.1.1.1")).status).toBe(200);
+      t += 15_000;
+      expect((await post(app, { data: unfreezeData }, "2.2.2.2")).status).toBe(200);
+      t += 15_000;
+      const third = await post(app, { data: mandateOf(agent) }, "3.3.3.3");
+      expect(third.status).toBe(429);
+      // The first action leaves the hour at 1_000_000 + 3_600_000.
+      expect(await third.json()).toMatchObject({
+        error: "agent_rate_limited",
+        retryAfter: 3_600 - 30,
+      });
+      t = 1_000_000 + 3_600_000;
+      expect((await post(app, { data: unfreezeData }, "4.4.4.4")).status).toBe(200);
+    });
+
+    it("never limits a freeze: right after setMandate, and many in a row", async () => {
+      const { c, sent } = chain();
+      const t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t, agentPerHour: 1 });
+      expect((await post(app, { data: mandateOf(agent) }, "1.1.1.1")).status).toBe(200);
+      expect((await post(app, { data: freezeData }, "1.1.1.1")).status).toBe(200);
+      expect((await post(app, { data: freezeData }, "2.2.2.2")).status).toBe(200);
+      expect(sent).toHaveLength(3);
+      // The limited actions are still held back.
+      expect((await post(app, { data: unfreezeData }, "3.3.3.3")).status).toBe(429);
+    });
+
+    it("never limits a guardian freeze either (rule v3)", async () => {
+      const { c, sent } = chain();
+      const t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t, agentPerHour: 1 });
+      const guardianFreeze = encodeFunctionData({
+        abi: agentPolicyAbi,
+        functionName: "guardianFreeze",
+        args: [agent, 0n, "0x"],
+      });
+      expect((await post(app, { data: mandateOf(agent) }, "1.1.1.1")).status).toBe(200);
+      expect((await post(app, { data: guardianFreeze }, "1.1.1.1")).status).toBe(200);
+      expect((await post(app, { data: guardianFreeze }, "2.2.2.2")).status).toBe(200);
+      expect(sent).toHaveLength(3);
+      expect((await post(app, { data: unfreezeData }, "3.3.3.3")).status).toBe(429);
+    });
+
+    it("a junk-proof freeze still in flight does not hold back the owner's freeze", async () => {
+      let let_go = () => {};
+      const { c, sent } = junkChain(new Promise((r) => (let_go = r)));
+      const app = createRelayerApp({ chain: c, trustProxy: true });
+      const junk = post(app, { data: freezeOf(agent, JUNK) }, "6.6.6.6");
+      await new Promise((r) => setTimeout(r, 5));
+      expect((await post(app, { data: freezeData }, "1.1.1.1")).status).toBe(200);
+      let_go();
+      expect((await junk).status).toBe(422);
+      expect(sent).toEqual([freezeData]);
+    });
+
+    it("a junk-proof unfreeze or mandate still in flight does not hold back the owner's own", async () => {
+      let let_go = () => {};
+      const { c, sent } = junkChain(new Promise((r) => (let_go = r)));
+      const app = createRelayerApp({ chain: c, trustProxy: true });
+      const junk = [
+        post(app, { data: unfreezeOf(agent, JUNK) }, "6.6.6.6"),
+        post(app, { data: mandateOf(agent, JUNK) }, "7.7.7.7"),
+      ];
+      await new Promise((r) => setTimeout(r, 5));
+      expect((await post(app, { data: unfreezeData }, "1.1.1.1")).status).toBe(200);
+      let_go();
+      expect((await Promise.all(junk)).map((r) => r.status)).toEqual([422, 422]);
+      expect(sent).toEqual([unfreezeData]);
+    });
+
+    it("junk proofs that fail simulation never count toward the limit", async () => {
+      const { c, sent } = junkChain();
+      const t = 1_000_000;
+      const app = createRelayerApp({ chain: c, trustProxy: true, now: () => t, agentPerHour: 1 });
+      for (let i = 0; i < 5; i++) {
+        expect((await post(app, { data: unfreezeOf(agent, JUNK) }, `6.6.6.${i}`)).status).toBe(422);
+        expect((await post(app, { data: mandateOf(agent, JUNK) }, `7.7.7.${i}`)).status).toBe(422);
+      }
+      expect((await post(app, { data: unfreezeData }, "1.1.1.1")).status).toBe(200);
+      expect(sent).toEqual([unfreezeData]);
+    });
+
+    it("lets one of two limited actions for the same agent arriving together through", async () => {
+      const { c, sent } = chain();
+      const app = createRelayerApp({ chain: c, trustProxy: true });
+      const [a, b] = await Promise.all([
+        post(app, { data: unfreezeData }, "1.1.1.1"),
+        post(app, { data: mandateOf(agent) }, "2.2.2.2"),
+      ]);
+      expect([a.status, b.status].sort()).toEqual([200, 429]);
+      expect(sent).toHaveLength(1);
+    });
   });
 
   it("says who it is and where it sends", async () => {

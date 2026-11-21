@@ -11,6 +11,7 @@ import { SiteShell } from "./SiteShell.js";
 import { StatusPill } from "./StatusPill.js";
 
 const r = result as unknown as Result;
+const OPLUS_BURST = `${ARENA.source}/blob/main/docs/MEASUREMENTS.md#o-in-the-burst-comparison-fuji-c-chain`;
 
 export default function ComparePage() {
   const { lang, setLang } = useI18n();
@@ -84,7 +85,12 @@ export default function ComparePage() {
             <p>{why.whenS}</p>
           </article>
         </div>
-        <p className="caption">{why.note}</p>
+        <p className="caption">
+          {why.note}{" "}
+          <a className="text-link" href={OPLUS_BURST}>
+            {why.noteLink} ↗
+          </a>
+        </p>
       </section>
       <section className="page-section">
         <div className="section-heading">
@@ -150,8 +156,11 @@ export default function ComparePage() {
         </div>
         <p className="section-note">
           {vi
-            ? "Cả hai giữ hạn mức ngày trong lượt chạy này. Sealed tính cả khoản trong pool vào ngân sách và từ chối khoản vượt hạn mức ngay khi nhận. O+ không nằm trong phép thử này."
-            : "Both stayed within the daily cap in this run. Sealed counts pooled payments toward the budget and refuses excess payments on arrival. O+ was not included in this experiment."}
+            ? "Cả hai giữ hạn mức ngày trong lượt chạy này. Sealed tính cả khoản trong pool vào ngân sách và từ chối khoản vượt hạn mức ngay khi nhận. O+ được đo riêng ngày 20/11 và cho cùng kết quả như O (2 settle, 18 revert)."
+            : "Both stayed within the daily cap in this run. Sealed counts pooled payments toward the budget and refuses excess payments on arrival. O+ was measured separately on 20/11 with the same result as O (2 settled, 18 reverted)."}{" "}
+          <a className="text-link" href={OPLUS_BURST}>
+            docs/MEASUREMENTS.md ↗
+          </a>
         </p>
       </section>
       <section className="scripted-panel">

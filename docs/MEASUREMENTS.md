@@ -84,7 +84,7 @@ Command: `SEALED_RULE_V2_AT=0 bash scripts/localnet.sh up` (a new network with r
 
 | Case | What was sent | Result | Verdict |
 |---|---|---|---|
-| a. 00:00 UTC boundary | payments up to dailyCap just before and just after 00:00 UTC | not sent: see below | NOT RUN |
+| a. 00:00 UTC boundary | 0.99 four times just before 00:00 UTC, then four times again in the first blocks after it (separate run, see below) | before: 3 included on day 20777, the 4th refused `agent: budget exceeded` (spentToday 2.970084 + 0.99 above 3); after: 3 included on day 20778, the 4th refused the same way | PASS |
 | b1. high tip | type 2, tip 10 gwei | refused: `agent: tip too high: 10000000000 above 1000000000` | PASS |
 | b2. high gas price | legacy, gas price 10 gwei above the base fee | refused: `agent: tip too high` | PASS |
 | b3. fee cap above the daily fee cap | tip 1 gwei, maximum fee 0.2 (21000 × fee cap) | refused: `agent: fee budget exceeded: fees today 0 + fee 199999999999989000 above dailyFeeCap 150000000000000000` | PASS |
@@ -95,11 +95,11 @@ Command: `SEALED_RULE_V2_AT=0 bash scripts/localnet.sh up` (a new network with r
 | e. control: not a registered agent | an allowed sender that is not an agent: 10 coins to a stranger, tip 10 gwei, 64 bytes of data, gas 60000, an access list | included; the stranger received 10 | PASS |
 | invariant | every agent of the run | balance ≥ funded − totalCharged for all 7 agents | PASS |
 
-Result: 9 PASS, 0 FAIL, 1 NOT RUN.
+Result: 10 PASS, 0 FAIL (case a from the second run below; b to e and the invariant gave the same results in both runs).
 
 - b5 shows what a high fee cap costs an agent under v2: the tip is capped at 1 gwei, so the fee paid is base fee plus at most 1 gwei per gas; the maximum fee (gas limit × fee cap) is what counts toward perTxCap, dailyCap and the daily fee cap, so a high fee cap uses up budget without being paid.
 - c: in these 5 trials the freeze and the payment arrived in the pool together and the freeze, with the higher tip, went first; the payment was then refused by the rule at block building and dropped. A payment that is already in a block before the freeze lands is not undone; this case does not cover that.
-- **a. NOT RUN.** The day index is the block timestamp divided by 86400, and the block timestamp comes from the nodes' clock. The clock is not changed for a test, so the case needs a real wait until 00:00 UTC; at the run the next boundary was 57441 s (about 16 h) away. `pnpm --filter attacks edge --utc-boundary` waits for it when it is at most 15 minutes away (`EDGE_UTC_MAX_WAIT`), spends 0.99 three times and a fourth time before and again after the boundary, and checks the block days.
+- **a. 00:00 UTC boundary.** The day index is the block timestamp divided by 86400, and the block timestamp comes from the nodes' clock, which is not changed for a test, so the case needs a real wait. It was NOT RUN in the first run (the boundary was 16 h away) and was run on 21/11/2026: `pnpm --filter attacks edge --utc-boundary`, a new local network (`SEALED_RULE_V2_AT=0`, node image built from `81657bc`, one node in Docker on Windows 11), started 23:49:51 UTC on 20/11, revision `f94cd45` of `main` plus a fix to the script (it read the time of the genesis block on a new network; it now builds a block first). The script waited until 45 s before 00:00 UTC, spent 0.99 four times, waited for a block on the next day and spent 0.99 four times again. Within each day the spend counter reached 2.97, the fourth payment was refused, and the counter started again on the new day. Raw file: [`services/attacks/results/edge-2026-11-20T23-49-51-236Z.json`](../services/attacks/results/edge-2026-11-20T23-49-51-236Z.json).
 
 ## Scripted adaptive attacker (local Sealed L1, rule v2)
 
@@ -140,7 +140,7 @@ Command: `pnpm --filter attacks compare setup` (deploys, once, a CapWalletOPlus 
 | Injected transfer (0.4 to the attacker address) | not measured (no payee list) | refused before settlement: `isValidSignature` false, the settlement simulation reverted `FiatTokenV2: invalid signature` | refused by the node (`agent: payee not allowed`) |
 | 20 × 0.4 at once | 20/20 passed verify; 2 settled, 18 reverted in blocks; spent 0.8 | 20/20 passed verify; 2 settled, 18 reverted in blocks; spent 0.8; reverted transactions burned 0.000000000216 AVAX of facilitator gas | refused payments never enter a block |
 
-O+ gives the same counts as O in the burst (20 passed verify, 2 settled, 18 reverted, 0.8 spent); the gas burned by the reverted transactions was recorded for O+ only, so the two cannot be compared on it. The payee list adds nothing when every payment goes to the listed seller, and the daily cap is enforced only when each settlement runs, after all twenty passed the facilitator's check. After the run the 0.5 left in the wallet went back to the project wallet (owner `withdraw`); the 0.8 paid went to the team-held seller address. This O+ result is not merged into `web/src/compare-result.json`, so the `/compare` page still shows P, O and S.
+O+ gives the same counts as O in the burst (20 passed verify, 2 settled, 18 reverted, 0.8 spent); the gas burned by the reverted transactions was recorded for O+ only, so the two cannot be compared on it. The payee list adds nothing when every payment goes to the listed seller, and the daily cap is enforced only when each settlement runs, after all twenty passed the facilitator's check. After the run the 0.5 left in the wallet went back to the project wallet (owner `withdraw`); the 0.8 paid went to the team-held seller address. This O+ result is not merged into `web/src/compare-result.json`: the `/compare` page charts P, O and S and states the O+ result in text, with a link to this section.
 
 ## Cost of the four runs above
 

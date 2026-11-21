@@ -7,7 +7,7 @@ const en = {
     intro:
       "The open challenge agent, read from the public RPC and gateway. Gateway acceptance is not block inclusion.",
     lanes: ["AGENT KEY", "TXPOOL", "BLOCK", "PAYEE"],
-    publicKey: "Published challenge key",
+    publicKey: "Challenge agent address",
     gateway: "Gateway · off-chain records",
     rpc: "Public RPC · chain state",
     latestBlock: "Latest block",
@@ -51,7 +51,7 @@ const en = {
   legend: "Filled ×: coins left outside the mandate. Open circle: no T0 recorded.",
   tie: "A contract wallet with a payee list (O+) matches Sealed on T0.",
   t1Note:
-    "Sealed does not stop T1. A permitted payment may still be unwanted. Fees count toward its cap; the lower T1 count is not evidence of better protection against deception.",
+    "Sealed does not stop unwanted payments inside the mandate (T1). A permitted payment may still be unwanted. Fees count toward its cap; the lower T1 count is not evidence of better protection against deception.",
   baselineNote:
     "Wallet baselines are written by the team for this comparison; they do not represent audited wallet products.",
   leaked: "When the key is already exposed",
@@ -60,8 +60,9 @@ const en = {
   followed: "runs followed the note",
   refused: "payments to the attacker refused",
   memoryNote:
-    "One model, local Sealed L1. The task asked the agent to read its notes. Sealed limits where the payment can go; the agent can still be tricked.",
-  pages: "Separate injected-page runs followed (two models, local network)",
+    "One model, local Sealed L1. The task asked the agent to read its notes. Sealed limits where the payment can go; the agent can still be tricked. On the Fuji C-Chain the limit wallet with a payee list (O+) also refused every tip to the attacker: 15/15 in a replay of these runs and 13/13 in live runs (docs/MEASUREMENTS.md).",
+  pages:
+    "Agents that obeyed an injected web page: {followed} of {runs} runs (two models, local network).",
   liveLoad: "Try a real payment",
   liveHint: "Opens the public-key transaction controls. Test assets only.",
   receipt: "A spending key. A defined boundary.",
@@ -115,6 +116,7 @@ const en = {
     "If this key leaks: up to {cap} USDC per UTC day, fees included, to the allowed payees ({payees}), until you freeze it or {expiry}.",
   pendingMandate:
     "Once your agent is linked, set its payees, limits and expiry here. Then try an allowed and a refused payment.",
+  pendingPayee: "Set a mandate in step 4 to enable the allowed-payee button.",
   ownKeyHint:
     "Using your own agent? Send a payment with your own client. These test buttons become available when this browser holds a demo agent key.",
   privateDemo: "Inspect the demo private key",
@@ -151,7 +153,7 @@ const vi: typeof en = {
     intro:
       "Agent của thử thách mở, đọc từ RPC và gateway công khai. Được gateway tiếp nhận không có nghĩa là đã vào block.",
     lanes: ["KHOÁ AGENT", "TXPOOL", "BLOCK", "NGƯỜI NHẬN"],
-    publicKey: "Khoá thử thách đã công bố",
+    publicKey: "Địa chỉ agent thử thách",
     gateway: "Gateway · bản ghi ngoài chain",
     rpc: "RPC công khai · trạng thái chain",
     latestBlock: "Block mới nhất",
@@ -195,7 +197,7 @@ const vi: typeof en = {
   legend: "Dấu × đặc: coin ra ngoài uỷ quyền. Vòng tròn rỗng: chưa ghi nhận T0.",
   tie: "Ví hợp đồng có danh sách người nhận (O+) ngang Sealed về T0.",
   t1Note:
-    "Sealed không ngăn T1. Khoản trả được phép vẫn có thể trái ý chủ sở hữu. Phí tính vào hạn mức; số T1 thấp hơn không chứng minh khả năng chống lừa tốt hơn.",
+    "Sealed không ngăn khoản trả không mong muốn nằm trong uỷ quyền (T1). Khoản trả được phép vẫn có thể trái ý chủ sở hữu. Phí tính vào hạn mức; số T1 thấp hơn không chứng minh khả năng chống lừa tốt hơn.",
   baselineNote:
     "Các ví đối chứng do đội viết cho phép so sánh này, không đại diện cho sản phẩm ví đã được kiểm toán.",
   leaked: "Khi private key đã bị lộ",
@@ -204,8 +206,8 @@ const vi: typeof en = {
   followed: "lượt làm theo ghi chú",
   refused: "khoản trả cho kẻ tấn công bị từ chối",
   memoryNote:
-    "Một model, Sealed L1 cục bộ. Tác vụ yêu cầu agent đọc ghi chú. Sealed giới hạn nơi khoản trả có thể đến; agent vẫn có thể bị lừa.",
-  pages: "Lượt làm theo trang chèn lệnh trong phép thử riêng (hai model, mạng cục bộ)",
+    "Một model, Sealed L1 cục bộ. Tác vụ yêu cầu agent đọc ghi chú. Sealed giới hạn nơi khoản trả có thể đến; agent vẫn có thể bị lừa. Trên Fuji C-Chain, ví hạn mức có danh sách người nhận (O+) cũng từ chối mọi khoản tip cho kẻ tấn công: 15/15 khi chạy lại các lượt này và 13/13 ở các lượt chạy thật (docs/MEASUREMENTS.md).",
+  pages: "Agent làm theo trang web cài lệnh: {followed} trên {runs} lượt (hai model, mạng cục bộ).",
   liveLoad: "Thử giao dịch thật",
   liveHint: "Mở các nút gửi giao dịch bằng private key đã công bố. Chỉ dùng tài sản thử.",
   receipt: "Một khoá chi tiêu. Giới hạn rõ ràng.",
@@ -259,6 +261,7 @@ const vi: typeof en = {
     "Nếu khoá này bị lộ: tối đa {cap} USDC mỗi ngày UTC, đã gồm phí, cho {payees} người nhận được phép, đến khi bạn đóng băng hoặc tới {expiry}.",
   pendingMandate:
     "Sau khi liên kết agent, đặt người nhận, hạn mức và thời hạn tại đây. Sau đó thử khoản trả được phép và khoản bị từ chối.",
+  pendingPayee: "Đặt uỷ quyền ở bước 4 để bật nút trả cho người nhận được phép.",
   ownKeyHint:
     "Bạn dùng agent riêng? Hãy gửi khoản trả bằng client của bạn. Các nút thử ở đây dùng khi trình duyệt giữ private key của agent demo.",
   privateDemo: "Xem private key của agent demo",

@@ -61,6 +61,10 @@ const en = [
     "The bridge relayer needs a filter",
     "The ICM relayer cannot decode the Sealed precompile entries in the chain config. On Fuji it reads the node through an operator-run proxy that removes those entries from that one answer. Warp settings and messages are unchanged; the destination still checks Warp signatures.",
   ],
+  [
+    "The pool can briefly admit an unbuildable payment",
+    "Close to a mandate’s expiry, or when two pooled payments together go over the daily fee cap, the pool can accept a payment that the block check then refuses. It is never confirmed and no coin moves, but it can show as pending. The fix belongs in the pool and is not done yet.",
+  ],
 ];
 
 const vi: typeof en = [
@@ -124,6 +128,30 @@ const vi: typeof en = [
     "Relayer cầu nối cần bộ lọc",
     "Relayer ICM không giải mã được các mục precompile riêng của Sealed trong cấu hình chain. Trên Fuji nó đọc node qua một proxy do bên vận hành chạy, proxy bỏ các mục đó khỏi đúng câu trả lời này. Cấu hình Warp và thông điệp giữ nguyên; chain đích vẫn kiểm chữ ký Warp.",
   ],
+  [
+    "Pool có thể tạm nhận khoản không vào block",
+    "Sát lúc uỷ quyền hết hạn, hoặc khi hai khoản trong pool cộng lại vượt hạn mức phí ngày, pool có thể nhận một khoản mà phép kiểm block sau đó từ chối. Khoản đó không bao giờ được xác nhận và không có coin nào chuyển, nhưng có thể hiện là đang chờ. Cách sửa nằm ở pool và chưa làm.",
+  ],
 ];
 
 export const limitationsText = (lang: Lang) => (lang === "vi" ? vi : en);
+
+/** The file a reader can check each limitation against, in the same order (links on /arena/rules). */
+export const limitationSources = [
+  "README.md#security-model-and-limitations",
+  "chain/patches/0002-agentpolicy-precompile.patch",
+  "chain/patches/0003-agent-rule.patch",
+  "chain/patches/0003-agent-rule.patch",
+  "services/attacks/suite/results/leaked-key-fuji.json",
+  "chain/patches/0003-agent-rule.patch",
+  "contracts/src/ArenaRecorder.sol",
+  "contracts/src/ReputationReceiver.sol",
+  "services/facilitator/src/scheme.ts",
+  "packages/shared/src/agentPolicy.ts",
+  "chain/patches/0002-agentpolicy-precompile.patch",
+  "chain/patches/0003-agent-rule.patch",
+  "services/relayer/src/chain.ts",
+  "chain/patches/0003-agent-rule.patch",
+  "services/fuji-ops/src/chain-config-proxy.ts",
+  "chain/patches/0003-agent-rule.patch",
+];

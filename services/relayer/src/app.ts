@@ -82,6 +82,10 @@ export type RelayerOptions = {
   arenaRecorder?: Address;
   /** Minimum time between two sends of the same arena action for the same agent (default 60 s). */
   arenaCooldownMs?: number;
+  /** Minimum time between two owner actions (/relay, except freezes) for the same agent (default 15 s). */
+  agentGapMs?: number;
+  /** Owner actions (/relay, except freezes) per agent in any hour (default 20). */
+  agentPerHour?: number;
   /** Clock, for tests. */
   now?: () => number;
   /** Allowed browser origins (CORS). Default: any. */
@@ -91,7 +95,10 @@ export type RelayerOptions = {
     issuer: DemoIssuer;
     /** Coins given to each demo agent (default 0.05). */
     funding?: bigint;
-    /** Agents per client address: one per this many ms (default 10 minutes). */
+    /**
+     * Agents per client address: one per this many ms (default 10 minutes). Only claims whose
+     * register transaction was sent count.
+     */
     perClientMs?: number;
     /** Agents per UTC day in total (default 40). */
     perDay?: number;
@@ -109,6 +116,9 @@ export function revertReason(e: unknown): string {
   );
 }
 
+/** Whole seconds until `ms` milliseconds have passed, at least 1. */
+const seconds = (ms: number) => Math.max(1, Math.ceil(ms / 1000));
+
 /**
  * Relayer for owner actions on AgentPolicy (docs/ARCHITECTURE.md 3.2, 7). It pays the gas and sends;
  * it cannot forge an action, because the precompile checks the owner's passkey proof. It holds only
@@ -121,6 +131,11 @@ export function createRelayerApp(o: RelayerOptions) {
   /** Last send per `${action}:${agent}`. */
   const lastSent = new Map<string, number>();
   const hits = new Map<string, number[]>();
+  const HOUR = 3_600_000;
+  const agentGap = o.agentGapMs ?? 15_000;
+  const agentPerHour = o.agentPerHour ?? 20;
+  /** Owner actions sent (or in flight) in the last hour, per agent (lower case). */
+  const agentSends = new Map<string, number[]>();
   // One send at a time from the relayer's key: two sends in flight together would pick the same
   // nonce (an owner's freeze and an arena checkpoint can arrive at once). A failed send does not
   // stop the queue.
@@ -180,6 +195,7 @@ export function createRelayerApp(o: RelayerOptions) {
     }
     if (!RELAYED.has(name))
       return c.json({ ok: false, error: "function_not_allowed", function: name }, 400);
+
     // A public relayer pays gas for anyone; registering throwaway agents would drain it.
     // Only agents the admin already allowed to send are registered.
     if (name === "register" && !(await o.chain.canSend(args?.[0] as Address).catch(() => false))) {
@@ -191,6 +207,41 @@ export function createRelayerApp(o: RelayerOptions) {
     } catch (e) {
       return c.json({ ok: false, error: "reverted", function: name, reason: revertReason(e) }, 422);
     }
+
+    // Every owner action names its agent first. One owner of one agent could otherwise loop
+    // setMandateV2 or unfreeze and spend the relayer's gas for everyone, so each agent gets a few
+    // sends per hour, whoever asks. Freezing (the owner's or, in rule v3, the guardian's) is
+    // never limited: it is the stop button.
+    // The slot is checked and taken only after the simulation passed (so a request with a junk
+    // proof never holds one), with no await in between (so two requests cannot both pass), and
+    // given back if the send fails.
+    let release = () => {};
+    if (name !== "freeze" && name !== "guardianFreeze") {
+      const key = String(args?.[0]).toLowerCase();
+      const at = clock();
+      const sends = (agentSends.get(key) ?? []).filter((s) => at - s < HOUR);
+      const latest = sends[sends.length - 1];
+      const oldest = sends[0];
+      const wait =
+        latest !== undefined && at - latest < agentGap
+          ? agentGap - (at - latest)
+          : oldest !== undefined && sends.length >= agentPerHour
+            ? HOUR - (at - oldest)
+            : 0;
+      if (wait > 0) {
+        c.header("Retry-After", String(seconds(wait)));
+        return c.json({ ok: false, error: "agent_rate_limited", retryAfter: seconds(wait) }, 429);
+      }
+      sends.push(at);
+      agentSends.set(key, sends);
+      release = () => {
+        const list = agentSends.get(key);
+        const i = list?.lastIndexOf(at) ?? -1;
+        if (list && i >= 0) list.splice(i, 1);
+        if (list?.length === 0) agentSends.delete(key);
+      };
+    }
+
     try {
       const r = await send(data);
       if (r.status !== "success") {
@@ -201,6 +252,7 @@ export function createRelayerApp(o: RelayerOptions) {
       }
       return c.json({ ok: true, function: name, ...r });
     } catch (e) {
+      release();
       return c.json(
         { ok: false, error: "send_failed", function: name, reason: revertReason(e) },
         502,
@@ -268,6 +320,7 @@ export function createRelayerApp(o: RelayerOptions) {
   // an enabled key without an owner-bound policy must never exist. No private key crosses this API.
   const demoLast = new Map<string, number>();
   const demoDays = new Map<number, number>();
+  const DAY = 86_400_000;
   app.post("/demo/claim", async (c) => {
     const demo = o.demo;
     if (!demo) return c.json({ ok: false, error: "no_demo" }, 404);
@@ -289,19 +342,40 @@ export function createRelayerApp(o: RelayerOptions) {
 
     const ip = client(c);
     const now = clock();
-    const day = Math.floor(now / 86_400_000);
+    const day = Math.floor(now / DAY);
+    const window = demo.perClientMs ?? 10 * 60_000;
     const last = demoLast.get(ip);
-    if (last !== undefined && now - last < (demo.perClientMs ?? 10 * 60_000))
-      return c.json({ ok: false, error: "rate_limited" }, 429);
-    if ((demoDays.get(day) ?? 0) >= (demo.perDay ?? 40))
-      return c.json({ ok: false, error: "demo_cap" }, 429);
+    if (last !== undefined && now - last < window) {
+      const retryAfter = seconds(window - (now - last));
+      c.header("Retry-After", String(retryAfter));
+      return c.json({ ok: false, error: "demo_rate_limited", retryAfter, windowMs: window }, 429);
+    }
+    if ((demoDays.get(day) ?? 0) >= (demo.perDay ?? 40)) {
+      const retryAfter = seconds((day + 1) * DAY - now);
+      c.header("Retry-After", String(retryAfter));
+      return c.json({ ok: false, error: "demo_cap", retryAfter }, 429);
+    }
+    // Both counters are taken before any await, so two claims arriving together cannot both
+    // pass. They are given back on every path where no register transaction was sent: a bad
+    // signature or a failing node must not use up a visitor's slot or the day's agents.
+    const previous = last;
     demoLast.set(ip, now);
     demoDays.set(day, (demoDays.get(day) ?? 0) + 1);
+    const release = () => {
+      if (demoLast.get(ip) === now) {
+        if (previous === undefined) demoLast.delete(ip);
+        else demoLast.set(ip, previous);
+      }
+      const n = demoDays.get(day) ?? 0;
+      if (n > 1) demoDays.set(day, n - 1);
+      else demoDays.delete(day);
+    };
 
     let policy: { version: RuleVersion; ids: PolicyIds };
     try {
       policy = await o.chain.policy();
     } catch (e) {
+      release();
       return c.json(
         { ok: false, error: "send_failed", function: "register", reason: revertReason(e) },
         502,
@@ -312,15 +386,19 @@ export function createRelayerApp(o: RelayerOptions) {
         hash: registerDigestFor(policy.version, policy.ids, agent, x, y),
         signature: sig,
       });
-      if (signer.toLowerCase() !== agent.toLowerCase())
+      if (signer.toLowerCase() !== agent.toLowerCase()) {
+        release();
         return c.json({ ok: false, error: "signature_invalid" }, 400);
+      }
     } catch {
+      release();
       return c.json({ ok: false, error: "signature_invalid" }, 400);
     }
     const data = registerData(agent, x, y, sig);
     try {
       await o.chain.simulate(data);
     } catch (e) {
+      release();
       return c.json(
         { ok: false, error: "reverted", function: "register", reason: revertReason(e) },
         422,
@@ -329,6 +407,7 @@ export function createRelayerApp(o: RelayerOptions) {
     let register: Hex;
     try {
       const r = await send(data);
+      // From here a register transaction was sent and paid for: the claim keeps its slot.
       if (r.status !== "success")
         return c.json(
           { ok: false, error: "reverted", function: "register", transaction: r.transaction },
@@ -336,6 +415,7 @@ export function createRelayerApp(o: RelayerOptions) {
         );
       register = r.transaction;
     } catch (e) {
+      release();
       return c.json(
         { ok: false, error: "send_failed", function: "register", reason: revertReason(e) },
         502,
